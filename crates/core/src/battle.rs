@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 use crate::attack::Attack;
 use crate::monster::Monster;
@@ -78,7 +79,7 @@ pub enum BattlePhase {
 }
 
 /// Style visuel d'un message de combat.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageStyle {
     Normal,
     PlayerAttack,
@@ -94,7 +95,7 @@ pub enum MessageStyle {
 }
 
 /// Message affiché pendant le combat.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BattleMessage {
     pub text: String,
     pub style: MessageStyle,
@@ -107,7 +108,7 @@ pub struct BattleMessage {
 }
 
 /// Type d'animation en cours.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AnimationType {
     PlayerAttack,
     OpponentAttack,
@@ -712,6 +713,117 @@ impl BattleState {
                     Some(self.opponent.current_hp),
                 );
             }
+        }
+    }
+
+    // ── API PvP (combat serveur-arbitré) ────────────────────────────
+
+    /// Résout un tour PvP où les deux joueurs fournissent leur choix d'attaque.
+    /// Les messages sont empilés dans `message_queue` mais `advance_message()` n'est PAS appelé.
+    pub fn pvp_attack(&mut self, player_attack_index: usize, opponent_attack_index: usize) {
+        if self.phase != BattlePhase::PlayerChooseAttack {
+            return;
+        }
+        if player_attack_index >= self.player.attacks.len() {
+            return;
+        }
+        if opponent_attack_index >= self.opponent.attacks.len() {
+            return;
+        }
+
+        let mut rng = rand::thread_rng();
+
+        // Détermine l'ordre d'attaque (vitesse)
+        let player_first = if self.player.speed_stat == self.opponent.speed_stat {
+            rng.gen_bool(0.5)
+        } else {
+            self.player.speed_stat > self.opponent.speed_stat
+        };
+
+        self.queue_msg(&format!("── Tour {} ──", self.turn), MessageStyle::Info);
+
+        if player_first {
+            self.execute_attack(true, player_attack_index, &mut rng);
+            if self.opponent.current_hp > 0 {
+                self.execute_attack(false, opponent_attack_index, &mut rng);
+            }
+        } else {
+            self.execute_attack(false, opponent_attack_index, &mut rng);
+            if self.player.current_hp > 0 {
+                self.execute_attack(true, player_attack_index, &mut rng);
+            }
+        }
+
+        // Effets de fin de tour
+        self.apply_end_of_turn_effects();
+
+        // Vérifier fin de combat
+        if self.player.current_hp == 0 {
+            self.loser_died = true;
+            self.phase = BattlePhase::Defeat;
+            self.queue_end_messages(false);
+        } else if self.opponent.current_hp == 0 {
+            self.xp_gained = 50 + (self.opponent.level * 5);
+            self.phase = BattlePhase::Victory;
+            self.queue_end_messages(true);
+        } else {
+            self.turn += 1;
+            self.phase = BattlePhase::PlayerChooseAttack;
+        }
+
+        // NOTE : on ne call PAS advance_message() — le serveur draine les messages.
+    }
+
+    /// Draine tous les messages en attente (pour envoi réseau).
+    pub fn drain_messages(&mut self) -> Vec<BattleMessage> {
+        self.message_queue.drain(..).collect()
+    }
+
+    /// Pousse des messages reçus du serveur dans la file.
+    pub fn push_messages(&mut self, messages: Vec<BattleMessage>) {
+        for msg in messages {
+            self.full_log.push(msg.text.clone());
+            self.message_queue.push_back(msg);
+        }
+    }
+}
+
+// ── Méthodes de permutation de perspective (PvP) ────────────────────
+
+impl MessageStyle {
+    /// Inverse la perspective joueur ↔ adversaire.
+    pub fn flip(&self) -> Self {
+        match self {
+            Self::PlayerAttack => Self::OpponentAttack,
+            Self::OpponentAttack => Self::PlayerAttack,
+            Self::Victory => Self::Defeat,
+            Self::Defeat => Self::Victory,
+            other => other.clone(),
+        }
+    }
+}
+
+impl AnimationType {
+    /// Inverse la perspective joueur ↔ adversaire.
+    pub fn flip(&self) -> Self {
+        match self {
+            Self::PlayerAttack => Self::OpponentAttack,
+            Self::OpponentAttack => Self::PlayerAttack,
+            Self::PlayerHit => Self::OpponentHit,
+            Self::OpponentHit => Self::PlayerHit,
+        }
+    }
+}
+
+impl BattleMessage {
+    /// Retourne une copie du message avec la perspective inversée (pour l'autre joueur).
+    pub fn flip_perspective(&self) -> Self {
+        BattleMessage {
+            text: self.text.clone(),
+            style: self.style.flip(),
+            player_hp: self.opponent_hp,
+            opponent_hp: self.player_hp,
+            anim_type: self.anim_type.as_ref().map(|a| a.flip()),
         }
     }
 }

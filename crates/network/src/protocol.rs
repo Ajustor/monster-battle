@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use monster_battle_core::Monster;
+use monster_battle_core::battle::BattleMessage;
 
 /// Type d'action multijoueur.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -23,6 +24,8 @@ pub enum NetMessage {
     },
     /// Quitter la file d'attente.
     CancelQueue,
+    /// Choix d'attaque du joueur (PvP interactif).
+    PvpAttackChoice { attack_index: usize },
 
     // ── Serveur → Client ────────────────────────────
     /// Confirmation de mise en file d'attente.
@@ -38,8 +41,25 @@ pub enum NetMessage {
         /// Monstre du joueur mis à jour après combat.
         updated_monster: Monster,
     },
-    /// Monstre de l'adversaire PvP (envoyé à chaque joueur pour un combat interactif local).
+    /// Monstre de l'adversaire PvP (envoyé à chaque joueur pour affichage).
     CombatOpponent { opponent_monster: Monster },
+    /// Résultat d'un tour PvP (messages + état).
+    PvpTurnResult {
+        /// Messages de combat à afficher.
+        messages: Vec<BattleMessage>,
+        /// PV actuels du joueur (de la perspective du destinataire).
+        player_hp: u32,
+        /// PV actuels de l'adversaire (de la perspective du destinataire).
+        opponent_hp: u32,
+        /// Le combat est-il terminé ?
+        battle_over: bool,
+        /// Le destinataire a-t-il gagné ? (pertinent si `battle_over`).
+        victory: bool,
+        /// XP gagné (pertinent si `battle_over` et `victory`).
+        xp_gained: u32,
+        /// Le perdant est-il mort ? (pertinent si `battle_over`).
+        loser_died: bool,
+    },
     /// Données du monstre partenaire (reproduction — envoyé à chaque joueur).
     BreedingPartner { partner_monster: Monster },
 

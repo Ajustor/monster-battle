@@ -67,7 +67,7 @@ Serveur relais centralisé (binaire séparé) :
 - Détection automatique HTTP vs protocole de jeu sur le même port
 - `GET /health` → `{"status":"online"}`
 - Matchmaking automatique : les joueurs sont mis en file et appairés dès que 2 sont prêts
-- Le combat est exécuté côté serveur pour éviter la triche
+- Le combat PvP est **arbitré tour par tour** côté serveur pour éviter la triche
 - La reproduction échange les monstres entre joueurs via le serveur
 
 ## 🚀 Lancer le jeu
@@ -123,6 +123,25 @@ Variables d'environnement optionnelles :
   - Choisis tes attaques tour par tour
   - Les types comptent : exploite les faiblesses adverses !
   - Le vainqueur gagne de l'XP et un `win` — le perdant risque la **mort**
+
+Le combat PvP est **arbitré par le serveur** — les deux joueurs interagissent en temps réel :
+
+```
+Joueur A                    Serveur                     Joueur B
+   │                           │                            │
+   ├── Queue ──────────────────►                            │
+   │                           ◄── Queue ──────────────────┤
+   ◄── Matched ────────────────┤── Matched ────────────────►
+   ◄── CombatOpponent ─────────┤── CombatOpponent ─────────►
+   │                           │                            │
+   │       ┌── Boucle tour par tour ──┐                     │
+   │       │                          │                     │
+   ├── PvpAttackChoice ────────►      │  ◄── PvpAttackChoice ┤
+   │       │   (attend les 2 choix)   │                     │
+   ◄── PvpTurnResult ─────────┤── PvpTurnResult ──────────►
+   │       │                          │                     │
+   │       └── (répète jusqu'à K.O.) ─┘                     │
+```
 
 ### Reproduction
 
