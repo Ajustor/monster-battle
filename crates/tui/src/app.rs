@@ -1139,11 +1139,7 @@ impl App {
         let (tx, rx) = mpsc::channel();
         self.status_rx = Some(rx);
 
-        let health_port: u16 = std::env::var("HEALTH_PORT")
-            .unwrap_or_else(|_| "8080".to_string())
-            .parse()
-            .unwrap_or(8080);
-        let health_addr = format_server_addr(&self.server_address, health_port);
+        let health_addr = format_server_addr(&self.server_address, 7878);
 
         self.tokio_rt.spawn(async move {
             loop {

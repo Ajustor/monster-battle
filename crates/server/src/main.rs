@@ -37,34 +37,18 @@ impl ServerState {
     }
 }
 
-/// Mini serveur HTTP qui répond 200 OK sur toute requête (health check).
-async fn run_health_server(addr: String) {
-    let listener = match TcpListener::bind(&addr).await {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!(
-                "⚠️  Impossible de démarrer le health check sur {} : {}",
-                addr, e
-            );
-            return;
-        }
-    };
-
-    loop {
-        if let Ok((mut socket, _)) = listener.accept().await {
-            tokio::spawn(async move {
-                let mut buf = [0u8; 1024];
-                let _ = socket.read(&mut buf).await;
-                let body = r#"{"status":"online"}"#;
-                let response = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{}",
-                    body.len(),
-                    body
-                );
-                let _ = socket.write_all(response.as_bytes()).await;
-            });
-        }
-    }
+/// Répond à une requête HTTP avec le status de santé.
+async fn handle_http(mut stream: TcpStream) {
+    // Lire le reste de la requête HTTP (on a déjà peek les 4 premiers octets)
+    let mut buf = [0u8; 1024];
+    let _ = stream.read(&mut buf).await;
+    let body = r#"{"status":"online"}"#;
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    let _ = stream.write_all(response.as_bytes()).await;
 }
 
 #[tokio::main]
@@ -72,13 +56,9 @@ async fn main() -> anyhow::Result<()> {
     let port = std::env::var("PORT").unwrap_or_else(|_| "7878".to_string());
     let addr = format!("0.0.0.0:{}", port);
 
-    // Route HTTP /health pour vérifier que le serveur est up
-    let health_addr = format!("0.0.0.0:{}", port);
-    tokio::spawn(run_health_server(health_addr));
-
     let listener = TcpListener::bind(&addr).await?;
     println!("🎮 Serveur Monster Battle démarré sur {}", addr);
-    println!("🩺 Route santé HTTP sur le port {}", port);
+    println!("🩺 Route santé HTTP sur le même port");
     println!("   En attente de connexions...");
 
     let state = Arc::new(Mutex::new(ServerState::new()));
@@ -86,8 +66,22 @@ async fn main() -> anyhow::Result<()> {
     loop {
         let (socket, peer_addr) = listener.accept().await?;
         let peer = peer_addr.to_string();
-        println!("📡 Connexion entrante : {}", peer);
 
+        // Peek les premiers octets pour distinguer HTTP du protocole de jeu.
+        // HTTP commence par "GET " (0x47 0x45 0x54 0x20),
+        // le protocole de jeu commence par 4 octets de longueur (u32 BE).
+        let mut peek_buf = [0u8; 4];
+        let is_http = match socket.peek(&mut peek_buf).await {
+            Ok(n) if n >= 3 => peek_buf.starts_with(b"GET") || peek_buf.starts_with(b"HEA"),
+            _ => false,
+        };
+
+        if is_http {
+            tokio::spawn(handle_http(socket));
+            continue;
+        }
+
+        println!("📡 Connexion entrante : {}", peer);
         let state = Arc::clone(&state);
         tokio::spawn(async move {
             if let Err(e) = handle_client(socket, &peer, state).await {

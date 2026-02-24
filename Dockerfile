@@ -27,9 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY --from=builder /app/target/release/monster-battle-server /usr/local/bin/monster-battle-server
 
 ENV PORT=7878
-ENV HEALTH_PORT=8080
 
 EXPOSE 7878
-EXPOSE 8080
 
 CMD ["monster-battle-server"]
