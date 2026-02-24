@@ -2,11 +2,9 @@ use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
-    text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
-use super::common::draw_placeholder;
 use crate::app::App;
 
 /// Sous-écrans du combat PvP.
@@ -16,8 +14,6 @@ pub enum PvpPhase {
     Searching,
     /// Adversaire trouvé, combat en cours.
     Matched { opponent_name: String },
-    /// Résultat du combat PvP (log).
-    Result,
     /// Erreur réseau.
     Error(String),
 }
@@ -61,33 +57,6 @@ pub fn draw_matched(frame: &mut Frame, area: Rect, _app: &App, opponent_name: &s
         .block(
             Block::default()
                 .title(" Combat PvP ")
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Red)),
-        );
-
-    frame.render_widget(paragraph, area);
-}
-
-/// Dessine le résultat du combat PvP.
-pub fn draw_pvp_result(frame: &mut Frame, area: Rect, app: &App) {
-    let log_text = app
-        .pvp_log
-        .iter()
-        .map(|line| Line::from(Span::raw(line.clone())))
-        .collect::<Vec<_>>();
-
-    if log_text.is_empty() {
-        draw_placeholder(frame, area, "Aucun résultat...");
-        return;
-    }
-
-    let paragraph = Paragraph::new(log_text)
-        .wrap(Wrap { trim: true })
-        .scroll((app.scroll_offset as u16, 0))
-        .block(
-            Block::default()
-                .title(" Résultat du combat PvP ")
-                .title_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Red)),
         );

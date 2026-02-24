@@ -1,13 +1,13 @@
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
-use crate::app::App;
 use super::common::draw_placeholder;
+use crate::app::App;
 
 /// Sous-écrans de la reproduction.
 #[derive(Debug, Clone, PartialEq, Eq)]

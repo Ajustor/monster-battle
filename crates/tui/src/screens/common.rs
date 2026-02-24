@@ -39,13 +39,7 @@ pub fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
             Screen::NamingMonster { .. } => {
                 "Tapez le nom de votre monstre | Enter Valider | Esc Annuler".to_string()
             }
-            Screen::TrainingResult | Screen::CombatResult | Screen::BreedingResult => {
-                "↑↓ Défiler | Enter ou q pour revenir".to_string()
-            }
             Screen::Combat(phase) => match phase {
-                crate::screens::pvp::PvpPhase::Result => {
-                    "↑↓ Défiler | Enter ou q pour revenir".to_string()
-                }
                 crate::screens::pvp::PvpPhase::Error(_) => "Enter ou Esc pour revenir".to_string(),
                 _ => "Esc Annuler".to_string(),
             },

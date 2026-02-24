@@ -27,20 +27,12 @@ pub enum Screen {
         /// Index du type élémentaire choisi.
         type_index: usize,
     },
-    /// Détails d'un monstre spécifique.
-    MonsterDetail,
     /// Entraînement contre un bot (50% XP).
     Training,
-    /// Log de combat d'entraînement en cours.
-    TrainingResult,
     /// Interface de combat PvP.
     Combat(pvp::PvpPhase),
-    /// Résultat du combat PvP.
-    CombatResult,
     /// Interface de reproduction.
     Breeding(breeding::BreedPhase),
-    /// Résultat de la reproduction.
-    BreedingResult,
     /// Combat interactif style Pokémon.
     Battle,
     /// Cimetière (monstres morts).
@@ -70,16 +62,13 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Screen::Cemetery => cemetery::draw(frame, chunks[1], app),
         Screen::Battle => battle::draw(frame, chunks[1], app),
         Screen::Training => training::draw_select(frame, chunks[1], app),
-        Screen::TrainingResult => training::draw_result(frame, chunks[1], app),
         Screen::Combat(phase) => match phase {
             pvp::PvpPhase::Searching => pvp::draw_searching(frame, chunks[1], app),
             pvp::PvpPhase::Matched { opponent_name } => {
                 pvp::draw_matched(frame, chunks[1], app, opponent_name)
             }
-            pvp::PvpPhase::Result => pvp::draw_pvp_result(frame, chunks[1], app),
             pvp::PvpPhase::Error(e) => pvp::draw_error(frame, chunks[1], e),
         },
-        Screen::CombatResult => pvp::draw_pvp_result(frame, chunks[1], app),
         Screen::Breeding(phase) => match phase {
             breeding::BreedPhase::Searching => breeding::draw_searching(frame, chunks[1], app),
             breeding::BreedPhase::Matched { opponent_name } => {
@@ -89,8 +78,6 @@ pub fn draw(frame: &mut Frame, app: &App) {
             breeding::BreedPhase::Result => breeding::draw_breed_result(frame, chunks[1], app),
             breeding::BreedPhase::Error(e) => breeding::draw_error(frame, chunks[1], e),
         },
-        Screen::BreedingResult => breeding::draw_breed_result(frame, chunks[1], app),
-        _ => common::draw_placeholder(frame, chunks[1], "En construction..."),
     }
 
     common::draw_footer(frame, chunks[2], app);

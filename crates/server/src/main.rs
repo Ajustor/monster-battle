@@ -6,6 +6,7 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::WebSocketStream;
 
 use monster_battle_core::Monster;
+use monster_battle_core::battle::{BattlePhase, BattleState};
 use monster_battle_network::protocol::NetAction;
 use monster_battle_network::{NetMessage, read_message, write_message};
 
@@ -204,8 +205,9 @@ async fn try_match(
     Ok(())
 }
 
-/// Exécute un combat PvP entre deux joueurs jumelés.
-/// Envoie à chaque joueur le monstre de l'adversaire pour un combat interactif local.
+/// Exécute un combat PvP interactif entre deux joueurs jumelés.
+/// Le serveur arbitre : il attend les choix d'attaque des deux joueurs,
+/// résout chaque tour, et envoie les résultats aux deux.
 async fn run_combat(mut player_a: QueuedPlayer, mut player_b: QueuedPlayer) -> anyhow::Result<()> {
     // Informer les deux joueurs qu'ils sont jumelés
     write_message(
@@ -224,23 +226,119 @@ async fn run_combat(mut player_a: QueuedPlayer, mut player_b: QueuedPlayer) -> a
     )
     .await?;
 
-    // Envoyer à chaque joueur le monstre de l'autre pour combat interactif local
-    let opponent_for_a = NetMessage::CombatOpponent {
-        opponent_monster: player_b.monster.clone(),
-    };
-    let opponent_for_b = NetMessage::CombatOpponent {
-        opponent_monster: player_a.monster.clone(),
-    };
+    // Envoyer le monstre adverse à chaque joueur (pour l'affichage)
+    write_message(
+        &mut player_a.stream,
+        &NetMessage::CombatOpponent {
+            opponent_monster: player_b.monster.clone(),
+        },
+    )
+    .await?;
+    write_message(
+        &mut player_b.stream,
+        &NetMessage::CombatOpponent {
+            opponent_monster: player_a.monster.clone(),
+        },
+    )
+    .await?;
 
-    write_message(&mut player_a.stream, &opponent_for_a).await?;
-    write_message(&mut player_b.stream, &opponent_for_b).await?;
+    // Créer le BattleState côté serveur (player_a = "player", player_b = "opponent")
+    let mut battle = BattleState::new(&player_a.monster, &player_b.monster, false);
+
+    // Passer l'intro (les clients affichent l'intro localement)
+    while battle.phase == BattlePhase::Intro {
+        if !battle.advance_message() {
+            break;
+        }
+    }
+    // Drainer les messages d'intro (déjà affichés côté client)
+    battle.drain_messages();
+    battle.current_message = None;
 
     println!(
-        "⚔️  Monstres échangés pour combat interactif entre {} et {}",
+        "⚔️  Combat PvP interactif entre {} et {}",
         player_a.player_name, player_b.player_name
     );
 
+    // Boucle de combat tour par tour
+    loop {
+        // Attendre les choix d'attaque des deux joueurs en parallèle
+        let (choice_a, choice_b) = tokio::try_join!(
+            wait_for_attack_choice(&mut player_a.stream),
+            wait_for_attack_choice(&mut player_b.stream),
+        )?;
+
+        println!(
+            "   Tour {} : {} attaque #{}, {} attaque #{}",
+            battle.turn, player_a.player_name, choice_a, player_b.player_name, choice_b
+        );
+
+        // Résoudre le tour (player_a = player, player_b = opponent)
+        battle.pvp_attack(choice_a, choice_b);
+
+        // Collecter les messages générés
+        let messages = battle.drain_messages();
+
+        let battle_over = matches!(battle.phase, BattlePhase::Victory | BattlePhase::Defeat);
+        let player_a_wins = battle.phase == BattlePhase::Victory;
+
+        // Envoyer les messages à player_a (perspective directe)
+        let result_a = NetMessage::PvpTurnResult {
+            messages: messages.clone(),
+            player_hp: battle.player.current_hp,
+            opponent_hp: battle.opponent.current_hp,
+            battle_over,
+            victory: player_a_wins,
+            xp_gained: if player_a_wins { battle.xp_gained } else { 0 },
+            loser_died: battle.loser_died,
+        };
+
+        // Envoyer les messages à player_b (perspective inversée)
+        let flipped_messages: Vec<_> = messages.iter().map(|m| m.flip_perspective()).collect();
+        let result_b = NetMessage::PvpTurnResult {
+            messages: flipped_messages,
+            player_hp: battle.opponent.current_hp,
+            opponent_hp: battle.player.current_hp,
+            battle_over,
+            victory: !player_a_wins,
+            xp_gained: if !player_a_wins { battle.xp_gained } else { 0 },
+            loser_died: battle.loser_died,
+        };
+
+        write_message(&mut player_a.stream, &result_a).await?;
+        write_message(&mut player_b.stream, &result_b).await?;
+
+        if battle_over {
+            println!(
+                "⚔️  Combat terminé : {} a gagné !",
+                if player_a_wins {
+                    &player_a.player_name
+                } else {
+                    &player_b.player_name
+                },
+            );
+            break;
+        }
+    }
+
     Ok(())
+}
+
+/// Attend qu'un joueur envoie son choix d'attaque.
+async fn wait_for_attack_choice(ws: &mut WebSocketStream<TcpStream>) -> anyhow::Result<usize> {
+    loop {
+        let msg = read_message(ws).await?;
+        match msg {
+            NetMessage::PvpAttackChoice { attack_index } => return Ok(attack_index),
+            NetMessage::Ping => {
+                write_message(ws, &NetMessage::Pong).await?;
+            }
+            NetMessage::Disconnect => {
+                return Err(anyhow::anyhow!("Joueur déconnecté pendant le combat"));
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Exécute une reproduction entre deux joueurs jumelés.

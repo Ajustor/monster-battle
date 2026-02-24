@@ -1,0 +1,36 @@
+name: CI & Release
+
+on:
+  push:
+    branches: [master]
+    tags:
+      - 'v*' # Déclenche aussi sur les tags (ex: v1.0.0)
+  pull_request:
+    branches: [master]
+
+jobs:
+  # ── Détection de changement de version ──────────────────────
+  version-check:
+    uses: Ajustor/workflows/.github/workflows/cargo-version-detect.yml@master
+
+  # ── Release (uniquement si la version a changé OU si c'est un tag) ─────────────
+  release-server:
+    needs: version-check
+    if: needs.version-check.outputs.version_changed == 'true'
+    uses: Ajustor/workflows/.github/workflows/cargo-monorepo-release.yml@master
+    with:
+      targets: '["windows", "linux", "macos"]'
+      version: ${{ needs.version-check.outputs.new_version }}
+      package_name: monster-battle-server
+      package_path: crates/server
+
+  release-client:
+    needs: version-check
+    if: needs.version-check.outputs.version_changed == 'true'
+    uses: Ajustor/workflows/.github/workflows/cargo-monorepo-release.yml@master
+    with:
+      targets: '["windows", "linux", "macos"]'
+      version: ${{ needs.version-check.outputs.new_version }}
+      package_name: monster-battle-tui
+      package_path: crates/tui
+      deploy_pages: true

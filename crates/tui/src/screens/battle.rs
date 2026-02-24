@@ -11,6 +11,7 @@ use monster_battle_core::types::ElementType;
 
 use super::common::draw_placeholder;
 use crate::app::App;
+use crate::sprites;
 
 // ── Couleur par élément ─────────────────────────────────────────────
 
@@ -74,59 +75,14 @@ fn draw_battlefield(frame: &mut Frame, area: Rect, battle: &BattleState) {
 fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
     let opp = &battle.opponent;
 
-    // Colonnes : sprite (gauche) + info (droite)
+    // Colonnes : info (gauche) + sprite (droite)
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
         .split(area);
 
-    // ── Sprite adversaire ───────────────────────────────────────
-    let is_hit = matches!(battle.anim_type, Some(AnimationType::OpponentHit));
-    let is_dead = opp.display_hp == 0 && opp.current_hp == 0;
-    let sprite_color = if is_hit {
-        Color::Red
-    } else {
-        element_color(opp.element)
-    };
-
-    let sprite_lines = if is_dead {
-        // Monstre K.O. — sprite masqué
-        vec![
-            Line::from(""),
-            Line::from(""),
-            Line::from(Span::styled(
-                "      ···",
-                Style::default().fg(Color::DarkGray),
-            )),
-        ]
-    } else if is_hit && battle.anim_frame % 2 == 0 {
-        // Flash : sprite disparaît brièvement
-        vec![
-            Line::from(""),
-            Line::from(""),
-            Line::from(Span::styled("       💥", Style::default().fg(Color::Red))),
-        ]
-    } else {
-        vec![
-            Line::from(""),
-            Line::from(Span::styled(
-                "      ╔════╗",
-                Style::default().fg(sprite_color),
-            )),
-            Line::from(Span::styled(
-                format!("      ║ {} ║", opp.element.icon()),
-                Style::default().fg(sprite_color),
-            )),
-            Line::from(Span::styled(
-                "      ╚════╝",
-                Style::default().fg(sprite_color),
-            )),
-        ]
-    };
-    frame.render_widget(Paragraph::new(sprite_lines), cols[0]);
-
     // ── Info adversaire ─────────────────────────────────────────
-    let bar_width = (cols[1].width as usize).saturating_sub(8).min(20);
+    let bar_width = (cols[0].width as usize).saturating_sub(8).min(20);
     let hp_bar = hp_bar_spans(opp.display_hp, opp.max_hp, bar_width);
 
     let type_str = match opp.secondary_element {
@@ -160,20 +116,85 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray)),
     );
-    frame.render_widget(info, cols[1]);
+    frame.render_widget(info, cols[0]);
+
+    // ── Sprite adversaire ───────────────────────────────────────
+    let is_hit = matches!(battle.anim_type, Some(AnimationType::OpponentHit));
+    let is_dead = opp.current_hp == 0
+        && opp.display_hp == 0
+        && matches!(battle.phase, BattlePhase::Victory | BattlePhase::Defeat);
+    let sprite_color = if is_hit {
+        Color::Red
+    } else {
+        element_color(opp.element)
+    };
+
+    let sprite_lines = if is_dead {
+        vec![
+            Line::from(""),
+            Line::from(""),
+            Line::from(Span::styled(
+                "      ···",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ]
+    } else if is_hit && battle.anim_frame % 2 == 0 {
+        vec![
+            Line::from(""),
+            Line::from(""),
+            Line::from(Span::styled("       💥", Style::default().fg(Color::Red))),
+        ]
+    } else {
+        let art = sprites::get_sprite(opp.element, opp.secondary_element);
+        art.iter()
+            .map(|line| Line::from(Span::styled(*line, Style::default().fg(sprite_color))))
+            .collect()
+    };
+    frame.render_widget(Paragraph::new(sprite_lines), cols[1]);
 }
 
 fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
     let p = &battle.player;
 
-    // Colonnes : info (gauche) + sprite (droite)
+    // Colonnes : sprite (gauche) + info (droite)
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(area);
 
+    // ── Sprite joueur ───────────────────────────────────────────
+    let is_hit = matches!(battle.anim_type, Some(AnimationType::PlayerHit));
+    let is_dead = p.current_hp == 0
+        && p.display_hp == 0
+        && matches!(battle.phase, BattlePhase::Victory | BattlePhase::Defeat);
+    let sprite_color = if is_hit {
+        Color::Red
+    } else {
+        element_color(p.element)
+    };
+
+    let sprite_lines = if is_dead {
+        vec![
+            Line::from(Span::styled("  ···", Style::default().fg(Color::DarkGray))),
+            Line::from(""),
+            Line::from(""),
+        ]
+    } else if is_hit && battle.anim_frame % 2 == 0 {
+        vec![
+            Line::from(Span::styled("  💥", Style::default().fg(Color::Red))),
+            Line::from(""),
+            Line::from(""),
+        ]
+    } else {
+        let art = sprites::get_sprite(p.element, p.secondary_element);
+        art.iter()
+            .map(|line| Line::from(Span::styled(*line, Style::default().fg(sprite_color))))
+            .collect()
+    };
+    frame.render_widget(Paragraph::new(sprite_lines), cols[0]);
+
     // ── Info joueur ─────────────────────────────────────────────
-    let bar_width = (cols[0].width as usize).saturating_sub(8).min(20);
+    let bar_width = (cols[1].width as usize).saturating_sub(8).min(20);
     let hp_bar = hp_bar_spans(p.display_hp, p.max_hp, bar_width);
 
     let type_str = match p.secondary_element {
@@ -206,41 +227,7 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Cyan)),
     );
-    frame.render_widget(info, cols[0]);
-
-    // ── Sprite joueur ───────────────────────────────────────────
-    let is_hit = matches!(battle.anim_type, Some(AnimationType::PlayerHit));
-    let is_dead = p.display_hp == 0 && p.current_hp == 0;
-    let sprite_color = if is_hit {
-        Color::Red
-    } else {
-        element_color(p.element)
-    };
-
-    let sprite_lines = if is_dead {
-        // Monstre K.O. — sprite masqué
-        vec![
-            Line::from(Span::styled("  ···", Style::default().fg(Color::DarkGray))),
-            Line::from(""),
-            Line::from(""),
-        ]
-    } else if is_hit && battle.anim_frame % 2 == 0 {
-        vec![
-            Line::from(Span::styled("  💥", Style::default().fg(Color::Red))),
-            Line::from(""),
-            Line::from(""),
-        ]
-    } else {
-        vec![
-            Line::from(Span::styled("  ╔════╗", Style::default().fg(sprite_color))),
-            Line::from(Span::styled(
-                format!("  ║ {} ║", p.element.icon()),
-                Style::default().fg(sprite_color),
-            )),
-            Line::from(Span::styled("  ╚════╝", Style::default().fg(sprite_color))),
-        ]
-    };
-    frame.render_widget(Paragraph::new(sprite_lines), cols[1]);
+    frame.render_widget(info, cols[1]);
 }
 
 // ── Barre de PV ─────────────────────────────────────────────────────

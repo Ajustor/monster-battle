@@ -5,9 +5,7 @@ use tokio_tungstenite::tungstenite::Message;
 use crate::protocol::NetMessage;
 
 /// Lit un message NetMessage depuis un WebSocket.
-pub async fn read_message<S>(
-    ws: &mut WebSocketStream<S>,
-) -> Result<NetMessage, anyhow::Error>
+pub async fn read_message<S>(ws: &mut WebSocketStream<S>) -> Result<NetMessage, anyhow::Error>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {

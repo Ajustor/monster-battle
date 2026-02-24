@@ -38,7 +38,6 @@ Moteur du jeu, sans aucune dépendance I/O. Contient :
 - `Stats` — HP, Attaque, Défense, Vitesse, Attaque Spé, Défense Spé
 - `Trait` — 8 traits génétiques héritables/mutables
 - `Attack` — attaques physiques et spéciales liées aux types
-- `combat::fight()` — moteur de combat tour par tour
 - `genetics::breed()` — reproduction avec héritage de stats et mutations
 - `BattleState` — combat interactif style Pokémon
 
@@ -51,7 +50,7 @@ Persistance locale avec chiffrement :
 ### `network`
 Couche réseau client + protocole :
 - `GameClient` — client TCP asynchrone (tokio)
-- `NetMessage` — protocole JSON sérialisé avec préfixe de longueur (`Queue`, `Matched`, `CombatResult`, `BreedingPartner`, `Ping`/`Pong`, etc.)
+- `NetMessage` — protocole JSON sérialisé avec préfixe de longueur (`Queue`, `Matched`, `CombatOpponent`, `PvpAttackChoice`, `PvpTurnResult`, `BreedingPartner`, `Ping`/`Pong`, etc.)
 - `NetAction` — type d'action : `Combat` ou `Breed`
 
 ### `tui`
@@ -67,7 +66,7 @@ Serveur relais centralisé (binaire séparé) :
 - Détection automatique HTTP vs protocole de jeu sur le même port
 - `GET /health` → `{"status":"online"}`
 - Matchmaking automatique : les joueurs sont mis en file et appairés dès que 2 sont prêts
-- Le combat est exécuté côté serveur pour éviter la triche
+- Le combat PvP est **arbitré tour par tour** côté serveur pour éviter la triche
 - La reproduction échange les monstres entre joueurs via le serveur
 
 ## 🚀 Lancer le jeu
@@ -123,6 +122,25 @@ Variables d'environnement optionnelles :
   - Choisis tes attaques tour par tour
   - Les types comptent : exploite les faiblesses adverses !
   - Le vainqueur gagne de l'XP et un `win` — le perdant risque la **mort**
+
+Le combat PvP est **arbitré par le serveur** — les deux joueurs interagissent en temps réel :
+
+```
+Joueur A                    Serveur                     Joueur B
+   │                           │                            │
+   ├── Queue ──────────────────►                            │
+   │                           ◄── Queue ──────────────────┤
+   ◄── Matched ────────────────┤── Matched ────────────────►
+   ◄── CombatOpponent ─────────┤── CombatOpponent ─────────►
+   │                           │                            │
+   │       ┌── Boucle tour par tour ──┐                     │
+   │       │                          │                     │
+   ├── PvpAttackChoice ────────►      │  ◄── PvpAttackChoice ┤
+   │       │   (attend les 2 choix)   │                     │
+   ◄── PvpTurnResult ─────────┤── PvpTurnResult ──────────►
+   │       │                          │                     │
+   │       └── (répète jusqu'à K.O.) ─┘                     │
+```
 
 ### Reproduction
 

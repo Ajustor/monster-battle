@@ -13,7 +13,7 @@ use tachyonfx::fx::Direction;
 use tachyonfx::{EffectTimer, Interpolation, Shader, fx};
 
 use monster_battle_core::Monster;
-use monster_battle_core::battle::{BattlePhase, BattleState, MessageStyle};
+use monster_battle_core::battle::{BattleMessage, BattlePhase, BattleState, MessageStyle};
 use monster_battle_network::{GameClient, NetAction, NetMessage, check_server_health};
 use monster_battle_storage::{LocalStorage, MonsterStorage};
 
@@ -28,8 +28,18 @@ enum NetworkEvent {
     Queued,
     /// Adversaire trouvé.
     Matched { opponent_name: String },
-    /// Monstre de l'adversaire PvP reçu — lancer le combat interactif local.
+    /// Monstre de l'adversaire PvP reçu — lancer le combat interactif.
     CombatOpponentReceived(Monster),
+    /// Résultat d'un tour PvP (messages du serveur).
+    PvpTurnResult {
+        messages: Vec<BattleMessage>,
+        player_hp: u32,
+        opponent_hp: u32,
+        battle_over: bool,
+        victory: bool,
+        xp_gained: u32,
+        loser_died: bool,
+    },
     /// Monstre du partenaire reçu (reproduction).
     BreedingPartnerReceived(Monster),
     /// Erreur réseau.
@@ -62,16 +72,12 @@ pub struct App {
     /// Instant du dernier blink.
     blink_timer: Instant,
 
-    /// Log du dernier combat d'entraînement.
-    pub training_log: Vec<String>,
-    /// Offset de scroll pour le log de combat.
+    /// Offset de scroll pour le log de reproduction.
     pub scroll_offset: usize,
 
     // --- Réseau ---
     /// Adresse du serveur relais (ex: "monster-battle.darthoit.eu").
     pub server_address: String,
-    /// Log du dernier combat PvP.
-    pub pvp_log: Vec<String>,
 
     // --- Reproduction ---
     /// Log du résultat de reproduction.
@@ -93,6 +99,8 @@ pub struct App {
     net_rx: Option<mpsc::Receiver<NetworkEvent>>,
     /// Handle de la tâche réseau en cours.
     net_task: Option<tokio::task::JoinHandle<()>>,
+    /// Canal pour envoyer les choix d'attaque PvP à la tâche réseau.
+    pvp_attack_tx: Option<tokio::sync::mpsc::Sender<usize>>,
 }
 
 impl App {
@@ -113,11 +121,9 @@ impl App {
             name_input: String::new(),
             name_input_blink: true,
             blink_timer: Instant::now(),
-            training_log: Vec::new(),
             scroll_offset: 0,
             server_address: std::env::var("MONSTER_SERVER")
                 .unwrap_or_else(|_| "monster-battle.darthoit.eu".to_string()),
-            pvp_log: Vec::new(),
             breeding_log: Vec::new(),
             remote_monster: None,
             battle_state: None,
@@ -126,6 +132,7 @@ impl App {
             tokio_rt,
             net_rx: None,
             net_task: None,
+            pvp_attack_tx: None,
         })
     }
 
@@ -286,13 +293,8 @@ impl App {
             return;
         }
 
-        // Si on consulte le résultat d'un entraînement / PvP / breeding
-        if matches!(
-            self.current_screen,
-            Screen::TrainingResult | Screen::CombatResult | Screen::BreedingResult
-        ) || matches!(self.current_screen, Screen::Combat(PvpPhase::Result))
-            || matches!(self.current_screen, Screen::Breeding(BreedPhase::Result))
-        {
+        // Si on consulte le résultat d'une reproduction
+        if matches!(self.current_screen, Screen::Breeding(BreedPhase::Result)) {
             match code {
                 KeyCode::Up => {
                     self.scroll_offset = self.scroll_offset.saturating_sub(1);
@@ -507,8 +509,12 @@ impl App {
         let player_name = monsters[0].name.clone();
         let (tx, rx) = mpsc::channel();
 
+        // Canal pour envoyer les choix d'attaque au serveur pendant le combat
+        let (attack_tx, mut attack_rx) = tokio::sync::mpsc::channel::<usize>(1);
+        self.pvp_attack_tx = Some(attack_tx);
+
         let handle = self.tokio_rt.spawn(async move {
-            let result: Result<Monster, anyhow::Error> = async {
+            let result: Result<(), anyhow::Error> = async {
                 let client = GameClient::new();
                 client.connect(&server_addr).await?;
 
@@ -543,21 +549,70 @@ impl App {
                     _ => return Err(anyhow::anyhow!("Réponse inattendue du serveur.")),
                 }
 
-                // Attendre le monstre adversaire pour combat interactif
+                // Attendre le monstre adversaire
                 let msg = client.recv().await?;
-                match msg {
-                    NetMessage::CombatOpponent { opponent_monster } => Ok(opponent_monster),
-                    NetMessage::Error(e) => Err(anyhow::anyhow!("{}", e)),
-                    _ => Err(anyhow::anyhow!("Données de l'adversaire manquantes.")),
+                let opponent_monster = match msg {
+                    NetMessage::CombatOpponent { opponent_monster } => opponent_monster,
+                    NetMessage::Error(e) => return Err(anyhow::anyhow!("{}", e)),
+                    _ => return Err(anyhow::anyhow!("Données de l'adversaire manquantes.")),
+                };
+
+                // Envoyer le monstre adverse → le client crée le BattleState local
+                let _ = tx.send(NetworkEvent::CombatOpponentReceived(opponent_monster));
+
+                // ── Boucle de combat PvP ──
+                // Attendre les choix d'attaque du joueur local et relayer au serveur,
+                // puis recevoir les résultats de tour du serveur.
+                loop {
+                    // Attendre que le joueur local choisisse une attaque
+                    let attack_index = match attack_rx.recv().await {
+                        Some(idx) => idx,
+                        None => break, // Canal fermé → combat annulé
+                    };
+
+                    // Envoyer le choix au serveur
+                    client
+                        .send(&NetMessage::PvpAttackChoice { attack_index })
+                        .await?;
+
+                    // Attendre le résultat du tour du serveur
+                    let msg = client.recv().await?;
+                    match msg {
+                        NetMessage::PvpTurnResult {
+                            messages,
+                            player_hp,
+                            opponent_hp,
+                            battle_over,
+                            victory,
+                            xp_gained,
+                            loser_died,
+                        } => {
+                            let _ = tx.send(NetworkEvent::PvpTurnResult {
+                                messages,
+                                player_hp,
+                                opponent_hp,
+                                battle_over,
+                                victory,
+                                xp_gained,
+                                loser_died,
+                            });
+
+                            if battle_over {
+                                break;
+                            }
+                        }
+                        NetMessage::Error(e) => return Err(anyhow::anyhow!("{}", e)),
+                        _ => return Err(anyhow::anyhow!("Réponse inattendue du serveur.")),
+                    }
                 }
+
+                Ok(())
             }
             .await;
 
-            let event = match result {
-                Ok(monster) => NetworkEvent::CombatOpponentReceived(monster),
-                Err(e) => NetworkEvent::NetError(format!("{}", e)),
-            };
-            let _ = tx.send(event);
+            if let Err(e) = result {
+                let _ = tx.send(NetworkEvent::NetError(format!("{}", e)));
+            }
         });
 
         self.net_task = Some(handle);
@@ -717,7 +772,10 @@ impl App {
             None,
             End,
             Forfeit,
+            PvpSendAttack(usize),
         }
+
+        let is_pvp = self.pvp_attack_tx.is_some();
 
         let action = if let Some(battle) = &mut self.battle_state {
             match &battle.phase {
@@ -738,8 +796,12 @@ impl App {
                         }
                         KeyCode::Enter => {
                             let idx = battle.attack_menu_index;
-                            battle.player_attack(idx);
-                            Action::None
+                            if is_pvp {
+                                Action::PvpSendAttack(idx)
+                            } else {
+                                battle.player_attack(idx);
+                                Action::None
+                            }
                         }
                         KeyCode::Esc if battle.is_training => Action::Forfeit,
                         _ => Action::None,
@@ -764,11 +826,36 @@ impl App {
 
         match action {
             Action::None => {}
-            Action::End => self.apply_battle_results(),
+            Action::End => {
+                // Nettoyer le canal PvP
+                self.pvp_attack_tx = None;
+                self.net_rx = None;
+                self.net_task = None;
+                self.apply_battle_results();
+            }
             Action::Forfeit => {
                 self.battle_state = None;
+                self.pvp_attack_tx = None;
                 self.current_screen = Screen::MainMenu;
                 self.message = Some("Vous avez fui le combat d'entraînement.".to_string());
+            }
+            Action::PvpSendAttack(idx) => {
+                // Envoyer le choix au serveur via le canal
+                if let Some(ref tx) = self.pvp_attack_tx {
+                    let _ = tx.try_send(idx);
+                }
+                // Passer en mode "attente" avec un message temporaire
+                if let Some(ref mut battle) = self.battle_state {
+                    battle.phase = BattlePhase::Executing;
+                    battle.current_message = Some(monster_battle_core::battle::BattleMessage {
+                        text: "⏳ En attente de l'adversaire...".to_string(),
+                        style: MessageStyle::Info,
+                        player_hp: None,
+                        opponent_hp: None,
+                        anim_type: None,
+                    });
+                    battle.message_counter += 1;
+                }
             }
         }
     }
@@ -890,15 +977,22 @@ impl App {
 
         let _ = self.storage.save(&monsters[0]);
 
-        // Afficher le log complet dans l'écran de résultat
-        if battle.is_training {
-            self.training_log = battle.full_log;
-            self.scroll_offset = 0;
-            self.current_screen = Screen::TrainingResult;
+        // Retour au menu principal avec un résumé
+        self.current_screen = Screen::MainMenu;
+        if is_victory {
+            self.message = Some(format!(
+                "🏆 Victoire ! +{} XP{}",
+                battle.xp_gained,
+                if battle.is_training {
+                    " (entraînement)"
+                } else {
+                    ""
+                }
+            ));
+        } else if battle.is_training {
+            self.message = Some("Défaite à l'entraînement — pas de pénalité !".to_string());
         } else {
-            self.pvp_log = battle.full_log;
-            self.scroll_offset = 0;
-            self.current_screen = Screen::Combat(PvpPhase::Result);
+            self.message = Some("💀 Défaite... Votre monstre est mort.".to_string());
         }
     }
 
@@ -1027,21 +1121,60 @@ impl App {
                 }
             }
             NetworkEvent::CombatOpponentReceived(opponent_monster) => {
-                // Nettoyer la tâche réseau
-                self.net_rx = None;
-                self.net_task = None;
+                // NE PAS nettoyer la tâche réseau — elle reste active pour le combat PvP
 
                 if let Ok(monsters) = self.storage.list_alive() {
                     if !monsters.is_empty() {
-                        // Lancer le combat interactif (comme l'entraînement, mais is_training = false)
+                        // Lancer le combat interactif (BattleState local pour l'affichage)
                         let battle = BattleState::new(&monsters[0], &opponent_monster, false);
                         self.battle_state = Some(battle);
                         self.current_screen = Screen::Battle;
                     } else {
+                        self.pvp_attack_tx = None;
+                        self.net_rx = None;
+                        self.net_task = None;
                         self.current_screen = Screen::MainMenu;
                     }
                 } else {
+                    self.pvp_attack_tx = None;
+                    self.net_rx = None;
+                    self.net_task = None;
                     self.current_screen = Screen::MainMenu;
+                }
+            }
+            NetworkEvent::PvpTurnResult {
+                messages,
+                player_hp,
+                opponent_hp,
+                battle_over,
+                victory,
+                xp_gained,
+                loser_died,
+            } => {
+                if let Some(ref mut battle) = self.battle_state {
+                    // Mettre à jour les PV réels depuis le serveur
+                    battle.player.current_hp = player_hp;
+                    battle.opponent.current_hp = opponent_hp;
+
+                    // Configurer la phase finale si le combat est terminé
+                    if battle_over {
+                        if victory {
+                            battle.phase = BattlePhase::Victory;
+                            battle.xp_gained = xp_gained;
+                        } else {
+                            battle.phase = BattlePhase::Defeat;
+                            battle.loser_died = loser_died;
+                        }
+                    } else {
+                        battle.phase = BattlePhase::Executing;
+                        battle.attack_menu_index = 0;
+                    }
+
+                    // Pousser les messages du serveur dans la file
+                    battle.push_messages(messages);
+
+                    // Afficher le premier message
+                    battle.advance_message();
                 }
             }
             NetworkEvent::BreedingPartnerReceived(monster) => {
@@ -1056,9 +1189,14 @@ impl App {
             NetworkEvent::NetError(e) => {
                 self.net_rx = None;
                 self.net_task = None;
+                self.pvp_attack_tx = None;
+                // Si on était en combat PvP, nettoyer le battle_state
+                if self.battle_state.is_some() && self.current_screen == Screen::Battle {
+                    self.battle_state = None;
+                }
 
                 match &self.current_screen {
-                    Screen::Combat(_) => {
+                    Screen::Combat(_) | Screen::Battle => {
                         self.current_screen = Screen::Combat(PvpPhase::Error(e));
                     }
                     Screen::Breeding(_) => {
@@ -1078,6 +1216,7 @@ impl App {
             handle.abort();
         }
         self.net_rx = None;
+        self.pvp_attack_tx = None;
     }
 
     fn check_all_aging(&mut self) {
