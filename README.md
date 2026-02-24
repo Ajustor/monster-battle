@@ -63,8 +63,9 @@ Interface terminal interactive :
 
 ### `server`
 Serveur relais centralisé (binaire séparé) :
-- TCP port **7878** — protocole de jeu (matchmaking, combat, reproduction)
-- HTTP port **8080** — route santé `GET /health` → `{"status":"online"}`
+- TCP port **7878** — protocole de jeu (matchmaking, combat, reproduction) + route santé HTTP
+- Détection automatique HTTP vs protocole de jeu sur le même port
+- `GET /health` → `{"status":"online"}`
 - Matchmaking automatique : les joueurs sont mis en file et appairés dès que 2 sont prêts
 - Le combat est exécuté côté serveur pour éviter la triche
 - La reproduction échange les monstres entre joueurs via le serveur
@@ -97,8 +98,7 @@ Variables d'environnement optionnelles :
 
 | Variable | Défaut | Description |
 |---|---|---|
-| `PORT` | `7878` | Port TCP du protocole de jeu |
-| `HEALTH_PORT` | `8080` | Port HTTP de la route santé |
+| `PORT` | `7878` | Port TCP (jeu + health check) |
 | `MONSTER_SERVER` | `monster-battle.darthoit.eu` | Adresse du serveur (côté client) |
 
 ## 🎮 Comment jouer
