@@ -70,16 +70,15 @@ async fn run_health_server(addr: String) {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let port = std::env::var("PORT").unwrap_or_else(|_| "7878".to_string());
-    let health_port = std::env::var("HEALTH_PORT").unwrap_or_else(|_| "8080".to_string());
     let addr = format!("0.0.0.0:{}", port);
 
     // Route HTTP /health pour vérifier que le serveur est up
-    let health_addr = format!("0.0.0.0:{}", health_port);
+    let health_addr = format!("0.0.0.0:{}", port);
     tokio::spawn(run_health_server(health_addr));
 
     let listener = TcpListener::bind(&addr).await?;
     println!("🎮 Serveur Monster Battle démarré sur {}", addr);
-    println!("🩺 Route santé HTTP sur le port {}", health_port);
+    println!("🩺 Route santé HTTP sur le port {}", port);
     println!("   En attente de connexions...");
 
     let state = Arc::new(Mutex::new(ServerState::new()));
