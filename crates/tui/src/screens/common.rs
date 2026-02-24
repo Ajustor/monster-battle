@@ -1,6 +1,6 @@
 use ratatui::{
     Frame,
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -43,35 +43,21 @@ pub fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
                 "↑↓ Défiler | Enter ou q pour revenir".to_string()
             }
             Screen::Combat(phase) => match phase {
-                crate::screens::pvp::PvpPhase::Menu => {
-                    "↑↓ Naviguer | Enter Sélectionner | Esc Retour".to_string()
-                }
-                crate::screens::pvp::PvpPhase::EnterAddress => {
-                    "Entrez l'adresse | Enter Valider | Esc Annuler".to_string()
-                }
-                crate::screens::pvp::PvpPhase::ReceivedChallenge { .. } => {
-                    "Enter Accepter | Esc Refuser".to_string()
-                }
                 crate::screens::pvp::PvpPhase::Result => {
                     "↑↓ Défiler | Enter ou q pour revenir".to_string()
                 }
+                crate::screens::pvp::PvpPhase::Error(_) => "Enter ou Esc pour revenir".to_string(),
                 _ => "Esc Annuler".to_string(),
             },
             Screen::Breeding(phase) => match phase {
-                crate::screens::breeding::BreedPhase::Menu => {
-                    "↑↓ Naviguer | Enter Sélectionner | Esc Retour".to_string()
-                }
-                crate::screens::breeding::BreedPhase::EnterAddress => {
-                    "Entrez l'adresse | Enter Valider | Esc Annuler".to_string()
-                }
                 crate::screens::breeding::BreedPhase::NamingChild => {
                     "Tapez le nom du bébé | Enter Valider | Esc Annuler".to_string()
                 }
-                crate::screens::breeding::BreedPhase::ReceivedProposal { .. } => {
-                    "Enter Accepter | Esc Refuser".to_string()
-                }
                 crate::screens::breeding::BreedPhase::Result => {
                     "↑↓ Défiler | Enter ou q pour revenir".to_string()
+                }
+                crate::screens::breeding::BreedPhase::Error(_) => {
+                    "Enter ou Esc pour revenir".to_string()
                 }
                 _ => "Esc Annuler".to_string(),
             },
@@ -95,11 +81,31 @@ pub fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
         }
     };
 
+    // Statut serveur à gauche
+    use crate::app::ServerStatus;
+    let (status_icon, status_color) = match app.server_status {
+        ServerStatus::Online => ("● En ligne", Color::Green),
+        ServerStatus::Offline => ("● Hors ligne", Color::Red),
+        ServerStatus::Unknown => ("● Connexion…", Color::DarkGray),
+    };
+
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(16), Constraint::Min(1)])
+        .split(area);
+
+    let status = Paragraph::new(Line::from(Span::styled(
+        format!(" {}", status_icon),
+        Style::default().fg(status_color),
+    )))
+    .block(Block::default().borders(Borders::ALL));
+
     let footer = Paragraph::new(text)
         .style(Style::default().fg(Color::Cyan))
         .block(Block::default().borders(Borders::ALL));
 
-    frame.render_widget(footer, area);
+    frame.render_widget(status, chunks[0]);
+    frame.render_widget(footer, chunks[1]);
 }
 
 /// Dessine un placeholder pour les écrans non implémentés.

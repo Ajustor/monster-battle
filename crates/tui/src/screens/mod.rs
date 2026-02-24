@@ -72,32 +72,19 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Screen::Training => training::draw_select(frame, chunks[1], app),
         Screen::TrainingResult => training::draw_result(frame, chunks[1], app),
         Screen::Combat(phase) => match phase {
-            pvp::PvpPhase::Menu => pvp::draw_menu(frame, chunks[1], app),
-            pvp::PvpPhase::WaitingForOpponent => pvp::draw_waiting(frame, chunks[1], app),
-            pvp::PvpPhase::EnterAddress => pvp::draw_enter_address(frame, chunks[1], app),
-            pvp::PvpPhase::Connecting => pvp::draw_connecting(frame, chunks[1], app),
-            pvp::PvpPhase::WaitingForAccept => pvp::draw_waiting(frame, chunks[1], app),
-            pvp::PvpPhase::ReceivedChallenge { opponent_name } => {
-                pvp::draw_received_challenge(frame, chunks[1], app, opponent_name)
+            pvp::PvpPhase::Searching => pvp::draw_searching(frame, chunks[1], app),
+            pvp::PvpPhase::Matched { opponent_name } => {
+                pvp::draw_matched(frame, chunks[1], app, opponent_name)
             }
-            pvp::PvpPhase::Fighting => pvp::draw_fighting(frame, chunks[1], app),
             pvp::PvpPhase::Result => pvp::draw_pvp_result(frame, chunks[1], app),
             pvp::PvpPhase::Error(e) => pvp::draw_error(frame, chunks[1], e),
         },
         Screen::CombatResult => pvp::draw_pvp_result(frame, chunks[1], app),
         Screen::Breeding(phase) => match phase {
-            breeding::BreedPhase::Menu => breeding::draw_menu(frame, chunks[1], app),
-            breeding::BreedPhase::WaitingForPartner => {
-                breeding::draw_waiting(frame, chunks[1], app)
+            breeding::BreedPhase::Searching => breeding::draw_searching(frame, chunks[1], app),
+            breeding::BreedPhase::Matched { opponent_name } => {
+                breeding::draw_matched(frame, chunks[1], app, opponent_name)
             }
-            breeding::BreedPhase::EnterAddress => {
-                breeding::draw_enter_address(frame, chunks[1], app)
-            }
-            breeding::BreedPhase::Connecting => breeding::draw_connecting(frame, chunks[1], app),
-            breeding::BreedPhase::ReceivedProposal {
-                partner_monster_name,
-            } => breeding::draw_received_proposal(frame, chunks[1], app, partner_monster_name),
-            breeding::BreedPhase::WaitingForAccept => breeding::draw_waiting(frame, chunks[1], app),
             breeding::BreedPhase::NamingChild => breeding::draw_naming_child(frame, chunks[1], app),
             breeding::BreedPhase::Result => breeding::draw_breed_result(frame, chunks[1], app),
             breeding::BreedPhase::Error(e) => breeding::draw_error(frame, chunks[1], e),

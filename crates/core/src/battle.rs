@@ -143,6 +143,8 @@ pub struct BattleState {
     pub loser_died: bool,
     /// Log complet du combat (texte brut).
     pub full_log: Vec<String>,
+    /// Compteur de messages affichés (utilisé par la TUI pour déclencher les effets).
+    pub message_counter: u64,
 }
 
 impl BattleState {
@@ -172,6 +174,7 @@ impl BattleState {
             xp_gained: 0,
             loser_died: false,
             full_log: Vec::new(),
+            message_counter: 0,
         };
 
         // Messages d'introduction
@@ -213,6 +216,7 @@ impl BattleState {
                 self.opponent_target_hp = hp;
             }
             self.current_message = Some(msg);
+            self.message_counter += 1;
             return true;
         }
 
@@ -381,6 +385,7 @@ impl BattleState {
                 self.opponent_target_hp = hp;
             }
             self.current_message = Some(msg);
+            self.message_counter += 1;
             true
         } else {
             false

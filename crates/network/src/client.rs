@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
-use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
 use crate::protocol::NetMessage;
-use crate::server::read_message;
+use crate::server::{read_message, write_message};
 
-/// Client réseau qui se connecte à un serveur distant.
+/// Client réseau qui se connecte au serveur relais centralisé.
 pub struct GameClient {
     /// Le stream de la connexion.
     pub stream: Arc<Mutex<Option<TcpStream>>>,
@@ -21,7 +20,7 @@ impl GameClient {
         }
     }
 
-    /// Se connecte à un serveur distant.
+    /// Se connecte au serveur relais.
     pub async fn connect(&self, addr: &str) -> Result<(), anyhow::Error> {
         let socket = TcpStream::connect(addr).await?;
         *self.stream.lock().await = Some(socket);
@@ -35,11 +34,7 @@ impl GameClient {
             .as_mut()
             .ok_or_else(|| anyhow::anyhow!("Pas connecté"))?;
 
-        let data = msg.to_bytes().map_err(|e| anyhow::anyhow!("{}", e))?;
-        stream.write_all(&data).await?;
-        stream.flush().await?;
-
-        Ok(())
+        write_message(stream, msg).await
     }
 
     /// Reçoit un message du serveur.
@@ -54,8 +49,6 @@ impl GameClient {
 
     /// Teste si le client est connecté.
     pub fn is_connected(&self) -> bool {
-        // On ne peut pas vérifier sans await, donc on vérifie si le stream est Some
-        // via try_lock
         self.stream
             .try_lock()
             .map(|guard| guard.is_some())

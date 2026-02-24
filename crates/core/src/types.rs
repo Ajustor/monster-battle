@@ -5,6 +5,8 @@ use std::fmt;
 /// Chaque monstre possède un type primaire et optionnellement un type secondaire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ElementType {
+    /// Type neutre (utilisé uniquement pour les attaques).
+    Normal,
     Fire,
     Water,
     Plant,
@@ -16,7 +18,7 @@ pub enum ElementType {
 }
 
 impl ElementType {
-    /// Retourne toutes les variantes du type élémentaire.
+    /// Retourne toutes les variantes du type élémentaire (hors Normal).
     pub fn all() -> &'static [ElementType] {
         &[
             ElementType::Fire,
@@ -35,6 +37,9 @@ impl ElementType {
     pub fn effectiveness_against(&self, defender: &ElementType) -> f64 {
         use ElementType::*;
         match (self, defender) {
+            // Normal : toujours neutre
+            (Normal, _) | (_, Normal) => 1.0,
+
             // Super efficace (×1.5)
             (Fire, Plant) | (Fire, Wind) => 1.5,
             (Water, Fire) | (Water, Earth) => 1.5,
@@ -61,6 +66,7 @@ impl ElementType {
     /// Emoji représentatif pour le TUI.
     pub fn icon(&self) -> &'static str {
         match self {
+            ElementType::Normal => "⭐",
             ElementType::Fire => "🔥",
             ElementType::Water => "💧",
             ElementType::Plant => "🌿",
@@ -76,6 +82,7 @@ impl ElementType {
 impl fmt::Display for ElementType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
+            ElementType::Normal => "Normal",
             ElementType::Fire => "Feu",
             ElementType::Water => "Eau",
             ElementType::Plant => "Plante",

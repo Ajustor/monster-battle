@@ -2,33 +2,50 @@ use serde::{Deserialize, Serialize};
 
 use monster_battle_core::Monster;
 
-/// Messages échangés entre les joueurs en réseau.
+/// Type d'action multijoueur.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum NetAction {
+    /// Combat PvP.
+    Combat,
+    /// Reproduction.
+    Breed,
+}
+
+/// Messages échangés entre un client et le serveur relais.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NetMessage {
-    /// Proposition d'action (combat ou reproduction).
-    Propose(NetAction),
-    /// Acceptation d'une proposition.
-    Accept,
-    /// Refus d'une proposition.
-    Decline,
-    /// Envoi des données du monstre.
-    MonsterData(Monster),
-    /// Résultat d'un combat (envoyé par l'hôte).
+    // ── Client → Serveur ────────────────────────────
+    /// S'inscrire dans la file d'attente pour un combat ou une reproduction.
+    Queue {
+        action: NetAction,
+        monster: Monster,
+        player_name: String,
+    },
+    /// Quitter la file d'attente.
+    CancelQueue,
+
+    // ── Serveur → Client ────────────────────────────
+    /// Confirmation de mise en file d'attente.
+    Queued,
+    /// Un adversaire / partenaire a été trouvé.
+    Matched {
+        opponent_name: String,
+    },
+    /// Résultat d'un combat PvP (calculé par le serveur).
     CombatResult {
         winner_id: String,
         loser_id: String,
         loser_died: bool,
         log: Vec<String>,
-        /// Monstre mis à jour du joueur (après combat).
+        /// Monstre du joueur mis à jour après combat.
         updated_monster: Monster,
     },
-    /// Résultat d'une reproduction.
-    BreedingResult {
-        child: Monster,
-        description: String,
-        /// `true` si l'enfant est pour le destinataire.
-        child_is_yours: bool,
+    /// Données du monstre partenaire (reproduction — envoyé à chaque joueur).
+    BreedingPartner {
+        partner_monster: Monster,
     },
+
+    // ── Bidirectionnel ──────────────────────────────
     /// Ping pour vérifier la connexion.
     Ping,
     /// Pong en réponse.
@@ -37,15 +54,6 @@ pub enum NetMessage {
     Disconnect,
     /// Erreur.
     Error(String),
-}
-
-/// Type d'action multijoueur.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum NetAction {
-    /// Proposition de combat PvP.
-    Combat,
-    /// Proposition de reproduction.
-    Breed,
 }
 
 impl NetMessage {

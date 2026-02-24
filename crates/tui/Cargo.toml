@@ -10,6 +10,7 @@ monster-battle-storage.workspace = true
 monster-battle-network.workspace = true
 ratatui.workspace = true
 crossterm.workspace = true
+tachyonfx.workspace = true
 anyhow.workspace = true
 uuid.workspace = true
 tokio.workspace = true

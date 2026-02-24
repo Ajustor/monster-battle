@@ -18,6 +18,7 @@ use crate::app::App;
 
 fn element_color(element: ElementType) -> Color {
     match element {
+        ElementType::Normal => Color::Gray,
         ElementType::Fire => Color::Red,
         ElementType::Water => Color::Blue,
         ElementType::Plant => Color::Green,
@@ -107,7 +108,7 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
         vec![
             Line::from(""),
             Line::from(Span::styled(
-                "      ╔═══╗",
+                "      ╔════╗",
                 Style::default().fg(sprite_color),
             )),
             Line::from(Span::styled(
@@ -115,7 +116,7 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
                 Style::default().fg(sprite_color),
             )),
             Line::from(Span::styled(
-                "      ╚═══╝",
+                "      ╚════╝",
                 Style::default().fg(sprite_color),
             )),
         ]
@@ -219,7 +220,7 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
     } else {
         vec![
             Line::from(Span::styled(
-                "  ╔═══╗",
+                "  ╔════╗",
                 Style::default().fg(sprite_color),
             )),
             Line::from(Span::styled(
@@ -227,7 +228,7 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
                 Style::default().fg(sprite_color),
             )),
             Line::from(Span::styled(
-                "  ╚═══╝",
+                "  ╚════╝",
                 Style::default().fg(sprite_color),
             )),
         ]
