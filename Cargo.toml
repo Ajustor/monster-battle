@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["crates/core", "crates/storage", "crates/network", "crates/tui"]
+members = [
+  "crates/core",
+  "crates/storage",
+  "crates/network",
+  "crates/tui",
+  "crates/server",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -24,6 +30,7 @@ rand = "0.8"
 # TUI
 ratatui = "0.29"
 crossterm = "0.28"
+tachyonfx = "0.9"
 
 # Encryption
 aes-gcm = "0.10"
@@ -47,3 +54,4 @@ thiserror = "2"
 monster-battle-core = { path = "crates/core" }
 monster-battle-storage = { path = "crates/storage" }
 monster-battle-network = { path = "crates/network" }
+monster-battle-server = { path = "crates/server" }

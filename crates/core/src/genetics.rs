@@ -188,6 +188,7 @@ pub fn generate_starter_stats(element: ElementType) -> Stats {
 
     // Chaque type a une spécialité
     let (base_hp, base_atk, base_def, base_spd, base_spatk, base_spdef) = match element {
+        ElementType::Normal => (45, 45, 45, 45, 45, 45),
         ElementType::Fire => (40, 55, 35, 50, 55, 35),
         ElementType::Water => (50, 40, 50, 40, 45, 50),
         ElementType::Plant => (55, 40, 45, 35, 50, 50),

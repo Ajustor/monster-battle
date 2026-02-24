@@ -2,11 +2,9 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
-
-use monster_battle_storage::MonsterStorage;
 
 use crate::app::App;
 use super::common::draw_placeholder;
@@ -14,18 +12,10 @@ use super::common::draw_placeholder;
 /// Sous-écrans de la reproduction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BreedPhase {
-    /// Menu : Héberger ou Rejoindre.
-    Menu,
-    /// En attente d'un partenaire (hôte).
-    WaitingForPartner,
-    /// Saisie d'adresse (client).
-    EnterAddress,
-    /// En cours de connexion.
-    Connecting,
-    /// Proposition de reproduction reçue.
-    ReceivedProposal { partner_monster_name: String },
-    /// En attente de réponse de l'autre joueur.
-    WaitingForAccept,
+    /// Recherche d'un partenaire sur le serveur.
+    Searching,
+    /// Partenaire trouvé, échange en cours.
+    Matched { opponent_name: String },
     /// Saisie du nom du bébé.
     NamingChild,
     /// Résultat de la reproduction.
@@ -34,91 +24,15 @@ pub enum BreedPhase {
     Error(String),
 }
 
-/// Menu de la reproduction.
-pub fn draw_menu(frame: &mut Frame, area: Rect, app: &App) {
-    let monsters = app.storage.list_alive().unwrap_or_default();
-    if monsters.is_empty() {
-        draw_placeholder(frame, area, "Vous n'avez pas de monstre vivant !");
-        return;
-    }
-
-    let m = &monsters[0];
-
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(5)])
-        .split(area);
-
-    let player_info = Paragraph::new(Line::from(vec![
-        Span::styled("  Votre monstre : ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            format!(
-                "{} {} — Nv.{} — Gén.{}",
-                m.primary_type.icon(),
-                m.name,
-                m.level,
-                m.generation
-            ),
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
-        ),
-    ]))
-    .block(Block::default().borders(Borders::ALL));
-
-    frame.render_widget(player_info, chunks[0]);
-
-    let items = vec![
-        "🖥️  Héberger (attendre un partenaire)",
-        "🔗 Rejoindre (entrer l'adresse IP)",
-    ];
-
-    let list_items: Vec<ListItem> = items
-        .iter()
-        .enumerate()
-        .map(|(i, item)| {
-            let style = if i == app.menu_index % items.len() {
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD | Modifier::REVERSED)
-            } else {
-                Style::default().fg(Color::White)
-            };
-            ListItem::new(Line::from(Span::styled(format!("  {}  ", item), style)))
-        })
-        .collect();
-
-    let list = List::new(list_items).block(
-        Block::default()
-            .title(" 🧬 Reproduction ")
-            .title_style(
-                Style::default()
-                    .fg(Color::Magenta)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Magenta)),
-    );
-
-    frame.render_widget(list, chunks[1]);
-}
-
-/// Écran d'attente d'un partenaire (hôte).
-pub fn draw_waiting(frame: &mut Frame, area: Rect, app: &App) {
-    let port = app.pvp_port;
-    let ips_display = app
-        .local_ips
-        .iter()
-        .map(|ip| format!("  📡 {}:{}", ip, port))
-        .collect::<Vec<_>>()
-        .join("\n");
-
+/// Écran de recherche d'un partenaire.
+pub fn draw_searching(frame: &mut Frame, area: Rect, app: &App) {
     let text = format!(
-        "⏳ En attente d'un partenaire sur le port {}...\n\n\
-         Votre adresse :\n{}\n\n\
-         Communiquez une de ces adresses à l'autre joueur.\n\n\
+        "⏳ Recherche d'un partenaire de reproduction...\n\n\
+         Serveur : {}\n\n\
+         La reproduction commencera automatiquement dès qu'un\n\
+         autre joueur sera trouvé.\n\n\
          Appuyez sur Esc pour annuler.",
-        port, ips_display
+        app.server_address
     );
 
     let paragraph = Paragraph::new(text)
@@ -126,7 +40,12 @@ pub fn draw_waiting(frame: &mut Frame, area: Rect, app: &App) {
         .wrap(Wrap { trim: true })
         .block(
             Block::default()
-                .title(" Hébergement — Reproduction ")
+                .title(" 🧬 Reproduction ")
+                .title_style(
+                    Style::default()
+                        .fg(Color::Magenta)
+                        .add_modifier(Modifier::BOLD),
+                )
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Magenta)),
         );
@@ -134,79 +53,12 @@ pub fn draw_waiting(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(paragraph, area);
 }
 
-/// Écran de saisie d'adresse (client).
-pub fn draw_enter_address(frame: &mut Frame, area: Rect, app: &App) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(5),
-            Constraint::Length(3),
-            Constraint::Min(1),
-        ])
-        .split(area);
-
-    let help = Paragraph::new(
-        "Entrez l'adresse IP et le port de l'autre joueur.\n\
-         Format : adresse_ip:port  (ex: 192.168.1.42:7878)",
-    )
-    .style(Style::default().fg(Color::White))
-    .wrap(Wrap { trim: true })
-    .block(
-        Block::default()
-            .title(" Rejoindre — Reproduction ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Magenta)),
-    );
-
-    frame.render_widget(help, chunks[0]);
-
-    let cursor = if app.name_input_blink { "█" } else { " " };
-    let input_text = format!("  {}{}", app.pvp_address_input, cursor);
-
-    let input = Paragraph::new(input_text)
-        .style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
-        .block(
-            Block::default()
-                .title(" Adresse ")
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow)),
-        );
-
-    frame.render_widget(input, chunks[1]);
-}
-
-/// Écran de connexion en cours.
-pub fn draw_connecting(frame: &mut Frame, area: Rect, _app: &App) {
-    let text = "🔗 Connexion en cours...\n\nAppuyez sur Esc pour annuler.";
-
-    let paragraph = Paragraph::new(text)
-        .style(Style::default().fg(Color::Magenta))
-        .wrap(Wrap { trim: true })
-        .block(
-            Block::default()
-                .title(" Connexion ")
-                .borders(Borders::ALL),
-        );
-
-    frame.render_widget(paragraph, area);
-}
-
-/// Proposition reçue.
-pub fn draw_received_proposal(
-    frame: &mut Frame,
-    area: Rect,
-    _app: &App,
-    partner_monster_name: &str,
-) {
+/// Écran de partenaire trouvé.
+pub fn draw_matched(frame: &mut Frame, area: Rect, _app: &App, opponent_name: &str) {
     let text = format!(
-        "🧬 L'autre joueur propose de faire reproduire son monstre : {}\n\n\
-         Appuyez sur Enter pour accepter\n\
-         Appuyez sur Esc pour refuser",
-        partner_monster_name
+        "🧬 Partenaire trouvé : {} !\n\n\
+         Échange des données en cours...",
+        opponent_name
     );
 
     let paragraph = Paragraph::new(text)
@@ -218,7 +70,7 @@ pub fn draw_received_proposal(
         .wrap(Wrap { trim: true })
         .block(
             Block::default()
-                .title(" Proposition de reproduction ")
+                .title(" Reproduction ")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Magenta)),
         );
