@@ -28,9 +28,7 @@ pub enum NetMessage {
     /// Confirmation de mise en file d'attente.
     Queued,
     /// Un adversaire / partenaire a été trouvé.
-    Matched {
-        opponent_name: String,
-    },
+    Matched { opponent_name: String },
     /// Résultat d'un combat PvP (calculé par le serveur).
     CombatResult {
         winner_id: String,
@@ -40,10 +38,10 @@ pub enum NetMessage {
         /// Monstre du joueur mis à jour après combat.
         updated_monster: Monster,
     },
+    /// Monstre de l'adversaire PvP (envoyé à chaque joueur pour un combat interactif local).
+    CombatOpponent { opponent_monster: Monster },
     /// Données du monstre partenaire (reproduction — envoyé à chaque joueur).
-    BreedingPartner {
-        partner_monster: Monster,
-    },
+    BreedingPartner { partner_monster: Monster },
 
     // ── Bidirectionnel ──────────────────────────────
     /// Ping pour vérifier la connexion.
