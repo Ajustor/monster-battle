@@ -1,30 +1,40 @@
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use futures_util::{SinkExt, StreamExt};
+use tokio_tungstenite::WebSocketStream;
+use tokio_tungstenite::tungstenite::Message;
 
 use crate::protocol::NetMessage;
 
-/// Lit un message préfixé par sa longueur depuis un TcpStream.
-pub async fn read_message(stream: &mut TcpStream) -> Result<NetMessage, anyhow::Error> {
-    let mut len_buf = [0u8; 4];
-    stream.read_exact(&mut len_buf).await?;
-    let len = u32::from_be_bytes(len_buf) as usize;
-
-    if len > 10 * 1024 * 1024 {
-        return Err(anyhow::anyhow!("Message trop gros : {} octets", len));
+/// Lit un message NetMessage depuis un WebSocket.
+pub async fn read_message<S>(
+    ws: &mut WebSocketStream<S>,
+) -> Result<NetMessage, anyhow::Error>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    loop {
+        match ws.next().await {
+            Some(Ok(Message::Text(text))) => {
+                let msg: NetMessage = serde_json::from_str(&text)?;
+                return Ok(msg);
+            }
+            Some(Ok(Message::Close(_))) | None => {
+                return Err(anyhow::anyhow!("Connexion fermée"));
+            }
+            Some(Ok(_)) => continue, // ignore ping/pong/binary frames
+            Some(Err(e)) => return Err(e.into()),
+        }
     }
-
-    let mut buf = vec![0u8; len];
-    stream.read_exact(&mut buf).await?;
-
-    let json = String::from_utf8(buf)?;
-    let msg = NetMessage::from_json(&json).map_err(|e| anyhow::anyhow!("{}", e))?;
-    Ok(msg)
 }
 
-/// Envoie un message préfixé par sa longueur sur un TcpStream.
-pub async fn write_message(stream: &mut TcpStream, msg: &NetMessage) -> Result<(), anyhow::Error> {
-    let data = msg.to_bytes().map_err(|e| anyhow::anyhow!("{}", e))?;
-    stream.write_all(&data).await?;
-    stream.flush().await?;
+/// Envoie un message NetMessage sur un WebSocket.
+pub async fn write_message<S>(
+    ws: &mut WebSocketStream<S>,
+    msg: &NetMessage,
+) -> Result<(), anyhow::Error>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    let json = serde_json::to_string(msg)?;
+    ws.send(Message::Text(json.into())).await?;
     Ok(())
 }

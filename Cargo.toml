@@ -46,6 +46,11 @@ tokio = { version = "1", features = [
   "time",
 ] }
 
+# WebSocket
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+rustls = { version = "0.23", features = ["ring"] }
+futures-util = "0.3"
+
 # Error handling
 anyhow = "1"
 thiserror = "2"

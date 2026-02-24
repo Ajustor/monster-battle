@@ -6,9 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
-use monster_battle_core::battle::{
-    AnimationType, BattlePhase, BattleState, MessageStyle,
-};
+use monster_battle_core::battle::{AnimationType, BattlePhase, BattleState, MessageStyle};
 use monster_battle_core::types::ElementType;
 
 use super::common::draw_placeholder;
@@ -56,11 +54,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 fn draw_battlefield(frame: &mut Frame, area: Rect, battle: &BattleState) {
     let block = Block::default()
         .title(" ⚔️  Combat ")
-        .title_style(
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD),
-        )
+        .title_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Red));
 
@@ -88,21 +82,29 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
 
     // ── Sprite adversaire ───────────────────────────────────────
     let is_hit = matches!(battle.anim_type, Some(AnimationType::OpponentHit));
+    let is_dead = opp.display_hp == 0 && opp.current_hp == 0;
     let sprite_color = if is_hit {
         Color::Red
     } else {
         element_color(opp.element)
     };
 
-    let sprite_lines = if is_hit && battle.anim_frame % 2 == 0 {
-        // Flash : sprite disparaît brièvement
+    let sprite_lines = if is_dead {
+        // Monstre K.O. — sprite masqué
         vec![
             Line::from(""),
             Line::from(""),
             Line::from(Span::styled(
-                "       💥",
-                Style::default().fg(Color::Red),
+                "      ···",
+                Style::default().fg(Color::DarkGray),
             )),
+        ]
+    } else if is_hit && battle.anim_frame % 2 == 0 {
+        // Flash : sprite disparaît brièvement
+        vec![
+            Line::from(""),
+            Line::from(""),
+            Line::from(Span::styled("       💥", Style::default().fg(Color::Red))),
         ]
     } else {
         vec![
@@ -145,7 +147,10 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
                 format!("Nv.{}", opp.level),
                 Style::default().fg(Color::Yellow),
             ),
-            Span::styled(format!(" ({})", type_str), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" ({})", type_str),
+                Style::default().fg(Color::DarkGray),
+            ),
         ]),
         Line::from(hp_bar),
     ];
@@ -188,7 +193,10 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
                 format!("Nv.{}", p.level),
                 Style::default().fg(Color::Yellow),
             ),
-            Span::styled(format!(" ({})", type_str), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" ({})", type_str),
+                Style::default().fg(Color::DarkGray),
+            ),
         ]),
         Line::from(hp_bar),
     ];
@@ -202,35 +210,34 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
 
     // ── Sprite joueur ───────────────────────────────────────────
     let is_hit = matches!(battle.anim_type, Some(AnimationType::PlayerHit));
+    let is_dead = p.display_hp == 0 && p.current_hp == 0;
     let sprite_color = if is_hit {
         Color::Red
     } else {
         element_color(p.element)
     };
 
-    let sprite_lines = if is_hit && battle.anim_frame % 2 == 0 {
+    let sprite_lines = if is_dead {
+        // Monstre K.O. — sprite masqué
         vec![
-            Line::from(Span::styled(
-                "  💥",
-                Style::default().fg(Color::Red),
-            )),
+            Line::from(Span::styled("  ···", Style::default().fg(Color::DarkGray))),
+            Line::from(""),
+            Line::from(""),
+        ]
+    } else if is_hit && battle.anim_frame % 2 == 0 {
+        vec![
+            Line::from(Span::styled("  💥", Style::default().fg(Color::Red))),
             Line::from(""),
             Line::from(""),
         ]
     } else {
         vec![
-            Line::from(Span::styled(
-                "  ╔════╗",
-                Style::default().fg(sprite_color),
-            )),
+            Line::from(Span::styled("  ╔════╗", Style::default().fg(sprite_color))),
             Line::from(Span::styled(
                 format!("  ║ {} ║", p.element.icon()),
                 Style::default().fg(sprite_color),
             )),
-            Line::from(Span::styled(
-                "  ╚════╝",
-                Style::default().fg(sprite_color),
-            )),
+            Line::from(Span::styled("  ╚════╝", Style::default().fg(sprite_color))),
         ]
     };
     frame.render_widget(Paragraph::new(sprite_lines), cols[1]);
@@ -263,10 +270,7 @@ fn hp_bar_spans(current: u32, max: u32, width: usize) -> Vec<Span<'static>> {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled("█".repeat(filled), Style::default().fg(color)),
-        Span::styled(
-            "░".repeat(empty),
-            Style::default().fg(Color::DarkGray),
-        ),
+        Span::styled("░".repeat(empty), Style::default().fg(Color::DarkGray)),
         Span::styled(
             format!(" {}/{}", current, max),
             Style::default().fg(Color::White),
@@ -326,9 +330,7 @@ fn draw_attack_menu(frame: &mut Frame, area: Rect, battle: &BattleState) {
     // ── Détails de l'attaque sélectionnée (droite) ──────────────
     if selected < attacks.len() {
         let atk = &attacks[selected];
-        let eff = atk
-            .element
-            .effectiveness_against(&battle.opponent.element);
+        let eff = atk.element.effectiveness_against(&battle.opponent.element);
         let eff_text = if eff > 1.2 {
             "💥 Super efficace !"
         } else if eff < 0.8 {
@@ -399,9 +401,7 @@ fn draw_message_panel(frame: &mut Frame, area: Rect, battle: &BattleState) {
         Some(MessageStyle::Victory) => Style::default()
             .fg(Color::Green)
             .add_modifier(Modifier::BOLD),
-        Some(MessageStyle::Defeat) => Style::default()
-            .fg(Color::Red)
-            .add_modifier(Modifier::BOLD),
+        Some(MessageStyle::Defeat) => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         Some(MessageStyle::Critical) | Some(MessageStyle::SuperEffective) => Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD),
@@ -409,9 +409,9 @@ fn draw_message_panel(frame: &mut Frame, area: Rect, battle: &BattleState) {
         Some(MessageStyle::PlayerAttack) => Style::default()
             .fg(Color::Cyan)
             .add_modifier(Modifier::BOLD),
-        Some(MessageStyle::OpponentAttack) => Style::default()
-            .fg(Color::Red)
-            .add_modifier(Modifier::BOLD),
+        Some(MessageStyle::OpponentAttack) => {
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+        }
         Some(MessageStyle::Damage) => Style::default().fg(Color::White),
         Some(MessageStyle::Heal) => Style::default().fg(Color::Green),
         _ => Style::default().fg(Color::White),
@@ -435,12 +435,10 @@ fn draw_message_panel(frame: &mut Frame, area: Rect, battle: &BattleState) {
         )),
     ];
 
-    let paragraph = Paragraph::new(lines)
-        .wrap(Wrap { trim: false })
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::White)),
-        );
+    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false }).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::White)),
+    );
     frame.render_widget(paragraph, area);
 }
