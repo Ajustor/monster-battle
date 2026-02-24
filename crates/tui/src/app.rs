@@ -14,7 +14,7 @@ use tachyonfx::{EffectTimer, Interpolation, Shader, fx};
 
 use monster_battle_core::Monster;
 use monster_battle_core::battle::{BattlePhase, BattleState, MessageStyle};
-use monster_battle_network::{GameClient, NetAction, NetMessage};
+use monster_battle_network::{GameClient, NetAction, NetMessage, check_server_health};
 use monster_battle_storage::{LocalStorage, MonsterStorage};
 
 use crate::screens;
@@ -507,7 +507,7 @@ impl App {
 
         self.current_screen = Screen::Combat(PvpPhase::Searching);
 
-        let server_addr = format_server_addr(&self.server_address, 7878);
+        let server_addr = self.server_address.clone();
         let my_monster = monsters[0].clone();
         let player_name = monsters[0].name.clone();
         let (tx, rx) = mpsc::channel();
@@ -598,7 +598,7 @@ impl App {
 
         self.current_screen = Screen::Breeding(BreedPhase::Searching);
 
-        let server_addr = format_server_addr(&self.server_address, 7878);
+        let server_addr = self.server_address.clone();
         let my_monster = monsters[0].clone();
         let player_name = monsters[0].name.clone();
         let (tx, rx) = mpsc::channel();
@@ -1135,40 +1135,21 @@ impl App {
     // ─── Health check serveur ────────────────────────────────
 
     /// Lance un ping périodique vers le serveur en arrière-plan.
+    /// Tente une connexion WebSocket pour vérifier la joignabilité.
     fn start_server_ping(&mut self) {
         let (tx, rx) = mpsc::channel();
         self.status_rx = Some(rx);
 
-        let health_addr = format_server_addr(&self.server_address, 7878);
+        let server_addr = self.server_address.clone();
 
         self.tokio_rt.spawn(async move {
             loop {
-                let online = match tokio::time::timeout(
-                    std::time::Duration::from_secs(3),
-                    tokio::net::TcpStream::connect(&health_addr),
+                let online = tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    check_server_health(&server_addr),
                 )
                 .await
-                {
-                    Ok(Ok(mut stream)) => {
-                        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-                        let req = format!(
-                            "GET /health HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
-                            health_addr
-                        );
-                        if stream.write_all(req.as_bytes()).await.is_ok() {
-                            let mut buf = [0u8; 512];
-                            if let Ok(n) = stream.read(&mut buf).await {
-                                let resp = String::from_utf8_lossy(&buf[..n]);
-                                resp.contains(r#""status":"online""#)
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        }
-                    }
-                    _ => false,
-                };
+                .unwrap_or(false);
 
                 let status = if online {
                     ServerStatus::Online
@@ -1192,17 +1173,6 @@ impl App {
                 self.server_status = status;
             }
         }
-    }
-}
-
-/// Construit l'adresse `host:port` à partir d'une adresse serveur.
-/// Si l'adresse contient déjà un port (ex: "host:1234"), elle est renvoyée telle quelle.
-/// Sinon, le port par défaut est ajouté.
-fn format_server_addr(addr: &str, default_port: u16) -> String {
-    if addr.contains(':') {
-        addr.to_string()
-    } else {
-        format!("{}:{}", addr, default_port)
     }
 }
 

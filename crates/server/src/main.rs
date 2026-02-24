@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
+use tokio_tungstenite::WebSocketStream;
 
 use monster_battle_core::Monster;
 use monster_battle_network::protocol::NetAction;
@@ -16,8 +17,8 @@ struct QueuedPlayer {
     player_name: String,
     /// Monstre proposé.
     monster: Monster,
-    /// Stream TCP.
-    stream: TcpStream,
+    /// Stream WebSocket.
+    stream: WebSocketStream<TcpStream>,
 }
 
 /// Files d'attente globales du serveur.
@@ -39,7 +40,7 @@ impl ServerState {
 
 /// Répond à une requête HTTP avec le status de santé.
 async fn handle_http(mut stream: TcpStream) {
-    // Lire le reste de la requête HTTP (on a déjà peek les 4 premiers octets)
+    // Lire le reste de la requête HTTP (on a déjà peek les premiers octets)
     let mut buf = [0u8; 1024];
     let _ = stream.read(&mut buf).await;
     let body = r#"{"status":"online"}"#;
@@ -58,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = TcpListener::bind(&addr).await?;
     println!("🎮 Serveur Monster Battle démarré sur {}", addr);
-    println!("🩺 Route santé HTTP sur le même port");
+    println!("🌐 WebSocket sur /ws — santé HTTP sur /health");
     println!("   En attente de connexions...");
 
     let state = Arc::new(Mutex::new(ServerState::new()));
@@ -67,39 +68,56 @@ async fn main() -> anyhow::Result<()> {
         let (socket, peer_addr) = listener.accept().await?;
         let peer = peer_addr.to_string();
 
-        // Peek les premiers octets pour distinguer HTTP du protocole de jeu.
-        // HTTP commence par "GET " (0x47 0x45 0x54 0x20),
-        // le protocole de jeu commence par 4 octets de longueur (u32 BE).
-        let mut peek_buf = [0u8; 4];
-        let is_http = match socket.peek(&mut peek_buf).await {
-            Ok(n) if n >= 3 => peek_buf.starts_with(b"GET") || peek_buf.starts_with(b"HEA"),
-            _ => false,
+        // Peek les premiers octets pour distinguer HTTP du reste.
+        let mut peek_buf = vec![0u8; 2048];
+        let n = match socket.peek(&mut peek_buf).await {
+            Ok(n) => n,
+            Err(_) => continue,
         };
 
-        if is_http {
-            tokio::spawn(handle_http(socket));
-            continue;
-        }
+        let request = String::from_utf8_lossy(&peek_buf[..n]);
+        let is_websocket = request.to_ascii_lowercase().contains("upgrade: websocket");
+        let is_http =
+            request.starts_with("GET") || request.starts_with("HEA") || request.starts_with("POS");
 
-        println!("📡 Connexion entrante : {}", peer);
-        let state = Arc::clone(&state);
-        tokio::spawn(async move {
-            if let Err(e) = handle_client(socket, &peer, state).await {
-                eprintln!("❌ Erreur client {} : {}", peer, e);
-            }
-            println!("👋 Déconnexion : {}", peer);
-        });
+        if is_websocket {
+            println!("📡 Connexion WebSocket : {}", peer);
+            let state = Arc::clone(&state);
+            tokio::spawn(async move {
+                match tokio_tungstenite::accept_async(socket).await {
+                    Ok(ws_stream) => {
+                        if let Err(e) = handle_client(ws_stream, &peer, state).await {
+                            // Ignorer les déconnexions propres (health check, etc.)
+                            let msg = e.to_string();
+                            if !msg.contains("fermée")
+                                && !msg.contains("closed")
+                                && !msg.contains("reset")
+                                && !msg.contains("broken pipe")
+                            {
+                                eprintln!("❌ Erreur client {} : {}", peer, e);
+                            }
+                        }
+                        println!("👋 Déconnexion : {}", peer);
+                    }
+                    Err(e) => {
+                        eprintln!("❌ WebSocket handshake {} : {}", peer, e);
+                    }
+                }
+            });
+        } else if is_http {
+            tokio::spawn(handle_http(socket));
+        }
     }
 }
 
-/// Gère un client qui vient de se connecter.
+/// Gère un client qui vient de se connecter via WebSocket.
 async fn handle_client(
-    mut stream: TcpStream,
+    mut ws: WebSocketStream<TcpStream>,
     peer: &str,
     state: Arc<Mutex<ServerState>>,
 ) -> anyhow::Result<()> {
     // Attendre le premier message : Queue { action, monster, player_name }
-    let msg = read_message(&mut stream).await?;
+    let msg = read_message(&mut ws).await?;
 
     match msg {
         NetMessage::Queue {
@@ -113,20 +131,20 @@ async fn handle_client(
             );
 
             // Confirmer la mise en file
-            write_message(&mut stream, &NetMessage::Queued).await?;
+            write_message(&mut ws, &NetMessage::Queued).await?;
 
             let player = QueuedPlayer {
                 _id: peer.to_string(),
                 player_name,
                 monster,
-                stream,
+                stream: ws,
             };
 
             // Tenter un match
             try_match(player, action, state).await?;
         }
         NetMessage::Ping => {
-            write_message(&mut stream, &NetMessage::Pong).await?;
+            write_message(&mut ws, &NetMessage::Pong).await?;
         }
         NetMessage::Disconnect => {
             // Rien à faire
@@ -134,7 +152,7 @@ async fn handle_client(
         other => {
             let err = format!("Message inattendu : {:?}", other);
             eprintln!("⚠️  {} : {}", peer, err);
-            write_message(&mut stream, &NetMessage::Error(err)).await?;
+            write_message(&mut ws, &NetMessage::Error(err)).await?;
         }
     }
 
