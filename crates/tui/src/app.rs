@@ -73,7 +73,7 @@ pub struct App {
     pub scroll_offset: usize,
 
     // --- Réseau ---
-    /// Adresse du serveur relais (ex: "monserveur.com:7878").
+    /// Adresse du serveur relais (ex: "monster-battle.darthoit.eu").
     pub server_address: String,
     /// Log du dernier combat PvP.
     pub pvp_log: Vec<String>,
@@ -121,7 +121,7 @@ impl App {
             training_log: Vec::new(),
             scroll_offset: 0,
             server_address: std::env::var("MONSTER_SERVER")
-                .unwrap_or_else(|_| "monster-battle.darthoit.eu:7878".to_string()),
+                .unwrap_or_else(|_| "monster-battle.darthoit.eu".to_string()),
             pvp_log: Vec::new(),
             breeding_log: Vec::new(),
             remote_monster: None,
@@ -507,7 +507,7 @@ impl App {
 
         self.current_screen = Screen::Combat(PvpPhase::Searching);
 
-        let server_addr = self.server_address.clone();
+        let server_addr = format_server_addr(&self.server_address, 7878);
         let my_monster = monsters[0].clone();
         let player_name = monsters[0].name.clone();
         let (tx, rx) = mpsc::channel();
@@ -598,7 +598,7 @@ impl App {
 
         self.current_screen = Screen::Breeding(BreedPhase::Searching);
 
-        let server_addr = self.server_address.clone();
+        let server_addr = format_server_addr(&self.server_address, 7878);
         let my_monster = monsters[0].clone();
         let player_name = monsters[0].name.clone();
         let (tx, rx) = mpsc::channel();
@@ -1139,18 +1139,11 @@ impl App {
         let (tx, rx) = mpsc::channel();
         self.status_rx = Some(rx);
 
-        let addr = self.server_address.clone();
         let health_port: u16 = std::env::var("HEALTH_PORT")
             .unwrap_or_else(|_| "8080".to_string())
             .parse()
             .unwrap_or(8080);
-
-        // Remplacer le port game par le port health
-        let health_addr = if let Some(host) = addr.split(':').next() {
-            format!("{}:{}", host, health_port)
-        } else {
-            format!("{}:{}", addr, health_port)
-        };
+        let health_addr = format_server_addr(&self.server_address, health_port);
 
         self.tokio_rt.spawn(async move {
             loop {
@@ -1167,8 +1160,13 @@ impl App {
                             health_addr
                         );
                         if stream.write_all(req.as_bytes()).await.is_ok() {
-                            let mut buf = [0u8; 256];
-                            matches!(stream.read(&mut buf).await, Ok(n) if n > 0)
+                            let mut buf = [0u8; 512];
+                            if let Ok(n) = stream.read(&mut buf).await {
+                                let resp = String::from_utf8_lossy(&buf[..n]);
+                                resp.contains(r#""status":"online""#)
+                            } else {
+                                false
+                            }
                         } else {
                             false
                         }
@@ -1198,6 +1196,17 @@ impl App {
                 self.server_status = status;
             }
         }
+    }
+}
+
+/// Construit l'adresse `host:port` à partir d'une adresse serveur.
+/// Si l'adresse contient déjà un port (ex: "host:1234"), elle est renvoyée telle quelle.
+/// Sinon, le port par défaut est ajouté.
+fn format_server_addr(addr: &str, default_port: u16) -> String {
+    if addr.contains(':') {
+        addr.to_string()
+    } else {
+        format!("{}:{}", addr, default_port)
     }
 }
 

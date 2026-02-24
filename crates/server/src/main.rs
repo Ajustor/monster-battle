@@ -42,7 +42,10 @@ async fn run_health_server(addr: String) {
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("⚠️  Impossible de démarrer le health check sur {} : {}", addr, e);
+            eprintln!(
+                "⚠️  Impossible de démarrer le health check sur {} : {}",
+                addr, e
+            );
             return;
         }
     };
@@ -52,7 +55,7 @@ async fn run_health_server(addr: String) {
             tokio::spawn(async move {
                 let mut buf = [0u8; 1024];
                 let _ = socket.read(&mut buf).await;
-                let body = r#"{"status":"ok"}"#;
+                let body = r#"{"status":"online"}"#;
                 let response = format!(
                     "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{}",
                     body.len(),
@@ -161,7 +164,10 @@ async fn try_match(
         if queue.is_empty() {
             // Pas d'adversaire — mettre en file et attendre
             queue.push(player);
-            println!("   ⏳ En attente d'un partenaire... (file: {})", queue.len());
+            println!(
+                "   ⏳ En attente d'un partenaire... (file: {})",
+                queue.len()
+            );
             return Ok(());
         }
 
@@ -188,10 +194,7 @@ async fn try_match(
 }
 
 /// Exécute un combat PvP entre deux joueurs jumelés.
-async fn run_combat(
-    mut player_a: QueuedPlayer,
-    mut player_b: QueuedPlayer,
-) -> anyhow::Result<()> {
+async fn run_combat(mut player_a: QueuedPlayer, mut player_b: QueuedPlayer) -> anyhow::Result<()> {
     // Informer les deux joueurs qu'ils sont jumelés
     write_message(
         &mut player_a.stream,
@@ -284,8 +287,10 @@ async fn run_breeding(
     write_message(&mut player_a.stream, &partner_for_a).await?;
     write_message(&mut player_b.stream, &partner_for_b).await?;
 
-    println!("🧬 Données de reproduction échangées entre {} et {}",
-        player_a.player_name, player_b.player_name);
+    println!(
+        "🧬 Données de reproduction échangées entre {} et {}",
+        player_a.player_name, player_b.player_name
+    );
 
     Ok(())
 }
