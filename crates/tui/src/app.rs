@@ -28,13 +28,8 @@ enum NetworkEvent {
     Queued,
     /// Adversaire trouvé.
     Matched { opponent_name: String },
-    /// Combat PvP terminé — résultat reçu du serveur.
-    PvpDone {
-        winner_id: String,
-        loser_died: bool,
-        log: Vec<String>,
-        updated_monster: Monster,
-    },
+    /// Monstre de l'adversaire PvP reçu — lancer le combat interactif local.
+    CombatOpponentReceived(Monster),
     /// Monstre du partenaire reçu (reproduction).
     BreedingPartnerReceived(Monster),
     /// Erreur réseau.
@@ -513,7 +508,7 @@ impl App {
         let (tx, rx) = mpsc::channel();
 
         let handle = self.tokio_rt.spawn(async move {
-            let result: Result<_, anyhow::Error> = async {
+            let result: Result<Monster, anyhow::Error> = async {
                 let client = GameClient::new();
                 client.connect(&server_addr).await?;
 
@@ -548,31 +543,18 @@ impl App {
                     _ => return Err(anyhow::anyhow!("Réponse inattendue du serveur.")),
                 }
 
-                // Attendre le résultat du combat
+                // Attendre le monstre adversaire pour combat interactif
                 let msg = client.recv().await?;
                 match msg {
-                    NetMessage::CombatResult {
-                        winner_id,
-                        loser_died,
-                        log,
-                        updated_monster,
-                        ..
-                    } => {
-                        return Ok((winner_id, loser_died, log, updated_monster));
-                    }
-                    NetMessage::Error(e) => return Err(anyhow::anyhow!("{}", e)),
-                    _ => return Err(anyhow::anyhow!("Résultat inattendu.")),
+                    NetMessage::CombatOpponent { opponent_monster } => Ok(opponent_monster),
+                    NetMessage::Error(e) => Err(anyhow::anyhow!("{}", e)),
+                    _ => Err(anyhow::anyhow!("Données de l'adversaire manquantes.")),
                 }
             }
             .await;
 
             let event = match result {
-                Ok((winner_id, loser_died, log, updated_monster)) => NetworkEvent::PvpDone {
-                    winner_id,
-                    loser_died,
-                    log,
-                    updated_monster,
-                },
+                Ok(monster) => NetworkEvent::CombatOpponentReceived(monster),
                 Err(e) => NetworkEvent::NetError(format!("{}", e)),
             };
             let _ = tx.send(event);
@@ -909,9 +891,15 @@ impl App {
         let _ = self.storage.save(&monsters[0]);
 
         // Afficher le log complet dans l'écran de résultat
-        self.training_log = battle.full_log;
-        self.scroll_offset = 0;
-        self.current_screen = Screen::TrainingResult;
+        if battle.is_training {
+            self.training_log = battle.full_log;
+            self.scroll_offset = 0;
+            self.current_screen = Screen::TrainingResult;
+        } else {
+            self.pvp_log = battle.full_log;
+            self.scroll_offset = 0;
+            self.current_screen = Screen::Combat(PvpPhase::Result);
+        }
     }
 
     /// Finalise la reproduction après la saisie du nom.
@@ -1038,48 +1026,23 @@ impl App {
                     _ => {}
                 }
             }
-            NetworkEvent::PvpDone {
-                winner_id,
-                loser_died,
-                log,
-                updated_monster,
-            } => {
+            NetworkEvent::CombatOpponentReceived(opponent_monster) => {
                 // Nettoyer la tâche réseau
                 self.net_rx = None;
                 self.net_task = None;
 
-                if let Ok(mut monsters) = self.storage.list_alive() {
+                if let Ok(monsters) = self.storage.list_alive() {
                     if !monsters.is_empty() {
-                        let mut pvp_log = Vec::new();
-                        pvp_log.push(format!("⚔️  Combat PvP : {} !", monsters[0].name));
-                        pvp_log.push(String::new());
-                        pvp_log.extend(log);
-                        pvp_log.push(String::new());
-
-                        let my_id = monsters[0].id.to_string();
-                        if winner_id == my_id {
-                            pvp_log.push(format!("🏆 {} a gagné !", monsters[0].name));
-                            monsters[0].wins += 1;
-                            // XP basée sur le niveau du monstre adverse
-                            let xp = 50 + (updated_monster.level * 5);
-                            monsters[0].gain_xp(xp);
-                            monsters[0].current_hp = monsters[0].max_hp();
-                        } else {
-                            pvp_log.push(format!("💀 {} a perdu...", monsters[0].name));
-                            monsters[0].losses += 1;
-                            if loser_died {
-                                monsters[0].died_at = Some(chrono::Utc::now());
-                                pvp_log
-                                    .push(format!("☠️  {} est mort au combat !", monsters[0].name));
-                            }
-                        }
-
-                        let _ = self.storage.save(&monsters[0]);
-                        self.pvp_log = pvp_log;
+                        // Lancer le combat interactif (comme l'entraînement, mais is_training = false)
+                        let battle = BattleState::new(&monsters[0], &opponent_monster, false);
+                        self.battle_state = Some(battle);
+                        self.current_screen = Screen::Battle;
+                    } else {
+                        self.current_screen = Screen::MainMenu;
                     }
+                } else {
+                    self.current_screen = Screen::MainMenu;
                 }
-                self.scroll_offset = 0;
-                self.current_screen = Screen::Combat(PvpPhase::Result);
             }
             NetworkEvent::BreedingPartnerReceived(monster) => {
                 self.net_rx = None;

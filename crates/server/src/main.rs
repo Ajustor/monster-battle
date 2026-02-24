@@ -205,6 +205,7 @@ async fn try_match(
 }
 
 /// Exécute un combat PvP entre deux joueurs jumelés.
+/// Envoie à chaque joueur le monstre de l'adversaire pour un combat interactif local.
 async fn run_combat(mut player_a: QueuedPlayer, mut player_b: QueuedPlayer) -> anyhow::Result<()> {
     // Informer les deux joueurs qu'ils sont jumelés
     write_message(
@@ -223,44 +224,21 @@ async fn run_combat(mut player_a: QueuedPlayer, mut player_b: QueuedPlayer) -> a
     )
     .await?;
 
-    // Préparer les monstres pour le combat
-    let mut monster_a = player_a.monster.clone();
-    let mut monster_b = player_b.monster.clone();
-    monster_a.current_hp = monster_a.max_hp();
-    monster_b.current_hp = monster_b.max_hp();
+    // Envoyer à chaque joueur le monstre de l'autre pour combat interactif local
+    let opponent_for_a = NetMessage::CombatOpponent {
+        opponent_monster: player_b.monster.clone(),
+    };
+    let opponent_for_b = NetMessage::CombatOpponent {
+        opponent_monster: player_a.monster.clone(),
+    };
 
-    // Lancer le combat
-    let result = monster_battle_core::combat::fight(&mut monster_a, &mut monster_b)
-        .map_err(|e| anyhow::anyhow!(e))?;
-
-    let log: Vec<String> = result.log.iter().map(|e| e.describe()).collect();
+    write_message(&mut player_a.stream, &opponent_for_a).await?;
+    write_message(&mut player_b.stream, &opponent_for_b).await?;
 
     println!(
-        "⚔️  Résultat : vainqueur={} perdant={} mort={}",
-        result.winner_id, result.loser_id, result.loser_died
+        "⚔️  Monstres échangés pour combat interactif entre {} et {}",
+        player_a.player_name, player_b.player_name
     );
-
-    // Envoyer les résultats aux deux joueurs
-    // Joueur A reçoit son monstre mis à jour
-    let result_for_a = NetMessage::CombatResult {
-        winner_id: result.winner_id.to_string(),
-        loser_id: result.loser_id.to_string(),
-        loser_died: result.loser_died,
-        log: log.clone(),
-        updated_monster: monster_a,
-    };
-
-    // Joueur B reçoit son monstre mis à jour
-    let result_for_b = NetMessage::CombatResult {
-        winner_id: result.winner_id.to_string(),
-        loser_id: result.loser_id.to_string(),
-        loser_died: result.loser_died,
-        log,
-        updated_monster: monster_b,
-    };
-
-    write_message(&mut player_a.stream, &result_for_a).await?;
-    write_message(&mut player_b.stream, &result_for_b).await?;
 
     Ok(())
 }
