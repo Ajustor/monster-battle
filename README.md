@@ -38,7 +38,6 @@ Moteur du jeu, sans aucune dépendance I/O. Contient :
 - `Stats` — HP, Attaque, Défense, Vitesse, Attaque Spé, Défense Spé
 - `Trait` — 8 traits génétiques héritables/mutables
 - `Attack` — attaques physiques et spéciales liées aux types
-- `combat::fight()` — moteur de combat tour par tour
 - `genetics::breed()` — reproduction avec héritage de stats et mutations
 - `BattleState` — combat interactif style Pokémon
 
@@ -51,7 +50,7 @@ Persistance locale avec chiffrement :
 ### `network`
 Couche réseau client + protocole :
 - `GameClient` — client TCP asynchrone (tokio)
-- `NetMessage` — protocole JSON sérialisé avec préfixe de longueur (`Queue`, `Matched`, `CombatResult`, `BreedingPartner`, `Ping`/`Pong`, etc.)
+- `NetMessage` — protocole JSON sérialisé avec préfixe de longueur (`Queue`, `Matched`, `CombatOpponent`, `PvpAttackChoice`, `PvpTurnResult`, `BreedingPartner`, `Ping`/`Pong`, etc.)
 - `NetAction` — type d'action : `Combat` ou `Breed`
 
 ### `tui`

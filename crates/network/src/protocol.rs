@@ -32,15 +32,6 @@ pub enum NetMessage {
     Queued,
     /// Un adversaire / partenaire a été trouvé.
     Matched { opponent_name: String },
-    /// Résultat d'un combat PvP (calculé par le serveur).
-    CombatResult {
-        winner_id: String,
-        loser_id: String,
-        loser_died: bool,
-        log: Vec<String>,
-        /// Monstre du joueur mis à jour après combat.
-        updated_monster: Monster,
-    },
     /// Monstre de l'adversaire PvP (envoyé à chaque joueur pour affichage).
     CombatOpponent { opponent_monster: Monster },
     /// Résultat d'un tour PvP (messages + état).

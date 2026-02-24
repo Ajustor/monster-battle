@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 
 use monster_battle_core::types::ElementType;
@@ -41,9 +41,10 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, type_index: usize) {
     let cursor = if app.name_input_blink { "█" } else { " " };
     let input_text = format!("  {} {}", app.name_input, cursor);
 
-    let input = Paragraph::new(Line::from(vec![
-        Span::styled(input_text, Style::default().fg(Color::White)),
-    ]))
+    let input = Paragraph::new(Line::from(vec![Span::styled(
+        input_text,
+        Style::default().fg(Color::White),
+    )]))
     .block(
         Block::default()
             .title(" Nom de votre monstre ")

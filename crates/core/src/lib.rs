@@ -1,6 +1,5 @@
 pub mod attack;
 pub mod battle;
-pub mod combat;
 pub mod genetics;
 pub mod monster;
 pub mod types;

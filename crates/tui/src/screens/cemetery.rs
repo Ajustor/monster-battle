@@ -1,15 +1,15 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem},
-    Frame,
 };
 
 use monster_battle_storage::MonsterStorage;
 
-use crate::app::App;
 use super::common::draw_placeholder;
+use crate::app::App;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let dead = app.storage.list_dead().unwrap_or_default();

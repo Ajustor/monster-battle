@@ -72,16 +72,12 @@ pub struct App {
     /// Instant du dernier blink.
     blink_timer: Instant,
 
-    /// Log du dernier combat d'entraînement.
-    pub training_log: Vec<String>,
-    /// Offset de scroll pour le log de combat.
+    /// Offset de scroll pour le log de reproduction.
     pub scroll_offset: usize,
 
     // --- Réseau ---
     /// Adresse du serveur relais (ex: "monster-battle.darthoit.eu").
     pub server_address: String,
-    /// Log du dernier combat PvP.
-    pub pvp_log: Vec<String>,
 
     // --- Reproduction ---
     /// Log du résultat de reproduction.
@@ -125,11 +121,9 @@ impl App {
             name_input: String::new(),
             name_input_blink: true,
             blink_timer: Instant::now(),
-            training_log: Vec::new(),
             scroll_offset: 0,
             server_address: std::env::var("MONSTER_SERVER")
                 .unwrap_or_else(|_| "monster-battle.darthoit.eu".to_string()),
-            pvp_log: Vec::new(),
             breeding_log: Vec::new(),
             remote_monster: None,
             battle_state: None,
@@ -299,13 +293,8 @@ impl App {
             return;
         }
 
-        // Si on consulte le résultat d'un entraînement / PvP / breeding
-        if matches!(
-            self.current_screen,
-            Screen::TrainingResult | Screen::CombatResult | Screen::BreedingResult
-        ) || matches!(self.current_screen, Screen::Combat(PvpPhase::Result))
-            || matches!(self.current_screen, Screen::Breeding(BreedPhase::Result))
-        {
+        // Si on consulte le résultat d'une reproduction
+        if matches!(self.current_screen, Screen::Breeding(BreedPhase::Result)) {
             match code {
                 KeyCode::Up => {
                     self.scroll_offset = self.scroll_offset.saturating_sub(1);
@@ -988,15 +977,22 @@ impl App {
 
         let _ = self.storage.save(&monsters[0]);
 
-        // Afficher le log complet dans l'écran de résultat
-        if battle.is_training {
-            self.training_log = battle.full_log;
-            self.scroll_offset = 0;
-            self.current_screen = Screen::TrainingResult;
+        // Retour au menu principal avec un résumé
+        self.current_screen = Screen::MainMenu;
+        if is_victory {
+            self.message = Some(format!(
+                "🏆 Victoire ! +{} XP{}",
+                battle.xp_gained,
+                if battle.is_training {
+                    " (entraînement)"
+                } else {
+                    ""
+                }
+            ));
+        } else if battle.is_training {
+            self.message = Some("Défaite à l'entraînement — pas de pénalité !".to_string());
         } else {
-            self.pvp_log = battle.full_log;
-            self.scroll_offset = 0;
-            self.current_screen = Screen::Combat(PvpPhase::Result);
+            self.message = Some("💀 Défaite... Votre monstre est mort.".to_string());
         }
     }
 

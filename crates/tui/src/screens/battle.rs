@@ -11,6 +11,7 @@ use monster_battle_core::types::ElementType;
 
 use super::common::draw_placeholder;
 use crate::app::App;
+use crate::sprites;
 
 // ── Couleur par élément ─────────────────────────────────────────────
 
@@ -119,7 +120,9 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
 
     // ── Sprite adversaire ───────────────────────────────────────
     let is_hit = matches!(battle.anim_type, Some(AnimationType::OpponentHit));
-    let is_dead = opp.display_hp == 0 && opp.current_hp == 0;
+    let is_dead = opp.current_hp == 0
+        && opp.display_hp == 0
+        && matches!(battle.phase, BattlePhase::Victory | BattlePhase::Defeat);
     let sprite_color = if is_hit {
         Color::Red
     } else {
@@ -142,21 +145,10 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
             Line::from(Span::styled("       💥", Style::default().fg(Color::Red))),
         ]
     } else {
-        vec![
-            Line::from(""),
-            Line::from(Span::styled(
-                "      ╔════╗",
-                Style::default().fg(sprite_color),
-            )),
-            Line::from(Span::styled(
-                format!("      ║ {} ║", opp.element.icon()),
-                Style::default().fg(sprite_color),
-            )),
-            Line::from(Span::styled(
-                "      ╚════╝",
-                Style::default().fg(sprite_color),
-            )),
-        ]
+        let art = sprites::get_sprite(opp.element, opp.secondary_element);
+        art.iter()
+            .map(|line| Line::from(Span::styled(*line, Style::default().fg(sprite_color))))
+            .collect()
     };
     frame.render_widget(Paragraph::new(sprite_lines), cols[1]);
 }
@@ -172,7 +164,9 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
 
     // ── Sprite joueur ───────────────────────────────────────────
     let is_hit = matches!(battle.anim_type, Some(AnimationType::PlayerHit));
-    let is_dead = p.display_hp == 0 && p.current_hp == 0;
+    let is_dead = p.current_hp == 0
+        && p.display_hp == 0
+        && matches!(battle.phase, BattlePhase::Victory | BattlePhase::Defeat);
     let sprite_color = if is_hit {
         Color::Red
     } else {
@@ -192,14 +186,10 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
             Line::from(""),
         ]
     } else {
-        vec![
-            Line::from(Span::styled("  ╔════╗", Style::default().fg(sprite_color))),
-            Line::from(Span::styled(
-                format!("  ║ {} ║", p.element.icon()),
-                Style::default().fg(sprite_color),
-            )),
-            Line::from(Span::styled("  ╚════╝", Style::default().fg(sprite_color))),
-        ]
+        let art = sprites::get_sprite(p.element, p.secondary_element);
+        art.iter()
+            .map(|line| Line::from(Span::styled(*line, Style::default().fg(sprite_color))))
+            .collect()
     };
     frame.render_widget(Paragraph::new(sprite_lines), cols[0]);
 

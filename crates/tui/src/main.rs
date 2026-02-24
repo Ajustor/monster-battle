@@ -1,5 +1,6 @@
 mod app;
 mod screens;
+mod sprites;
 
 use anyhow::Result;
 
