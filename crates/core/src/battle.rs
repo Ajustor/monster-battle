@@ -102,6 +102,8 @@ pub struct BattleMessage {
     pub player_hp: Option<u32>,
     /// Si défini, met à jour les PV visuels de l'adversaire quand le message est affiché.
     pub opponent_hp: Option<u32>,
+    /// Animation à déclencher quand ce message est affiché.
+    pub anim_type: Option<AnimationType>,
 }
 
 /// Type d'animation en cours.
@@ -214,6 +216,10 @@ impl BattleState {
             }
             if let Some(hp) = msg.opponent_hp {
                 self.opponent_target_hp = hp;
+            }
+            if let Some(ref anim) = msg.anim_type {
+                self.anim_type = Some(anim.clone());
+                self.anim_frame = 0;
             }
             self.current_message = Some(msg);
             self.message_counter += 1;
@@ -355,6 +361,7 @@ impl BattleState {
             style,
             player_hp: None,
             opponent_hp: None,
+            anim_type: None,
         });
         self.full_log.push(text.to_string());
     }
@@ -372,6 +379,7 @@ impl BattleState {
             style,
             player_hp,
             opponent_hp,
+            anim_type: None,
         });
         self.full_log.push(text.to_string());
     }
@@ -383,6 +391,10 @@ impl BattleState {
             }
             if let Some(hp) = msg.opponent_hp {
                 self.opponent_target_hp = hp;
+            }
+            if let Some(ref anim) = msg.anim_type {
+                self.anim_type = Some(anim.clone());
+                self.anim_frame = 0;
             }
             self.current_message = Some(msg);
             self.message_counter += 1;
@@ -408,10 +420,7 @@ impl BattleState {
                 MessageStyle::Info,
             );
         } else {
-            self.queue_msg(
-                &format!("💀 {} est K.O. !", self.player.name),
-                MessageStyle::Defeat,
-            );
+            // Le message "💀 est K.O." est déjà ajouté par execute_attack.
             if self.is_training {
                 self.queue_msg(
                     "Pas de pénalité — c'est de l'entraînement !",
@@ -497,13 +506,12 @@ impl BattleState {
             def_secondary = defender.secondary_element;
         }
 
-        // ── Animation ───────────────────────────────────────────────
-        self.anim_type = Some(if is_player {
+        // Animation d'attaque associée au message "utilise"
+        let atk_anim = Some(if is_player {
             AnimationType::PlayerAttack
         } else {
             AnimationType::OpponentAttack
         });
-        self.anim_frame = 0;
 
         // ── Précision ───────────────────────────────────────────────
         if rng.gen_range(0u8..100) >= attack.accuracy {
@@ -515,6 +523,9 @@ impl BattleState {
                     MessageStyle::OpponentAttack
                 },
             );
+            if let Some(msg) = self.message_queue.back_mut() {
+                msg.anim_type = atk_anim;
+            }
             self.queue_msg("L'attaque a raté !", MessageStyle::Info);
             return;
         }
@@ -529,6 +540,9 @@ impl BattleState {
                     MessageStyle::OpponentAttack
                 },
             );
+            if let Some(msg) = self.message_queue.back_mut() {
+                msg.anim_type = atk_anim;
+            }
             self.queue_msg(
                 &format!("💨 {} esquive l'attaque !", def_name),
                 MessageStyle::Info,
@@ -571,6 +585,9 @@ impl BattleState {
                 MessageStyle::OpponentAttack
             },
         );
+        if let Some(msg) = self.message_queue.back_mut() {
+            msg.anim_type = atk_anim;
+        }
 
         if type_mult > 1.2 {
             self.queue_msg("C'est super efficace ! 💥", MessageStyle::SuperEffective);
@@ -581,16 +598,15 @@ impl BattleState {
             self.queue_msg("Coup critique ! 💥", MessageStyle::Critical);
         }
 
-        // ── Animation de dégâts ─────────────────────────────────────
-        self.anim_type = Some(if is_player {
+        // ── Application des dégâts ──────────────────────────────────
+        let (actual, tenacity_saved) = self.apply_damage(!is_player, total_damage, rng);
+
+        // Animation de dégâts attachée au message → se déclenche à l'affichage
+        let hit_anim = Some(if is_player {
             AnimationType::OpponentHit
         } else {
             AnimationType::PlayerHit
         });
-        self.anim_frame = 0;
-
-        // ── Application des dégâts ──────────────────────────────────
-        let (actual, tenacity_saved) = self.apply_damage(!is_player, total_damage, rng);
 
         // Snapshot HP après dégâts → la barre se mettra à jour à l'affichage de CE message
         let (p_hp, o_hp) = (self.player.current_hp, self.opponent.current_hp);
@@ -600,6 +616,9 @@ impl BattleState {
             if !is_player { Some(p_hp) } else { None },
             if is_player { Some(o_hp) } else { None },
         );
+        if let Some(msg) = self.message_queue.back_mut() {
+            msg.anim_type = hit_anim;
+        }
 
         if tenacity_saved {
             self.queue_msg(

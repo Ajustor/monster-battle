@@ -865,10 +865,10 @@ impl App {
                 )));
             }
             MessageStyle::Defeat => {
-                effects.push(fx::dissolve(EffectTimer::from_ms(
-                    800,
-                    Interpolation::QuadIn,
-                )));
+                effects.push(fx::fade_from_fg(
+                    Color::Red,
+                    EffectTimer::from_ms(600, Interpolation::QuadIn),
+                ));
             }
             _ => {}
         }
