@@ -1,0 +1,14 @@
+[package]
+name = "monster-battle-network"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+monster-battle-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true

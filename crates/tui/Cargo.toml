@@ -1,0 +1,16 @@
+[package]
+name = "monster-battle-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+monster-battle-core.workspace = true
+monster-battle-storage.workspace = true
+monster-battle-network.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+anyhow.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+chrono.workspace = true
