@@ -34,3 +34,22 @@ pub fn get_sprite(
         ElementType::Normal => fire::sprite(secondary), // fallback
     }
 }
+
+/// Retourne un sprite ASCII art de dos (5 lignes) pour un monstre vu de derrière.
+/// Utilisé côté joueur en combat, comme dans Pokémon.
+pub fn get_back_sprite(
+    primary: ElementType,
+    secondary: Option<ElementType>,
+) -> [&'static str; SPRITE_HEIGHT] {
+    match primary {
+        ElementType::Fire => fire::back_sprite(secondary),
+        ElementType::Water => water::back_sprite(secondary),
+        ElementType::Plant => plant::back_sprite(secondary),
+        ElementType::Electric => electric::back_sprite(secondary),
+        ElementType::Earth => earth::back_sprite(secondary),
+        ElementType::Wind => wind::back_sprite(secondary),
+        ElementType::Shadow => shadow::back_sprite(secondary),
+        ElementType::Light => light::back_sprite(secondary),
+        ElementType::Normal => fire::back_sprite(secondary), // fallback
+    }
+}

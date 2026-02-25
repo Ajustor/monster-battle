@@ -71,3 +71,73 @@ pub fn sprite(secondary: Option<ElementType>) -> [&'static str; 5] {
         _ => sprite(None),
     }
 }
+
+pub fn back_sprite(secondary: Option<ElementType>) -> [&'static str; 5] {
+    match secondary {
+        // Électrique pur (dos)
+        None => [
+            r"   /\   /\    ",
+            r"  / ^^^^^ \   ",
+            r"  |  ===  |   ",
+            r"   \ vvv /    ",
+            r"    | w |     ",
+        ],
+        // Électrique + Feu (dos)
+        Some(ElementType::Fire) => [
+            r"  ^/\   /\^   ",
+            r"  / ^^^^^ \   ",
+            r"  |^^===^^|   ",
+            r"   \ vvv /    ",
+            r"   ^| w |^    ",
+        ],
+        // Électrique + Eau (dos)
+        Some(ElementType::Water) => [
+            r"  ~/\   /\~   ",
+            r"  / ~~~~~ \   ",
+            r"  |~ === ~|   ",
+            r"   \ ~~~ /    ",
+            r"   ~| w |~    ",
+        ],
+        // Électrique + Plante (dos)
+        Some(ElementType::Plant) => [
+            r"  @/\   /\@   ",
+            r"  / @@@@@ \   ",
+            r"  |@ === @|   ",
+            r"   \ @@@ /    ",
+            r"   @| w |@    ",
+        ],
+        // Électrique + Terre (dos)
+        Some(ElementType::Earth) => [
+            r"  [/\   /\]   ",
+            r"  [ ^^^^^ ]   ",
+            r"  |[ === ]|   ",
+            r"   [ vvv ]    ",
+            r"   [| w |]    ",
+        ],
+        // Électrique + Vent (dos)
+        Some(ElementType::Wind) => [
+            r"  =/\   /\=   ",
+            r"  / ===== \   ",
+            r" =|  ===  |=  ",
+            r"   \ === /    ",
+            r"   =| w |=    ",
+        ],
+        // Électrique + Ombre (dos)
+        Some(ElementType::Shadow) => [
+            r"  ./\   /\.   ",
+            r"  / ..... \   ",
+            r"  |. === .|   ",
+            r"   \ ... /    ",
+            r"   .| w |.    ",
+        ],
+        // Électrique + Lumière (dos)
+        Some(ElementType::Light) => [
+            r"  */\   /\*   ",
+            r"  / ***** \   ",
+            r"  |* === *|   ",
+            r"   \ *** /    ",
+            r"   *| w |*    ",
+        ],
+        _ => back_sprite(None),
+    }
+}

@@ -71,3 +71,73 @@ pub fn sprite(secondary: Option<ElementType>) -> [&'static str; 5] {
         _ => sprite(None),
     }
 }
+
+pub fn back_sprite(secondary: Option<ElementType>) -> [&'static str; 5] {
+    match secondary {
+        // Lumière pure (dos)
+        None => [
+            r"   \*|  |*/   ",
+            r"    (^^^^)    ",
+            r"    | ** |    ",
+            r"    |/  \|    ",
+            r"    * ww *    ",
+        ],
+        // Lumière + Feu (dos)
+        Some(ElementType::Fire) => [
+            r"  ^\*| |*/^   ",
+            r"    (^^^^)    ",
+            r"    |^**^|    ",
+            r"    |/^^\|    ",
+            r"   ^* ww *^   ",
+        ],
+        // Lumière + Eau (dos)
+        Some(ElementType::Water) => [
+            r"  ~\*|  |*/~  ",
+            r"    (~~~~)    ",
+            r"    |~**~|    ",
+            r"    |/~~\|    ",
+            r"   ~* ww *~   ",
+        ],
+        // Lumière + Plante (dos)
+        Some(ElementType::Plant) => [
+            r"  @\*|  |*/@  ",
+            r"    (@@@@)    ",
+            r"    |@**@|    ",
+            r"    |/@@\|    ",
+            r"   @* ww *@   ",
+        ],
+        // Lumière + Électrique (dos)
+        Some(ElementType::Electric) => [
+            r"  Z\*|  |*/Z  ",
+            r"    (ZZZZ)    ",
+            r"    |Z**Z|    ",
+            r"    |/ZZ\|    ",
+            r"   Z* ww *Z   ",
+        ],
+        // Lumière + Terre (dos)
+        Some(ElementType::Earth) => [
+            r"  [\*|  |*/]  ",
+            r"    [^^^^]    ",
+            r"    |[**]|    ",
+            r"    |/##\|    ",
+            r"   [* ww *]   ",
+        ],
+        // Lumière + Vent (dos)
+        Some(ElementType::Wind) => [
+            r"  =\*|  |*/=  ",
+            r"    (====)    ",
+            r"   =| ** |=   ",
+            r"    |/==\|    ",
+            r"   =* ww *=   ",
+        ],
+        // Lumière + Ombre (dos)
+        Some(ElementType::Shadow) => [
+            r"  .\*|  |*/.  ",
+            r"    (....)    ",
+            r"    |.**.|    ",
+            r"    |/..\|    ",
+            r"   .* ww *.   ",
+        ],
+        _ => back_sprite(None),
+    }
+}

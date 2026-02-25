@@ -186,7 +186,7 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
             Line::from(""),
         ]
     } else {
-        let art = sprites::get_sprite(p.element, p.secondary_element);
+        let art = sprites::get_back_sprite(p.element, p.secondary_element);
         art.iter()
             .map(|line| Line::from(Span::styled(*line, Style::default().fg(sprite_color))))
             .collect()
