@@ -71,3 +71,73 @@ pub fn sprite(secondary: Option<ElementType>) -> [&'static str; 5] {
         _ => sprite(None),
     }
 }
+
+pub fn back_sprite(secondary: Option<ElementType>) -> [&'static str; 5] {
+    match secondary {
+        // Vent pur (dos)
+        None => [
+            r"  __/\  /\__  ",
+            r" /   ^^^^   \ ",
+            r" |   /^^\   | ",
+            r"  \__/  \__/  ",
+            r"     |  |     ",
+        ],
+        // Vent + Feu (dos)
+        Some(ElementType::Fire) => [
+            r" ^__/\  /\__^ ",
+            r" /   ^^^^   \ ",
+            r" |  ^/^^\^  | ",
+            r"  \__/^^\__/  ",
+            r"    ^|^^|^    ",
+        ],
+        // Vent + Eau (dos)
+        Some(ElementType::Water) => [
+            r" ~__/\  /\__~ ",
+            r" /   ~~~~   \ ",
+            r" | ~~/^^\~~ | ",
+            r"  \__/  \__/  ",
+            r"    ~|~~|~    ",
+        ],
+        // Vent + Plante (dos)
+        Some(ElementType::Plant) => [
+            r" @__/\  /\__@ ",
+            r" /   @@@@   \ ",
+            r" | @@/^^\@@ | ",
+            r"  \__/@_\__/  ",
+            r"    @|@@|@    ",
+        ],
+        // Vent + Électrique (dos)
+        Some(ElementType::Electric) => [
+            r" Z__/\  /\__Z ",
+            r" /   ZZZZ   \ ",
+            r" | Z /^^\ Z | ",
+            r"  \__/ZZ\__/  ",
+            r"    Z|ZZ|Z    ",
+        ],
+        // Vent + Terre (dos)
+        Some(ElementType::Earth) => [
+            r" #__/\  /\__# ",
+            r" /   ####   \ ",
+            r" | # /^^\ # | ",
+            r"  [__/  \__]  ",
+            r"    #|##|#    ",
+        ],
+        // Vent + Ombre (dos)
+        Some(ElementType::Shadow) => [
+            r" .__/\  /\__. ",
+            r" /   ....   \ ",
+            r" | . /^^\ . | ",
+            r"  \__/..\__/  ",
+            r"    .|..|.    ",
+        ],
+        // Vent + Lumière (dos)
+        Some(ElementType::Light) => [
+            r" *__/\  /\__* ",
+            r" /   ****   \ ",
+            r" | * /^^\ * | ",
+            r"  \__/ *\__/  ",
+            r"    *|**|     ",
+        ],
+        _ => back_sprite(None),
+    }
+}
