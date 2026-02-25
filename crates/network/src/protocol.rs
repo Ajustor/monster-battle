@@ -28,6 +28,8 @@ pub enum NetMessage {
     PvpAttackChoice { attack_index: usize },
     /// Le joueur abandonne le combat PvP (fuite).
     PvpForfeit,
+    /// Le joueur a fini de lire les messages du tour (synchronisation PvP).
+    PvpReady,
     /// Demander la version du serveur.
     VersionCheck,
     // ── Serveur → Client ────────────────────────────
@@ -56,6 +58,8 @@ pub enum NetMessage {
         /// Le perdant a-t-il fui ? (pertinent si `battle_over`).
         loser_fled: bool,
     },
+    /// Signal de début de tour (PvP — envoyé quand les deux joueurs sont prêts).
+    PvpNextTurn,
     /// Données du monstre partenaire (reproduction — envoyé à chaque joueur).
     BreedingPartner { partner_monster: Monster },
     /// Réponse à un VersionCheck.

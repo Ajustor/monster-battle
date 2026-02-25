@@ -158,7 +158,19 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         m.max_age_days()
     );
 
-    let stat_modifier = format!("{}% ({})", (stage.stat_multiplier() * 100.0) as i32, stage);
+    let hunger = m.hunger_level();
+    let hunger_info = format!("{} {}", hunger.icon(), hunger);
+    let hunger_modifier = format!("{}%", (hunger.stat_multiplier() * 100.0) as i32);
+
+    let stat_modifier = format!(
+        "{}% ({})",
+        (stage.stat_multiplier() * hunger.stat_multiplier() * 100.0) as i32,
+        if hunger.stat_multiplier() != 1.0 {
+            format!("{} × {}", stage, hunger)
+        } else {
+            format!("{}", stage)
+        }
+    );
 
     let info = format!(
         r#"
@@ -176,6 +188,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
   Traits     : {}
   Stade      : {} {}
   Âge        : {}
+  Faim       : {} (stats: {})
   Puissance  : {}
   Génération : {}
   Victoires  : {}  |  Défaites : {}
@@ -195,6 +208,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         stage.icon(),
         stage,
         age_bar,
+        hunger_info,
+        hunger_modifier,
         stat_modifier,
         m.generation,
         m.wins,

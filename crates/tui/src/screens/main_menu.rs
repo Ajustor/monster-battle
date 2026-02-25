@@ -22,6 +22,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         items.push("🧬 Reproduction");
     }
     items.push("💀 Cimetière");
+    items.push("❓ Aide");
     items.push("🚪 Quitter");
 
     let list_items: Vec<ListItem> = items
