@@ -1,8 +1,8 @@
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Flex, Layout};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
-use ratatui::Frame;
 
 /// Dessine la modale de mise à jour par-dessus tout.
 pub fn draw(frame: &mut Frame, server_version: Option<&str>) {
@@ -69,19 +69,17 @@ pub fn draw(frame: &mut Frame, server_version: Option<&str>) {
         )),
     ];
 
-    let paragraph = Paragraph::new(lines)
-        .wrap(Wrap { trim: false })
-        .block(
-            Block::default()
-                .title(" 🔄 Mise à jour ")
-                .title_style(
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow)),
-        );
+    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false }).block(
+        Block::default()
+            .title(" 🔄 Mise à jour ")
+            .title_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow)),
+    );
 
     frame.render_widget(paragraph, modal_area);
 }

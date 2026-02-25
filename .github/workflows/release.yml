@@ -5,8 +5,6 @@ on:
     branches: [master]
     tags:
       - 'v*' # Déclenche aussi sur les tags (ex: v1.0.0)
-  pull_request:
-    branches: [master]
 
 permissions:
   contents: write
