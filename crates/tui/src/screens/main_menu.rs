@@ -12,10 +12,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let has_monster = app.has_living_monster();
 
     let mut items: Vec<&str> = Vec::new();
-    items.push("🐾 Mon Monstre");
-    if !has_monster {
-        items.push("🥚 Nouveau Monstre");
-    }
+    items.push("🐾 Mes Monstres");
+    items.push("🥚 Nouveau Monstre");
     if has_monster {
         items.push("⚔️  Entraînement");
         items.push("🗡️  Combat PvP");

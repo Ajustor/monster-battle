@@ -43,10 +43,16 @@ pub fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
                 "Tapez le nom de votre monstre | Enter Valider | Esc Annuler".to_string()
             }
             Screen::Combat(phase) => match phase {
+                crate::screens::pvp::PvpPhase::SelectMonster => {
+                    "↑↓ Naviguer | Enter Sélectionner | Esc Annuler".to_string()
+                }
                 crate::screens::pvp::PvpPhase::Error(_) => "Enter ou Esc pour revenir".to_string(),
                 _ => "Esc Annuler".to_string(),
             },
             Screen::Breeding(phase) => match phase {
+                crate::screens::breeding::BreedPhase::SelectMonster => {
+                    "↑↓ Naviguer | Enter Sélectionner | Esc Annuler".to_string()
+                }
                 crate::screens::breeding::BreedPhase::NamingChild => {
                     "Tapez le nom du bébé | Enter Valider | Esc Annuler".to_string()
                 }
@@ -81,7 +87,10 @@ pub fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
                     String::new()
                 }
             }
-            Screen::MonsterList => "f Nourrir | q Retour".to_string(),
+            Screen::MonsterList => "↑↓ Naviguer | f Nourrir | q Retour".to_string(),
+            Screen::TrainingSelectMonster => {
+                "↑↓ Naviguer | Enter Sélectionner | Esc Annuler".to_string()
+            }
             Screen::Help => "↑↓ Défiler | q Retour".to_string(),
             _ => "↑↓ Naviguer | Enter Sélectionner | q Retour".to_string(),
         }

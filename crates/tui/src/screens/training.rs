@@ -20,7 +20,10 @@ pub fn draw_select(frame: &mut Frame, area: Rect, app: &App, wild: bool) {
         return;
     }
 
-    let m = &monsters[0];
+    let idx = app
+        .monster_select_index
+        .min(monsters.len().saturating_sub(1));
+    let m = &monsters[idx];
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -31,7 +34,7 @@ pub fn draw_select(frame: &mut Frame, area: Rect, app: &App, wild: bool) {
         ])
         .split(area);
 
-    // Info du monstre du joueur
+    // Info du monstre sélectionné
     let player_info = Paragraph::new(Line::from(vec![
         Span::styled("  Votre monstre : ", Style::default().fg(Color::DarkGray)),
         Span::styled(
@@ -133,4 +136,15 @@ pub fn draw_select(frame: &mut Frame, area: Rect, app: &App, wild: bool) {
     );
 
     frame.render_widget(list, chunks[2]);
+}
+
+/// Écran de sélection du monstre pour l'entraînement.
+pub fn draw_select_monster(frame: &mut Frame, area: Rect, app: &App) {
+    super::pvp::draw_monster_selection(
+        frame,
+        area,
+        app,
+        " ⚔️  Choisir un monstre — Entraînement ",
+        Color::Yellow,
+    );
 }

@@ -31,6 +31,8 @@ pub enum Screen {
     /// Entraînement contre un bot.
     /// `wild` = false : docile (50% XP, pas de mort) / `wild` = true : sauvage (100% XP, mort possible).
     Training { wild: bool },
+    /// Sélection du monstre pour l'entraînement.
+    TrainingSelectMonster,
     /// Interface de combat PvP.
     Combat(pvp::PvpPhase),
     /// Interface de reproduction.
@@ -67,7 +69,9 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Screen::Help => help::draw(frame, chunks[1], app),
         Screen::Battle => battle::draw(frame, chunks[1], app),
         Screen::Training { wild } => training::draw_select(frame, chunks[1], app, *wild),
+        Screen::TrainingSelectMonster => training::draw_select_monster(frame, chunks[1], app),
         Screen::Combat(phase) => match phase {
+            pvp::PvpPhase::SelectMonster => pvp::draw_select_monster(frame, chunks[1], app),
             pvp::PvpPhase::Searching => pvp::draw_searching(frame, chunks[1], app),
             pvp::PvpPhase::Matched { opponent_name } => {
                 pvp::draw_matched(frame, chunks[1], app, opponent_name)
@@ -75,6 +79,9 @@ pub fn draw(frame: &mut Frame, app: &App) {
             pvp::PvpPhase::Error(e) => pvp::draw_error(frame, chunks[1], e),
         },
         Screen::Breeding(phase) => match phase {
+            breeding::BreedPhase::SelectMonster => {
+                breeding::draw_select_monster(frame, chunks[1], app)
+            }
             breeding::BreedPhase::Searching => breeding::draw_searching(frame, chunks[1], app),
             breeding::BreedPhase::Matched { opponent_name } => {
                 breeding::draw_matched(frame, chunks[1], app, opponent_name)

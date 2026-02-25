@@ -12,6 +12,8 @@ use crate::app::App;
 /// Sous-écrans de la reproduction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BreedPhase {
+    /// Sélection du monstre à envoyer en reproduction.
+    SelectMonster,
     /// Recherche d'un partenaire sur le serveur.
     Searching,
     /// Partenaire trouvé, échange en cours.
@@ -152,6 +154,17 @@ pub fn draw_breed_result(frame: &mut Frame, area: Rect, app: &App) {
         );
 
     frame.render_widget(paragraph, area);
+}
+
+/// Dessine l'écran de sélection du monstre pour la reproduction.
+pub fn draw_select_monster(frame: &mut Frame, area: Rect, app: &App) {
+    super::pvp::draw_monster_selection(
+        frame,
+        area,
+        app,
+        " 🧬 Choisir un monstre — Reproduction ",
+        Color::Magenta,
+    );
 }
 
 /// Erreur réseau.
