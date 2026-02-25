@@ -47,8 +47,8 @@ impl BattleMonster {
             attack_stat: monster.effective_attack(),
             defense_stat: monster.effective_defense(),
             speed_stat: monster.effective_speed(),
-            sp_attack: monster.base_stats.special_attack + (monster.level / 2),
-            sp_defense: monster.base_stats.special_defense + (monster.level / 2),
+            sp_attack: monster.effective_sp_attack(),
+            sp_defense: monster.effective_sp_defense(),
         }
     }
 
@@ -760,10 +760,13 @@ impl BattleState {
         // Vérifier fin de combat
         if self.player.current_hp == 0 {
             self.loser_died = true;
+            // XP pour le vainqueur (l'adversaire) — doublé car kill en PvP
+            self.xp_gained = (50 + (self.player.level * 5)) * 2;
             self.phase = BattlePhase::Defeat;
             self.queue_end_messages(false);
         } else if self.opponent.current_hp == 0 {
-            self.xp_gained = 50 + (self.opponent.level * 5);
+            // XP doublé car kill en PvP
+            self.xp_gained = (50 + (self.opponent.level * 5)) * 2;
             self.phase = BattlePhase::Victory;
             self.queue_end_messages(true);
         } else {

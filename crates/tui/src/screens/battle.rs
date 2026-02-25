@@ -123,11 +123,6 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
     let is_dead = opp.current_hp == 0
         && opp.display_hp == 0
         && matches!(battle.phase, BattlePhase::Victory | BattlePhase::Defeat);
-    let sprite_color = if is_hit {
-        Color::Red
-    } else {
-        element_color(opp.element)
-    };
 
     let sprite_lines = if is_dead {
         vec![
@@ -145,10 +140,12 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
             Line::from(Span::styled("       💥", Style::default().fg(Color::Red))),
         ]
     } else {
-        let art = sprites::get_sprite(opp.element, opp.secondary_element);
-        art.iter()
-            .map(|line| Line::from(Span::styled(*line, Style::default().fg(sprite_color))))
-            .collect()
+        let grid = sprites::pixel::get_pixel_sprite(opp.element, opp.secondary_element);
+        if is_hit {
+            sprites::pixel::render_pixel_sprite_hit(grid)
+        } else {
+            sprites::pixel::render_pixel_sprite(grid, opp.element, opp.secondary_element)
+        }
     };
     frame.render_widget(Paragraph::new(sprite_lines), cols[1]);
 }
@@ -167,11 +164,6 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
     let is_dead = p.current_hp == 0
         && p.display_hp == 0
         && matches!(battle.phase, BattlePhase::Victory | BattlePhase::Defeat);
-    let sprite_color = if is_hit {
-        Color::Red
-    } else {
-        element_color(p.element)
-    };
 
     let sprite_lines = if is_dead {
         vec![
@@ -186,10 +178,12 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
             Line::from(""),
         ]
     } else {
-        let art = sprites::get_back_sprite(p.element, p.secondary_element);
-        art.iter()
-            .map(|line| Line::from(Span::styled(*line, Style::default().fg(sprite_color))))
-            .collect()
+        let grid = sprites::pixel::get_pixel_back_sprite(p.element, p.secondary_element);
+        if is_hit {
+            sprites::pixel::render_pixel_sprite_hit(grid)
+        } else {
+            sprites::pixel::render_pixel_sprite(grid, p.element, p.secondary_element)
+        }
     };
     frame.render_widget(Paragraph::new(sprite_lines), cols[0]);
 

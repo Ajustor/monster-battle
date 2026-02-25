@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::WebSocketStream;
 
 use monster_battle_core::Monster;
-use monster_battle_core::battle::{BattlePhase, BattleState};
+use monster_battle_core::battle::{BattleMessage, BattlePhase, BattleState, MessageStyle};
 use monster_battle_network::protocol::NetAction;
 use monster_battle_network::{NetMessage, read_message, write_message};
 
@@ -275,18 +275,113 @@ async fn run_combat(mut player_a: QueuedPlayer, mut player_b: QueuedPlayer) -> a
     // Boucle de combat tour par tour
     loop {
         // Attendre les choix d'attaque des deux joueurs en parallèle
+        // Un joueur peut aussi forfeit (fuir)
+        enum PlayerChoice {
+            Attack(usize),
+            Forfeit,
+        }
+
+        async fn wait_for_player_choice(
+            ws: &mut WebSocketStream<TcpStream>,
+        ) -> anyhow::Result<PlayerChoice> {
+            loop {
+                let msg = read_message(ws).await?;
+                match msg {
+                    NetMessage::PvpAttackChoice { attack_index } => {
+                        return Ok(PlayerChoice::Attack(attack_index));
+                    }
+                    NetMessage::PvpForfeit => return Ok(PlayerChoice::Forfeit),
+                    NetMessage::Ping => {
+                        write_message(ws, &NetMessage::Pong).await?;
+                    }
+                    NetMessage::Disconnect => {
+                        return Err(anyhow::anyhow!("Joueur déconnecté pendant le combat"));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         let (choice_a, choice_b) = tokio::try_join!(
-            wait_for_attack_choice(&mut player_a.stream),
-            wait_for_attack_choice(&mut player_b.stream),
+            wait_for_player_choice(&mut player_a.stream),
+            wait_for_player_choice(&mut player_b.stream),
         )?;
+
+        // Gérer les forfeits
+        let a_forfeited = matches!(choice_a, PlayerChoice::Forfeit);
+        let b_forfeited = matches!(choice_b, PlayerChoice::Forfeit);
+
+        if a_forfeited || b_forfeited {
+            // Le joueur qui fuit perd, le vainqueur gagne 100% XP (pas de double car pas de kill)
+            let a_wins = b_forfeited && !a_forfeited;
+            let xp = if a_wins {
+                50 + (battle.opponent.level * 5)
+            } else {
+                50 + (battle.player.level * 5)
+            };
+
+            let forfeit_name = if a_forfeited {
+                &player_a.player_name
+            } else {
+                &player_b.player_name
+            };
+            println!("🏳️  {} a fui le combat PvP !", forfeit_name);
+
+            let forfeit_msg = BattleMessage {
+                text: format!("🏳️ {} a fui le combat !", forfeit_name),
+                style: if a_wins {
+                    MessageStyle::Victory
+                } else {
+                    MessageStyle::Defeat
+                },
+                player_hp: None,
+                opponent_hp: None,
+                anim_type: None,
+            };
+            let flipped_forfeit = forfeit_msg.flip_perspective();
+
+            let result_a = NetMessage::PvpTurnResult {
+                messages: vec![forfeit_msg],
+                player_hp: battle.player.current_hp,
+                opponent_hp: battle.opponent.current_hp,
+                battle_over: true,
+                victory: a_wins,
+                xp_gained: if a_wins { xp } else { 0 },
+                loser_died: false,
+                loser_fled: true,
+            };
+            let result_b = NetMessage::PvpTurnResult {
+                messages: vec![flipped_forfeit],
+                player_hp: battle.opponent.current_hp,
+                opponent_hp: battle.player.current_hp,
+                battle_over: true,
+                victory: !a_wins,
+                xp_gained: if !a_wins { xp } else { 0 },
+                loser_died: false,
+                loser_fled: true,
+            };
+
+            write_message(&mut player_a.stream, &result_a).await?;
+            write_message(&mut player_b.stream, &result_b).await?;
+            break;
+        }
+
+        let attack_a = match choice_a {
+            PlayerChoice::Attack(idx) => idx,
+            _ => 0,
+        };
+        let attack_b = match choice_b {
+            PlayerChoice::Attack(idx) => idx,
+            _ => 0,
+        };
 
         println!(
             "   Tour {} : {} attaque #{}, {} attaque #{}",
-            battle.turn, player_a.player_name, choice_a, player_b.player_name, choice_b
+            battle.turn, player_a.player_name, attack_a, player_b.player_name, attack_b
         );
 
         // Résoudre le tour (player_a = player, player_b = opponent)
-        battle.pvp_attack(choice_a, choice_b);
+        battle.pvp_attack(attack_a, attack_b);
 
         // Collecter les messages générés
         let messages = battle.drain_messages();
@@ -303,6 +398,7 @@ async fn run_combat(mut player_a: QueuedPlayer, mut player_b: QueuedPlayer) -> a
             victory: player_a_wins,
             xp_gained: if player_a_wins { battle.xp_gained } else { 0 },
             loser_died: battle.loser_died,
+            loser_fled: false,
         };
 
         // Envoyer les messages à player_b (perspective inversée)
@@ -315,6 +411,7 @@ async fn run_combat(mut player_a: QueuedPlayer, mut player_b: QueuedPlayer) -> a
             victory: !player_a_wins,
             xp_gained: if !player_a_wins { battle.xp_gained } else { 0 },
             loser_died: battle.loser_died,
+            loser_fled: false,
         };
 
         write_message(&mut player_a.stream, &result_a).await?;
@@ -334,23 +431,6 @@ async fn run_combat(mut player_a: QueuedPlayer, mut player_b: QueuedPlayer) -> a
     }
 
     Ok(())
-}
-
-/// Attend qu'un joueur envoie son choix d'attaque.
-async fn wait_for_attack_choice(ws: &mut WebSocketStream<TcpStream>) -> anyhow::Result<usize> {
-    loop {
-        let msg = read_message(ws).await?;
-        match msg {
-            NetMessage::PvpAttackChoice { attack_index } => return Ok(attack_index),
-            NetMessage::Ping => {
-                write_message(ws, &NetMessage::Pong).await?;
-            }
-            NetMessage::Disconnect => {
-                return Err(anyhow::anyhow!("Joueur déconnecté pendant le combat"));
-            }
-            _ => {}
-        }
-    }
 }
 
 /// Exécute une reproduction entre deux joueurs jumelés.
