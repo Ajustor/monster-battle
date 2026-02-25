@@ -81,9 +81,18 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from(Span::styled("  🔥 Feu    > 🌿 Plante > 💧 Eau    > 🔥 Feu", Style::default().fg(Color::White))),
-        Line::from(Span::styled("  ⚡ Électrique > 💧 Eau    🌍 Terre > ⚡ Électrique", Style::default().fg(Color::White))),
-        Line::from(Span::styled("  🌀 Vent   > 🌍 Terre   🌑 Ombre > 🌟 Lumière > 🌑 Ombre", Style::default().fg(Color::White))),
+        Line::from(Span::styled(
+            "  🔥 Feu    > 🌿 Plante > 💧 Eau    > 🔥 Feu",
+            Style::default().fg(Color::White),
+        )),
+        Line::from(Span::styled(
+            "  ⚡ Électrique > 💧 Eau    🌍 Terre > ⚡ Électrique",
+            Style::default().fg(Color::White),
+        )),
+        Line::from(Span::styled(
+            "  🌀 Vent   > 🌍 Terre   🌑 Ombre > 🌟 Lumière > 🌑 Ombre",
+            Style::default().fg(Color::White),
+        )),
         Line::from(""),
         Line::from(Span::styled(
             "  ── Reproduction ────────────────────────",
