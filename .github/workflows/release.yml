@@ -36,6 +36,6 @@ jobs:
     with:
       targets: '["windows", "linux", "macos"]'
       version: ${{ needs.version-check.outputs.new_version }}
-      package_name: monster-battle-tui
+      package_name: monster-battle
       package_path: crates/tui
       deploy_pages: true

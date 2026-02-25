@@ -1,5 +1,5 @@
 [package]
-name = "monster-battle-tui"
+name = "monster-battle"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
