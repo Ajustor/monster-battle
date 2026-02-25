@@ -44,7 +44,10 @@ async fn handle_http(mut stream: TcpStream) {
     // Lire le reste de la requête HTTP (on a déjà peek les premiers octets)
     let mut buf = [0u8; 1024];
     let _ = stream.read(&mut buf).await;
-    let body = r#"{"status":"online"}"#;
+    let body = format!(
+        r#"{{"status":"online","version":"{}"}}"#,
+        env!("CARGO_PKG_VERSION")
+    );
     let response = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{}",
         body.len(),
@@ -146,6 +149,15 @@ async fn handle_client(
         }
         NetMessage::Ping => {
             write_message(&mut ws, &NetMessage::Pong).await?;
+        }
+        NetMessage::VersionCheck => {
+            write_message(
+                &mut ws,
+                &NetMessage::VersionInfo {
+                    version: env!("CARGO_PKG_VERSION").to_string(),
+                },
+            )
+            .await?;
         }
         NetMessage::Disconnect => {
             // Rien à faire

@@ -26,7 +26,8 @@ pub enum NetMessage {
     CancelQueue,
     /// Choix d'attaque du joueur (PvP interactif).
     PvpAttackChoice { attack_index: usize },
-
+    /// Demander la version du serveur.
+    VersionCheck,
     // ── Serveur → Client ────────────────────────────
     /// Confirmation de mise en file d'attente.
     Queued,
@@ -53,6 +54,8 @@ pub enum NetMessage {
     },
     /// Données du monstre partenaire (reproduction — envoyé à chaque joueur).
     BreedingPartner { partner_monster: Monster },
+    /// Réponse à un VersionCheck.
+    VersionInfo { version: String },
 
     // ── Bidirectionnel ──────────────────────────────
     /// Ping pour vérifier la connexion.

@@ -18,7 +18,10 @@ pub fn draw_header(frame: &mut Frame, area: Rect) {
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled("v0.1.0", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            env!("CARGO_PKG_VERSION"),
+            Style::default().fg(Color::DarkGray),
+        ),
     ]))
     .block(
         Block::default()

@@ -1,4 +1,5 @@
 mod app;
+mod modales;
 mod screens;
 mod sprites;
 

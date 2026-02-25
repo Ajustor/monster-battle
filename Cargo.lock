@@ -693,8 +693,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "monster-battle"
+version = "0.2.1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "crossterm",
+ "monster-battle-core",
+ "monster-battle-network",
+ "monster-battle-storage",
+ "ratatui",
+ "tachyonfx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "monster-battle-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "chrono",
  "rand 0.8.5",
@@ -706,7 +722,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-network"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -722,7 +738,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-server"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -736,7 +752,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-storage"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -747,22 +763,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
- "uuid",
-]
-
-[[package]]
-name = "monster-battle-tui"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "chrono",
- "crossterm",
- "monster-battle-core",
- "monster-battle-network",
- "monster-battle-storage",
- "ratatui",
- "tachyonfx",
- "tokio",
  "uuid",
 ]
 

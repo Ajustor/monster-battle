@@ -16,7 +16,9 @@ use uuid::Uuid;
 
 use monster_battle_core::Monster;
 use monster_battle_core::battle::{BattleMessage, BattlePhase, BattleState, MessageStyle};
-use monster_battle_network::{GameClient, NetAction, NetMessage, check_server_health};
+use monster_battle_network::{
+    GameClient, NetAction, NetMessage, check_server_health, check_server_version,
+};
 use monster_battle_storage::{LocalStorage, MonsterStorage};
 
 use crate::screens;
@@ -97,6 +99,13 @@ pub struct App {
     /// Récepteur pour les mises à jour du statut serveur.
     status_rx: Option<mpsc::Receiver<ServerStatus>>,
 
+    /// Afficher la modale de mise à jour ?
+    pub show_update_modal: bool,
+    /// Version du serveur (si différente du client).
+    pub server_version: Option<String>,
+    /// Récepteur pour le résultat du check de version.
+    version_rx: Option<mpsc::Receiver<Option<String>>>,
+
     /// Runtime tokio pour les opérations réseau.
     tokio_rt: tokio::runtime::Runtime,
     /// Récepteur pour les événements réseau en arrière-plan.
@@ -134,6 +143,9 @@ impl App {
             fighter_id: None,
             server_status: ServerStatus::Unknown,
             status_rx: None,
+            show_update_modal: false,
+            server_version: None,
+            version_rx: None,
             tokio_rt,
             net_rx: None,
             net_task: None,
@@ -158,6 +170,7 @@ impl App {
 
         self.check_all_aging();
         self.start_server_ping();
+        self.start_version_check();
 
         let result = self.main_loop(&mut terminal);
 
@@ -185,6 +198,7 @@ impl App {
             // Vérifier les événements réseau en arrière-plan
             self.poll_network();
             self.poll_server_status();
+            self.poll_version_check();
 
             // Tick du combat interactif (animation HP, etc.)
             if let Some(ref mut battle) = self.battle_state {
@@ -245,6 +259,11 @@ impl App {
                         !effect.done()
                     });
                 }
+
+                // Modale de mise à jour par-dessus tout
+                if self.show_update_modal {
+                    crate::modales::update::draw(frame, self.server_version.as_deref());
+                }
             })?;
 
             // Poll avec timeout pour le blink
@@ -264,6 +283,14 @@ impl App {
     }
 
     fn handle_key(&mut self, code: KeyCode) {
+        // Modale de mise à jour : seule Enter ou Esc ferme
+        if self.show_update_modal {
+            if matches!(code, KeyCode::Enter | KeyCode::Esc | KeyCode::Char('q')) {
+                self.show_update_modal = false;
+            }
+            return;
+        }
+
         // Combat interactif
         if self.current_screen == Screen::Battle {
             self.handle_battle_key(code);
@@ -1302,6 +1329,43 @@ impl App {
         if let Some(rx) = &self.status_rx {
             while let Ok(status) = rx.try_recv() {
                 self.server_status = status;
+            }
+        }
+    }
+
+    // ─── Version check ──────────────────────────────────────
+
+    /// Lance la vérification de version du serveur en arrière-plan.
+    fn start_version_check(&mut self) {
+        let (tx, rx) = mpsc::channel();
+        self.version_rx = Some(rx);
+
+        let server_addr = self.server_address.clone();
+
+        self.tokio_rt.spawn(async move {
+            let version = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                check_server_version(&server_addr),
+            )
+            .await
+            .unwrap_or(None);
+
+            let _ = tx.send(version);
+        });
+    }
+
+    /// Vérifie le résultat du check de version.
+    fn poll_version_check(&mut self) {
+        if let Some(rx) = &self.version_rx {
+            if let Ok(server_version) = rx.try_recv() {
+                if let Some(ref sv) = server_version {
+                    let client_version = env!("CARGO_PKG_VERSION");
+                    if sv != client_version {
+                        self.server_version = Some(sv.clone());
+                        self.show_update_modal = true;
+                    }
+                }
+                self.version_rx = None;
             }
         }
     }

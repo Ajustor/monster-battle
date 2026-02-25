@@ -78,6 +78,24 @@ pub async fn check_server_health(addr: &str) -> bool {
     }
 }
 
+/// Récupère la version du serveur via le protocole WebSocket.
+/// Retourne `Some("x.y.z")` en cas de succès, `None` si le serveur est injoignable.
+pub async fn check_server_version(addr: &str) -> Option<String> {
+    ensure_crypto_provider();
+    let url = make_ws_url(addr);
+    let (mut ws_stream, _) = connect_async(&url).await.ok()?;
+
+    write_message(&mut ws_stream, &NetMessage::VersionCheck)
+        .await
+        .ok()?;
+
+    let msg = read_message(&mut ws_stream).await.ok()?;
+    match msg {
+        NetMessage::VersionInfo { version } => Some(version),
+        _ => None,
+    }
+}
+
 /// Construit l'URL WebSocket à partir d'une adresse serveur.
 /// - "host"         → "wss://host/ws"   (via Cloudflare / TLS)
 /// - "host:port"    → "ws://host:port/ws" (LAN / local)
