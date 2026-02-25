@@ -694,7 +694,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "rand 0.8.5",
@@ -706,7 +706,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-network"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -722,7 +722,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -736,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-storage"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -752,7 +752,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-tui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
