@@ -12,6 +12,8 @@ use std::time::{Duration, Instant};
 use tachyonfx::fx::Direction;
 use tachyonfx::{EffectTimer, Interpolation, Shader, fx};
 
+use uuid::Uuid;
+
 use monster_battle_core::Monster;
 use monster_battle_core::battle::{BattleMessage, BattlePhase, BattleState, MessageStyle};
 use monster_battle_network::{GameClient, NetAction, NetMessage, check_server_health};
@@ -87,6 +89,8 @@ pub struct App {
 
     /// État du combat interactif en cours (style Pokémon).
     pub battle_state: Option<BattleState>,
+    /// UUID du monstre actuellement en combat (pour le retrouver après).
+    fighter_id: Option<Uuid>,
 
     /// Statut de connexion au serveur relais.
     pub server_status: ServerStatus,
@@ -127,6 +131,7 @@ impl App {
             breeding_log: Vec::new(),
             remote_monster: None,
             battle_state: None,
+            fighter_id: None,
             server_status: ServerStatus::Unknown,
             status_rx: None,
             tokio_rt,
@@ -419,8 +424,8 @@ impl App {
                 self.current_screen = Screen::NamingMonster { type_index };
                 self.message = None;
             }
-            Screen::Training => {
-                self.run_training_fight();
+            Screen::Training { wild } => {
+                self.run_training_fight(wild);
             }
             _ => {}
         }
@@ -453,7 +458,7 @@ impl App {
         // Entraînement (si monstre vivant)
         if has_monster {
             if self.menu_index == idx {
-                self.current_screen = Screen::Training;
+                self.current_screen = Screen::Training { wild: false };
                 self.menu_index = 0;
                 return;
             }
@@ -503,6 +508,7 @@ impl App {
         };
 
         self.current_screen = Screen::Combat(PvpPhase::Searching);
+        self.fighter_id = Some(monsters[0].id);
 
         let server_addr = self.server_address.clone();
         let my_monster = monsters[0].clone();
@@ -730,7 +736,7 @@ impl App {
         self.menu_index = 0;
     }
 
-    fn run_training_fight(&mut self) {
+    fn run_training_fight(&mut self, wild: bool) {
         use monster_battle_core::genetics::generate_starter_stats;
         use monster_battle_core::types::ElementType;
 
@@ -757,7 +763,9 @@ impl App {
         }
 
         // Lancer le combat interactif
-        let battle = BattleState::new(&monsters[0], &bot, true);
+        // is_training = true (docile, 50% XP) / false (sauvage, 100% XP)
+        self.fighter_id = Some(monsters[0].id);
+        let battle = BattleState::new(&monsters[0], &bot, !wild);
         self.battle_state = Some(battle);
         self.current_screen = Screen::Battle;
     }
@@ -949,6 +957,7 @@ impl App {
             Some(b) => b,
             None => return,
         };
+        let fighter_id = self.fighter_id.take();
 
         let mut monsters = match self.storage.list_alive() {
             Ok(m) if !m.is_empty() => m,
@@ -958,24 +967,38 @@ impl App {
             }
         };
 
+        // Retrouver le monstre qui a combattu par son UUID
+        let fighter = if let Some(id) = fighter_id {
+            monsters.iter_mut().find(|m| m.id == id)
+        } else {
+            monsters.first_mut()
+        };
+
+        let fighter = match fighter {
+            Some(f) => f,
+            None => {
+                self.current_screen = Screen::MainMenu;
+                return;
+            }
+        };
+
         let is_victory = battle.phase == BattlePhase::Victory;
 
         if is_victory {
-            monsters[0].wins += 1;
-            monsters[0].gain_xp(battle.xp_gained);
-            monsters[0].current_hp = monsters[0].max_hp();
+            fighter.wins += 1;
+            fighter.gain_xp(battle.xp_gained);
+            fighter.current_hp = fighter.max_hp();
         } else {
-            monsters[0].losses += 1;
-            if battle.is_training {
-                // Pas de mort en entraînement
-                monsters[0].died_at = None;
-                monsters[0].current_hp = monsters[0].max_hp();
-            } else if battle.loser_died {
-                monsters[0].died_at = Some(chrono::Utc::now());
+            fighter.losses += 1;
+            if battle.loser_died {
+                fighter.died_at = Some(chrono::Utc::now());
+            } else {
+                // Entraînement docile : soigner le monstre
+                fighter.current_hp = fighter.max_hp();
             }
         }
 
-        let _ = self.storage.save(&monsters[0]);
+        let _ = self.storage.save(fighter);
 
         // Retour au menu principal avec un résumé
         self.current_screen = Screen::MainMenu;
@@ -984,13 +1007,13 @@ impl App {
                 "🏆 Victoire ! +{} XP{}",
                 battle.xp_gained,
                 if battle.is_training {
-                    " (entraînement)"
+                    " (entraînement docile)"
                 } else {
                     ""
                 }
             ));
-        } else if battle.is_training {
-            self.message = Some("Défaite à l'entraînement — pas de pénalité !".to_string());
+        } else if !battle.loser_died {
+            self.message = Some("Défaite à l'entraînement docile — pas de pénalité !".to_string());
         } else {
             self.message = Some("💀 Défaite... Votre monstre est mort.".to_string());
         }

@@ -27,8 +27,9 @@ pub enum Screen {
         /// Index du type élémentaire choisi.
         type_index: usize,
     },
-    /// Entraînement contre un bot (50% XP).
-    Training,
+    /// Entraînement contre un bot.
+    /// `wild` = false : docile (50% XP, pas de mort) / `wild` = true : sauvage (100% XP, mort possible).
+    Training { wild: bool },
     /// Interface de combat PvP.
     Combat(pvp::PvpPhase),
     /// Interface de reproduction.
@@ -61,7 +62,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Screen::NamingMonster { type_index } => naming::draw(frame, chunks[1], app, *type_index),
         Screen::Cemetery => cemetery::draw(frame, chunks[1], app),
         Screen::Battle => battle::draw(frame, chunks[1], app),
-        Screen::Training => training::draw_select(frame, chunks[1], app),
+        Screen::Training { wild } => training::draw_select(frame, chunks[1], app, *wild),
         Screen::Combat(phase) => match phase {
             pvp::PvpPhase::Searching => pvp::draw_searching(frame, chunks[1], app),
             pvp::PvpPhase::Matched { opponent_name } => {
