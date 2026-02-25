@@ -8,6 +8,7 @@ license.workspace = true
 monster-battle-core.workspace = true
 monster-battle-storage.workspace = true
 monster-battle-network.workspace = true
+monster-battle-audio = { workspace = true, optional = true }
 ratatui.workspace = true
 crossterm.workspace = true
 tachyonfx.workspace = true
@@ -15,3 +16,9 @@ anyhow.workspace = true
 uuid.workspace = true
 tokio.workspace = true
 chrono.workspace = true
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+[features]
+default = ["audio"]
+audio = ["dep:monster-battle-audio", "dep:serde", "dep:serde_json"]

@@ -1,0 +1,9 @@
+[package]
+name = "monster-battle-audio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rodio = { version = "0.19", default-features = false }
+rand.workspace = true

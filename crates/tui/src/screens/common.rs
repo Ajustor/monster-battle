@@ -68,12 +68,21 @@ pub fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
                         | monster_battle_core::battle::BattlePhase::Defeat => {
                             "Enter pour continuer...".to_string()
                         }
+                        monster_battle_core::battle::BattlePhase::WaitingForOpponent => {
+                            if b.message_queue.is_empty() && b.current_message.is_none() {
+                                "⏳ En attente de l'adversaire...".to_string()
+                            } else {
+                                "Enter / Espace pour continuer… | Esc Fuir".to_string()
+                            }
+                        }
                         _ => "Enter / Espace pour continuer… | Esc Fuir".to_string(),
                     }
                 } else {
                     String::new()
                 }
             }
+            Screen::MonsterList => "f Nourrir | q Retour".to_string(),
+            Screen::Help => "↑↓ Défiler | q Retour".to_string(),
             _ => "↑↓ Naviguer | Enter Sélectionner | q Retour".to_string(),
         }
     };

@@ -96,6 +96,9 @@ pub fn breed(
         wins: 0,
         losses: 0,
         generation,
+        last_fed: Some(Utc::now()),
+        meals_today: 0,
+        meals_window_start: None,
     };
 
     let mut desc = format!(

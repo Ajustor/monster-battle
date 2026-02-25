@@ -6,10 +6,11 @@ members = [
   "crates/network",
   "crates/tui",
   "crates/server",
+  "crates/audio",
 ]
 
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "MIT"
 
@@ -60,3 +61,4 @@ monster-battle-core = { path = "crates/core" }
 monster-battle-storage = { path = "crates/storage" }
 monster-battle-network = { path = "crates/network" }
 monster-battle-server = { path = "crates/server" }
+monster-battle-audio = { path = "crates/audio" }

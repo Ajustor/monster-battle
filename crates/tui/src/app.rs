@@ -45,6 +45,8 @@ enum NetworkEvent {
         loser_died: bool,
         loser_fled: bool,
     },
+    /// Les deux joueurs sont prêts — début du prochain tour (PvP).
+    PvpNextTurn,
     /// Monstre du partenaire reçu (reproduction).
     BreedingPartnerReceived(Monster),
     /// Erreur réseau.
@@ -172,6 +174,9 @@ impl App {
         self.check_all_aging();
         self.start_server_ping();
         self.start_version_check();
+
+        // Start title screen music
+        crate::audio::play_title_music();
 
         let result = self.main_loop(&mut terminal);
 
@@ -333,6 +338,27 @@ impl App {
             return;
         }
 
+        // Écran d'aide — scroll & retour
+        if self.current_screen == Screen::Help {
+            match code {
+                KeyCode::Up => {
+                    self.scroll_offset = self.scroll_offset.saturating_sub(1);
+                }
+                KeyCode::Down => {
+                    self.scroll_offset += 1;
+                }
+                KeyCode::Char('q') | KeyCode::Esc => {
+                    self.current_screen = Screen::MainMenu;
+                    self.menu_index = 0;
+                    self.scroll_offset = 0;
+                    self.message = None;
+                    crate::audio::play_title_music();
+                }
+                _ => {}
+            }
+            return;
+        }
+
         // Si on consulte le résultat d'une reproduction
         if matches!(self.current_screen, Screen::Breeding(BreedPhase::Result)) {
             match code {
@@ -347,6 +373,7 @@ impl App {
                     self.menu_index = 0;
                     self.scroll_offset = 0;
                     self.message = None;
+                    crate::audio::play_title_music();
                 }
                 _ => {}
             }
@@ -380,6 +407,7 @@ impl App {
                     self.current_screen = Screen::MainMenu;
                     self.menu_index = 0;
                     self.message = None;
+                    crate::audio::play_title_music();
                 }
                 _ => {}
             }
@@ -396,6 +424,7 @@ impl App {
                     self.current_screen = Screen::MainMenu;
                     self.menu_index = 0;
                     self.message = None;
+                    crate::audio::play_title_music();
                 }
                 _ => {}
             }
@@ -415,12 +444,23 @@ impl App {
                 self.current_screen = Screen::MainMenu;
                 self.menu_index = 0;
                 self.message = None;
+                crate::audio::play_title_music();
             }
             return;
         }
 
         // Navigation standard
         match code {
+            KeyCode::Char('m') | KeyCode::Char('M') => {
+                crate::audio::toggle_mute();
+                return;
+            }
+            KeyCode::Char('f') | KeyCode::Char('F')
+                if self.current_screen == Screen::MonsterList =>
+            {
+                self.feed_monster();
+                return;
+            }
             KeyCode::Char('q') | KeyCode::Esc => {
                 if self.current_screen == Screen::MainMenu {
                     self.should_quit = true;
@@ -428,15 +468,18 @@ impl App {
                     self.current_screen = Screen::MainMenu;
                     self.menu_index = 0;
                     self.message = None;
+                    crate::audio::play_title_music();
                 }
             }
             KeyCode::Up => {
                 if self.menu_index > 0 {
                     self.menu_index -= 1;
+                    crate::audio::sfx_menu_move();
                 }
             }
             KeyCode::Down => {
                 self.menu_index += 1;
+                crate::audio::sfx_menu_move();
             }
             KeyCode::Left | KeyCode::Right => {
                 // Toggle mode docile <-> sauvage sur l'écran d'entraînement
@@ -445,6 +488,7 @@ impl App {
                 }
             }
             KeyCode::Enter => {
+                crate::audio::sfx_menu_select();
                 self.handle_enter();
             }
             _ => {}
@@ -466,6 +510,7 @@ impl App {
                 self.message = None;
             }
             Screen::Training { wild } => {
+                crate::audio::play_battle_music();
                 self.run_training_fight(wild);
             }
             _ => {}
@@ -482,6 +527,7 @@ impl App {
         if self.menu_index == idx {
             self.current_screen = Screen::MonsterList;
             self.menu_index = 0;
+            crate::audio::play_exploration_music();
             return;
         }
         idx += 1;
@@ -507,6 +553,7 @@ impl App {
 
             // Combat PvP — connexion directe au serveur relais
             if self.menu_index == idx {
+                crate::audio::play_battle_music();
                 self.run_pvp();
                 return;
             }
@@ -514,6 +561,7 @@ impl App {
 
             // Reproduction — connexion directe au serveur relais
             if self.menu_index == idx {
+                crate::audio::play_breeding_music();
                 self.run_breeding();
                 return;
             }
@@ -524,6 +572,16 @@ impl App {
         if self.menu_index == idx {
             self.current_screen = Screen::Cemetery;
             self.menu_index = 0;
+            crate::audio::play_cemetery_music();
+            return;
+        }
+        idx += 1;
+
+        // Aide
+        if self.menu_index == idx {
+            self.current_screen = Screen::Help;
+            self.menu_index = 0;
+            self.scroll_offset = 0;
             return;
         }
         idx += 1;
@@ -620,6 +678,32 @@ impl App {
                     // usize::MAX = signal de forfait (fuite PvP)
                     if attack_index == usize::MAX {
                         client.send(&NetMessage::PvpForfeit).await?;
+                    } else if attack_index == usize::MAX - 1 {
+                        // Signal PvpReady (joueur a fini de lire les messages)
+                        client.send(&NetMessage::PvpReady).await?;
+
+                        // Attendre PvpNextTurn du serveur
+                        loop {
+                            let msg = client.recv().await?;
+                            match msg {
+                                NetMessage::PvpNextTurn => {
+                                    // Signaler au client qu'il peut choisir sa prochaine attaque
+                                    let _ = tx.send(NetworkEvent::PvpNextTurn);
+                                    break;
+                                }
+                                NetMessage::Ping => {
+                                    client.send(&NetMessage::Pong).await?;
+                                }
+                                NetMessage::Error(e) => {
+                                    return Err(anyhow::anyhow!("{}", e));
+                                }
+                                NetMessage::Disconnect => {
+                                    return Err(anyhow::anyhow!("Adversaire déconnecté."));
+                                }
+                                _ => {}
+                            }
+                        }
+                        continue;
                     } else {
                         // Envoyer le choix au serveur
                         client
@@ -830,6 +914,7 @@ impl App {
             Forfeit,
             PvpForfeit,
             PvpSendAttack(usize),
+            PvpSendReady,
         }
 
         let is_pvp = self.pvp_attack_tx.is_some();
@@ -865,6 +950,27 @@ impl App {
                         _ => Action::None,
                     }
                 }
+                BattlePhase::WaitingForOpponent => {
+                    // PvP : messages à lire → avancer, sinon bloquer
+                    match code {
+                        KeyCode::Enter | KeyCode::Char(' ') => {
+                            if !battle.message_queue.is_empty() || battle.current_message.is_some()
+                            {
+                                if !battle.advance_message() && battle.message_queue.is_empty() {
+                                    // Dernier message lu → envoyer PvpReady au serveur
+                                    Action::PvpSendReady
+                                } else {
+                                    Action::None
+                                }
+                            } else {
+                                // Plus rien à lire, on attend le serveur
+                                Action::None
+                            }
+                        }
+                        KeyCode::Esc if is_pvp => Action::PvpForfeit,
+                        _ => Action::None,
+                    }
+                }
                 _ => match code {
                     KeyCode::Enter | KeyCode::Char(' ') => {
                         // En PvP, ne pas avancer si on attend la réponse du serveur
@@ -892,6 +998,14 @@ impl App {
         match action {
             Action::None => {}
             Action::End => {
+                // Jouer la musique de victoire/défaite
+                if let Some(ref b) = self.battle_state {
+                    if b.phase == BattlePhase::Victory {
+                        crate::audio::play_victory_music();
+                    } else {
+                        crate::audio::play_defeat_music();
+                    }
+                }
                 // Nettoyer le canal PvP
                 self.pvp_attack_tx = None;
                 self.net_rx = None;
@@ -899,12 +1013,16 @@ impl App {
                 self.apply_battle_results();
             }
             Action::Forfeit => {
+                crate::audio::sfx_flee();
+                crate::audio::play_title_music();
                 self.battle_state = None;
                 self.pvp_attack_tx = None;
                 self.current_screen = Screen::MainMenu;
+                self.menu_index = 0;
                 self.message = Some("Vous avez fui le combat d'entraînement.".to_string());
             }
             Action::PvpForfeit => {
+                crate::audio::sfx_flee();
                 // Envoyer le forfait au serveur — le monstre NE meurt PAS
                 if let Some(ref tx) = self.pvp_attack_tx {
                     // On réutilise le canal : envoyer un signal spécial
@@ -943,6 +1061,23 @@ impl App {
                     battle.message_counter += 1;
                 }
             }
+            Action::PvpSendReady => {
+                // Envoyer PvpReady au serveur via le canal (sentinel usize::MAX - 1)
+                if let Some(ref tx) = self.pvp_attack_tx {
+                    let _ = tx.try_send(usize::MAX - 1);
+                }
+                // Afficher un message d'attente
+                if let Some(ref mut battle) = self.battle_state {
+                    battle.current_message = Some(monster_battle_core::battle::BattleMessage {
+                        text: "⏳ En attente de l'adversaire...".to_string(),
+                        style: MessageStyle::Info,
+                        player_hp: None,
+                        opponent_hp: None,
+                        anim_type: None,
+                    });
+                    battle.message_counter += 1;
+                }
+            }
         }
     }
 
@@ -970,6 +1105,7 @@ impl App {
 
         match style {
             MessageStyle::PlayerAttack => {
+                crate::audio::sfx_hit();
                 let color = element_to_color(player.element);
                 effects.push(fx::sweep_in(
                     Direction::LeftToRight,
@@ -980,6 +1116,7 @@ impl App {
                 ));
             }
             MessageStyle::OpponentAttack => {
+                crate::audio::sfx_hit();
                 let color = element_to_color(opponent.element);
                 effects.push(fx::sweep_in(
                     Direction::RightToLeft,
@@ -996,6 +1133,7 @@ impl App {
                 ));
             }
             MessageStyle::Critical => {
+                crate::audio::sfx_critical_hit();
                 effects.push(fx::fade_from_fg(
                     Color::White,
                     EffectTimer::from_ms(400, Interpolation::QuadOut),
@@ -1008,6 +1146,7 @@ impl App {
                 ));
             }
             MessageStyle::Heal => {
+                crate::audio::sfx_heal();
                 effects.push(fx::fade_from_fg(
                     Color::Green,
                     EffectTimer::from_ms(400, Interpolation::QuadOut),
@@ -1064,7 +1203,11 @@ impl App {
 
         if is_victory {
             fighter.wins += 1;
+            let old_level = fighter.level;
             fighter.gain_xp(battle.xp_gained);
+            if fighter.level > old_level {
+                crate::audio::sfx_level_up();
+            }
             fighter.current_hp = fighter.max_hp();
         } else {
             fighter.losses += 1;
@@ -1080,6 +1223,8 @@ impl App {
 
         // Retour au menu principal avec un résumé
         self.current_screen = Screen::MainMenu;
+        self.menu_index = 0;
+        crate::audio::play_title_music();
         if is_victory {
             self.message = Some(format!(
                 "🏆 Victoire ! +{} XP{}",
@@ -1100,6 +1245,7 @@ impl App {
                 );
             }
         } else {
+            crate::audio::sfx_monster_death();
             self.message = Some("💀 Défaite... Votre monstre est mort.".to_string());
         }
     }
@@ -1216,6 +1362,7 @@ impl App {
                 // Rien de spécial — on reste sur l'écran d'attente
             }
             NetworkEvent::Matched { opponent_name } => {
+                crate::audio::sfx_match_found();
                 // Mettre à jour l'écran pour afficher l'adversaire trouvé
                 match &self.current_screen {
                     Screen::Combat(_) => {
@@ -1242,12 +1389,14 @@ impl App {
                         self.net_rx = None;
                         self.net_task = None;
                         self.current_screen = Screen::MainMenu;
+                        crate::audio::play_title_music();
                     }
                 } else {
                     self.pvp_attack_tx = None;
                     self.net_rx = None;
                     self.net_task = None;
                     self.current_screen = Screen::MainMenu;
+                    crate::audio::play_title_music();
                 }
             }
             NetworkEvent::PvpTurnResult {
@@ -1275,7 +1424,10 @@ impl App {
                             battle.loser_died = loser_died;
                         }
                     } else {
-                        battle.phase = BattlePhase::Executing;
+                        // Phase WaitingForOpponent : le joueur lit les messages,
+                        // puis envoie PvpReady. Le serveur attend les deux joueurs
+                        // avant d'envoyer PvpNextTurn.
+                        battle.phase = BattlePhase::WaitingForOpponent;
                         battle.attack_menu_index = 0;
                     }
 
@@ -1284,6 +1436,14 @@ impl App {
 
                     // Afficher le premier message
                     battle.advance_message();
+                }
+            }
+            NetworkEvent::PvpNextTurn => {
+                // Les deux joueurs sont prêts → passer au choix d'attaque
+                if let Some(ref mut battle) = self.battle_state {
+                    battle.turn += 1;
+                    battle.phase = BattlePhase::PlayerChooseAttack;
+                    battle.attack_menu_index = 0;
                 }
             }
             NetworkEvent::BreedingPartnerReceived(monster) => {
@@ -1331,16 +1491,74 @@ impl App {
     fn check_all_aging(&mut self) {
         if let Ok(mut monsters) = self.storage.list_alive() {
             for monster in &mut monsters {
-                if monster.check_aging() {
+                let died_of_age = monster.check_aging();
+                let died_of_hunger = if !died_of_age {
+                    monster.check_hunger()
+                } else {
+                    false
+                };
+
+                if died_of_age {
                     self.message = Some(format!(
                         "💀 {} est mort de vieillesse à {} jours...",
                         monster.name,
                         monster.age_days()
                     ));
                     let _ = self.storage.save(monster);
+                } else if died_of_hunger {
+                    self.message = Some(format!(
+                        "💀 {} est mort de faim ! ({} heures sans manger)",
+                        monster.name,
+                        monster.hours_since_fed()
+                    ));
+                    let _ = self.storage.save(monster);
                 }
             }
         }
+    }
+
+    // ─── Nourrir le monstre ──────────────────────────────────
+
+    fn feed_monster(&mut self) {
+        let mut monsters = match self.storage.list_alive() {
+            Ok(m) if !m.is_empty() => m,
+            _ => {
+                self.message = Some("Pas de monstre vivant !".to_string());
+                return;
+            }
+        };
+
+        let monster = &mut monsters[0];
+        let hunger_before = monster.hunger_level();
+        let hunger_after = monster.feed();
+
+        use monster_battle_core::HungerLevel;
+        let msg = match hunger_after {
+            HungerLevel::Overfed => format!(
+                "🤢 {} a trop mangé ! Malus de stats... (×{:.0}%)",
+                monster.name,
+                hunger_after.stat_multiplier() * 100.0
+            ),
+            HungerLevel::Satisfied => {
+                if hunger_before == HungerLevel::Starving || hunger_before == HungerLevel::Hungry {
+                    format!(
+                        "😊 {} est rassasié ! Boost de stats ! (×{:.0}%)",
+                        monster.name,
+                        hunger_after.stat_multiplier() * 100.0
+                    )
+                } else {
+                    format!(
+                        "😊 {} a bien mangé ! (×{:.0}%)",
+                        monster.name,
+                        hunger_after.stat_multiplier() * 100.0
+                    )
+                }
+            }
+            _ => format!("🍽️ {} a été nourri.", monster.name),
+        };
+
+        let _ = self.storage.save(monster);
+        self.message = Some(msg);
     }
 
     // ─── Health check serveur ────────────────────────────────

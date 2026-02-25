@@ -2,6 +2,7 @@ pub mod battle;
 pub mod breeding;
 pub mod cemetery;
 pub mod common;
+pub mod help;
 pub mod main_menu;
 pub mod monster_list;
 pub mod naming;
@@ -38,6 +39,8 @@ pub enum Screen {
     Battle,
     /// Cimetière (monstres morts).
     Cemetery,
+    /// Écran d'aide / tutoriel.
+    Help,
 }
 
 /// Point d'entrée du rendu : dispatche vers l'écran courant.
@@ -61,6 +64,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Screen::NewMonster => new_monster::draw(frame, chunks[1], app),
         Screen::NamingMonster { type_index } => naming::draw(frame, chunks[1], app, *type_index),
         Screen::Cemetery => cemetery::draw(frame, chunks[1], app),
+        Screen::Help => help::draw(frame, chunks[1], app),
         Screen::Battle => battle::draw(frame, chunks[1], app),
         Screen::Training { wild } => training::draw_select(frame, chunks[1], app, *wild),
         Screen::Combat(phase) => match phase {

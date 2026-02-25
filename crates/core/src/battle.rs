@@ -72,6 +72,8 @@ pub enum BattlePhase {
     PlayerChooseAttack,
     /// Exécution du tour (messages affichés un par un).
     Executing,
+    /// En attente que l'adversaire finisse de lire (PvP uniquement).
+    WaitingForOpponent,
     /// Victoire du joueur.
     Victory,
     /// Défaite du joueur.
@@ -260,6 +262,10 @@ impl BattleState {
                 // Terminé — `is_over()` sera `true`.
             }
             BattlePhase::PlayerChooseAttack => {}
+            BattlePhase::WaitingForOpponent => {
+                // PvP : ne PAS transitionner vers PlayerChooseAttack.
+                // Le serveur enverra PvpNextTurn quand les deux joueurs sont prêts.
+            }
         }
 
         false
