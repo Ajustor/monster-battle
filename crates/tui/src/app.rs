@@ -403,6 +403,12 @@ impl App {
             KeyCode::Down => {
                 self.menu_index += 1;
             }
+            KeyCode::Left | KeyCode::Right => {
+                // Toggle mode docile <-> sauvage sur l'écran d'entraînement
+                if let Screen::Training { wild } = self.current_screen {
+                    self.current_screen = Screen::Training { wild: !wild };
+                }
+            }
             KeyCode::Enter => {
                 self.handle_enter();
             }
