@@ -37,3 +37,4 @@ jobs:
       package_name: monster-battle
       package_path: crates/tui
       deploy_pages: true
+      linux_apt_packages: libasound2-dev
