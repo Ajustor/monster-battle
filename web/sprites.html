@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monster Battle — Sprites</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --bg-card: #16213e;
+      --bg-card-hover: #1a2744;
+      --border: #0f3460;
+      --text: #e2e2e2;
+      --text-muted: #7a7a8e;
+      --accent: #e94560;
+
+      /* Type colors */
+      --fire: #f44336;
+      --water: #2196f3;
+      --plant: #4caf50;
+      --electric: #ffc107;
+      --earth: #b4783c;
+      --wind: #00bcd4;
+      --shadow: #9c27b0;
+      --light: #fff9c4;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      text-align: center;
+      padding: 2.5rem 1rem 1.5rem;
+      background: linear-gradient(180deg, #0f3460 0%, var(--bg) 100%);
+    }
+
+    header h1 {
+      font-size: 2.4rem;
+      letter-spacing: 0.05em;
+      background: linear-gradient(135deg, var(--accent), #ff6b81);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      color: var(--text-muted);
+      margin-top: .5rem;
+      font-size: 1.1rem;
+    }
+
+    /* Filters */
+    .filters {
+      display: flex;
+      justify-content: center;
+      gap: .5rem;
+      padding: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: .45rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: 999px;
+      background: var(--bg-card);
+      color: var(--text);
+      cursor: pointer;
+      font-size: .9rem;
+      transition: all .2s;
+    }
+
+    .filter-btn:hover,
+    .filter-btn.active {
+      border-color: var(--accent);
+      background: rgba(233, 69, 96, 0.15);
+      color: #fff;
+    }
+
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 1.5rem;
+      padding: 1.5rem 2rem 3rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Card */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: transform .2s, box-shadow .2s;
+      cursor: default;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, .4);
+      background: var(--bg-card-hover);
+    }
+
+    .card-sprite {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      padding: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-sprite::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: .08;
+      border-radius: 50%;
+      filter: blur(40px);
+    }
+
+    .card-sprite svg {
+      width: 140px;
+      height: 140px;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, .5));
+      transition: transform .3s;
+    }
+
+    .card:hover .card-sprite svg {
+      transform: scale(1.08);
+    }
+
+    .card-info {
+      padding: 1rem 1.2rem 1.2rem;
+    }
+
+    .card-info h3 {
+      font-size: 1.15rem;
+      margin-bottom: .25rem;
+    }
+
+    .card-info .type-badge {
+      display: inline-block;
+      padding: .15rem .65rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #fff;
+      margin-right: .3rem;
+      margin-bottom: .4rem;
+    }
+
+    .card-info .desc {
+      color: var(--text-muted);
+      font-size: .85rem;
+      line-height: 1.45;
+      margin-top: .4rem;
+    }
+
+    /* Type badge colors */
+    .badge-fire {
+      background: var(--fire);
+    }
+
+    .badge-water {
+      background: var(--water);
+    }
+
+    .badge-plant {
+      background: var(--plant);
+    }
+
+    .badge-electric {
+      background: var(--electric);
+      color: #333;
+    }
+
+    .badge-earth {
+      background: var(--earth);
+    }
+
+    .badge-wind {
+      background: var(--wind);
+      color: #1a1a2e;
+    }
+
+    .badge-shadow {
+      background: var(--shadow);
+    }
+
+    .badge-light {
+      background: #f5e642;
+      color: #333;
+    }
+
+    /* Glow per type */
+    .glow-fire .card-sprite::before {
+      background: var(--fire);
+    }
+
+    .glow-water .card-sprite::before {
+      background: var(--water);
+    }
+
+    .glow-plant .card-sprite::before {
+      background: var(--plant);
+    }
+
+    .glow-electric .card-sprite::before {
+      background: var(--electric);
+    }
+
+    .glow-earth .card-sprite::before {
+      background: var(--earth);
+    }
+
+    .glow-wind .card-sprite::before {
+      background: var(--wind);
+    }
+
+    .glow-shadow .card-sprite::before {
+      background: var(--shadow);
+    }
+
+    .glow-light .card-sprite::before {
+      background: #fff9c4;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: .8rem;
+    }
+
+    /* Animation on load */
+    .card {
+      animation: fadeUp .5s ease both;
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>🐉 Monster Battle</h1>
+    <p>Bestiaire — 64 monstres élémentaires uniques</p>
+  </header>
+
+  <div class="filters">
+    <button class="filter-btn active" data-filter="all">Tous</button>
+    <button class="filter-btn" data-filter="fire">🔥 Feu</button>
+    <button class="filter-btn" data-filter="water">💧 Eau</button>
+    <button class="filter-btn" data-filter="plant">🌿 Plante</button>
+    <button class="filter-btn" data-filter="electric">⚡ Électrique</button>
+    <button class="filter-btn" data-filter="earth">🪨 Terre</button>
+    <button class="filter-btn" data-filter="wind">🌪️ Vent</button>
+    <button class="filter-btn" data-filter="shadow">🌑 Ombre</button>
+    <button class="filter-btn" data-filter="light">✨ Lumière</button>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <footer>Monster Battle &copy; 2026 — Sprites générés pour le web</footer>
+
+  <script>
+    // ── Monster Data ────────────────────────────────────────────────
+    const MONSTERS = [
+      // ═══ FEU ═══
+      { name: "Dragon de flammes", primary: "fire", secondary: null, desc: "Un dragon féroce entouré de flammes éternelles." },
+      { name: "Wyrm de vapeur", primary: "fire", secondary: "water", desc: "Un dragon marin qui crache de la vapeur brûlante." },
+      { name: "Dragon floral", primary: "fire", secondary: "plant", desc: "Un dragon dont les écailles sont couvertes de fleurs ardentes." },
+      { name: "Drake de foudre", primary: "fire", secondary: "electric", desc: "Un drake qui canalise l'énergie électrique de ses ailes." },
+      { name: "Dragon de lave", primary: "fire", secondary: "earth", desc: "Un dragon massif dont le corps est fait de roche en fusion." },
+      { name: "Phoenix", primary: "fire", secondary: "wind", desc: "Un oiseau mythique renaissant sans cesse de ses cendres." },
+      { name: "Drake infernal", primary: "fire", secondary: "shadow", desc: "Un drake sombre venu des profondeurs des enfers." },
+      { name: "Dragon solaire", primary: "fire", secondary: "light", desc: "Un dragon radieux nourri par la lumière du soleil." },
+
+      // ═══ EAU ═══
+      { name: "Serpent marin", primary: "water", secondary: null, desc: "Un serpent ondulant maîtrisant les courants marins." },
+      { name: "Crabe geyser", primary: "water", secondary: "fire", desc: "Un crabe massif dont les pinces projettent de l'eau bouillante." },
+      { name: "Grenouille nénuphar", primary: "water", secondary: "plant", desc: "Une grenouille géante qui se fond dans les marécages." },
+      { name: "Anguille électrique", primary: "water", secondary: "electric", desc: "Une anguille capable de paralyser ses proies à distance." },
+      { name: "Tortue de boue", primary: "water", secondary: "earth", desc: "Une tortue centenaire à la carapace de terre cuite." },
+      { name: "Serpent tempête", primary: "water", secondary: "wind", desc: "Un serpent chevauchant les tornades marines." },
+      { name: "Poisson abyssal", primary: "water", secondary: "shadow", desc: "Un poisson des abysses à la lueur trompeuse." },
+      { name: "Serpent cristallin", primary: "water", secondary: "light", desc: "Un serpent aux écailles transparentes comme le cristal." },
+
+      // ═══ PLANTE ═══
+      { name: "Treant", primary: "plant", secondary: null, desc: "Un arbre ancien doté de conscience et de force colossale." },
+      { name: "Arbre ardent", primary: "plant", secondary: "fire", desc: "Un arbre dont les racines puisent dans le magma." },
+      { name: "Lotus vivant", primary: "plant", secondary: "water", desc: "Un lotus géant flottant sur des eaux enchantées." },
+      { name: "Cactus statique", primary: "plant", secondary: "electric", desc: "Un cactus hérissé de piquants conducteurs." },
+      { name: "Golem de mousse", primary: "plant", secondary: "earth", desc: "Un colosse de pierre recouvert de mousse vivante." },
+      { name: "Pissenlit esprit", primary: "plant", secondary: "wind", desc: "Un esprit végétal transporté par la brise." },
+      { name: "Ronce maudite", primary: "plant", secondary: "shadow", desc: "Des ronces animées par une malédiction ancienne." },
+      { name: "Floraison sacrée", primary: "plant", secondary: "light", desc: "Un arbre sacré dont les fleurs guérissent les blessures." },
+
+      // ═══ ÉLECTRIQUE ═══
+      { name: "Loup de foudre", primary: "electric", secondary: null, desc: "Un loup rapide comme l'éclair, crépitant d'énergie." },
+      { name: "Loup plasma", primary: "electric", secondary: "fire", desc: "Un loup incandescent fait de plasma brûlant." },
+      { name: "Requin de foudre", primary: "electric", secondary: "water", desc: "Un requin qui électrise l'eau autour de lui." },
+      { name: "Scarabée étincelle", primary: "electric", secondary: "plant", desc: "Un scarabée géant dont la carapace accumule l'énergie." },
+      { name: "Golem magnétique", primary: "electric", secondary: "earth", desc: "Un golem de métal animé par des forces magnétiques." },
+      { name: "Oiseau-tonnerre", primary: "electric", secondary: "wind", desc: "Un rapace dont les ailes invoquent les orages." },
+      { name: "Pulsion sombre", primary: "electric", secondary: "shadow", desc: "Une entité d'énergie noire et instable." },
+      { name: "Arc céleste", primary: "electric", secondary: "light", desc: "Un arc d'énergie pure traversant le ciel." },
+
+      // ═══ TERRE ═══
+      { name: "Golem de pierre", primary: "earth", secondary: null, desc: "Un golem massif façonné dans la roche la plus dure." },
+      { name: "Golem de magma", primary: "earth", secondary: "fire", desc: "Un golem dont les fissures laissent couler la lave." },
+      { name: "Titan de boue", primary: "earth", secondary: "water", desc: "Un titan lent mais dévastateur, fait de boue ancienne." },
+      { name: "Colosse de mousse", primary: "earth", secondary: "plant", desc: "Un colosse bienveillant protégeant la forêt." },
+      { name: "Mech de cristal", primary: "earth", secondary: "electric", desc: "Un automate de cristal alimenté par l'électricité." },
+      { name: "Djinn de sable", primary: "earth", secondary: "wind", desc: "Un djinn qui se matérialise dans les tempêtes de sable." },
+      { name: "Chevalier d'obsidienne", primary: "earth", secondary: "shadow", desc: "Un chevalier de ténèbres taillé dans l'obsidienne." },
+      { name: "Gardien de diamant", primary: "earth", secondary: "light", desc: "Un gardien étincelant fait de diamant pur." },
+
+      // ═══ VENT ═══
+      { name: "Aigle céleste", primary: "wind", secondary: null, desc: "Un aigle majestueux planant au-dessus des nuages." },
+      { name: "Phoenix", primary: "wind", secondary: "fire", desc: "Un phoenix embrasé chevauchant les vents ardents." },
+      { name: "Albatros des tempêtes", primary: "wind", secondary: "water", desc: "Un albatros surfant sur les fronts orageux." },
+      { name: "Papillon de feuilles", primary: "wind", secondary: "plant", desc: "Un papillon géant aux ailes faites de feuilles vivantes." },
+      { name: "Faucon-éclair", primary: "wind", secondary: "electric", desc: "Un faucon foudroyant qui pique à la vitesse de l'éclair." },
+      { name: "Faucon de sable", primary: "wind", secondary: "earth", desc: "Un rapace des déserts soulevant des tempêtes de sable." },
+      { name: "Corbeau fantôme", primary: "wind", secondary: "shadow", desc: "Un corbeau spectral annonciateur de malheur." },
+      { name: "Colombe angélique", primary: "wind", secondary: "light", desc: "Un oiseau divin porteur de paix et de lumière." },
+
+      // ═══ OMBRE ═══
+      { name: "Spectre", primary: "shadow", secondary: null, desc: "Un fantôme errant entre le monde des vivants et des morts." },
+      { name: "Spectre infernal", primary: "shadow", secondary: "fire", desc: "Un spectre consumé par des flammes éternelles." },
+      { name: "Esprit noyé", primary: "shadow", secondary: "water", desc: "L'esprit tourmenté d'un marin perdu en mer." },
+      { name: "Ronce morte", primary: "shadow", secondary: "plant", desc: "Des racines mortes animées par une volonté obscure." },
+      { name: "Poltergeist", primary: "shadow", secondary: "electric", desc: "Un esprit frappeur alimenté par l'électricité statique." },
+      { name: "Golem de tombe", primary: "shadow", secondary: "earth", desc: "Un golem assemblé à partir de pierres tombales." },
+      { name: "Fantôme éolien", primary: "shadow", secondary: "wind", desc: "Un esprit qui se déplace avec le vent nocturne." },
+      { name: "Esprit crépusculaire", primary: "shadow", secondary: "light", desc: "Un être entre lumière et ténèbres, au crépuscule éternel." },
+
+      // ═══ LUMIÈRE ═══
+      { name: "Cerf céleste", primary: "light", secondary: null, desc: "Un cerf divin aux bois incandescents." },
+      { name: "Phoenix solaire", primary: "light", secondary: "fire", desc: "Un phoenix irradiant de lumière solaire." },
+      { name: "Poisson lunaire", primary: "light", secondary: "water", desc: "Un poisson qui nage dans les reflets de la lune." },
+      { name: "Cerf sacré", primary: "light", secondary: "plant", desc: "Un cerf gardien de la forêt sacrée." },
+      { name: "Étincelle stellaire", primary: "light", secondary: "electric", desc: "Une étoile vivante crépitante d'énergie." },
+      { name: "Bête de diamant", primary: "light", secondary: "earth", desc: "Un animal mythique au pelage de diamant." },
+      { name: "Oiseau angélique", primary: "light", secondary: "wind", desc: "Un oiseau céleste aux ailes de lumière pure." },
+      { name: "Sphinx du crépuscule", primary: "light", secondary: "shadow", desc: "Un sphinx gardant la frontière entre jour et nuit." },
+    ];
+
+    // ── SVG Sprite Generators ─────────────────────────────────────
+    // Each returns an inline SVG string, pixel-art style on a 16x16 grid
+    const TYPE_COLORS = {
+      fire: { main: '#f44336', dark: '#c62828', accent: '#ff8a65', bg: '#4a1a1a' },
+      water: { main: '#2196f3', dark: '#1565c0', accent: '#64b5f6', bg: '#1a2a4a' },
+      plant: { main: '#4caf50', dark: '#2e7d32', accent: '#81c784', bg: '#1a3a1a' },
+      electric: { main: '#ffc107', dark: '#f9a825', accent: '#fff176', bg: '#4a3a0a' },
+      earth: { main: '#b4783c', dark: '#7c4a1a', accent: '#d4a76a', bg: '#3a2a1a' },
+      wind: { main: '#00bcd4', dark: '#00838f', accent: '#4dd0e1', bg: '#1a3a3a' },
+      shadow: { main: '#9c27b0', dark: '#6a1b9a', accent: '#ba68c8', bg: '#2a1a3a' },
+      light: { main: '#fff176', dark: '#f9a825', accent: '#fff9c4', bg: '#3a3a2a' },
+    };
+
+    function makeSecondaryOverlay(secondary) {
+      if (!secondary) return '';
+      const sc = TYPE_COLORS[secondary];
+      if (!secondary) return '';
+      // Small corner accent to show secondary type
+      return `
+    <rect x="12" y="0" width="4" height="4" fill="${sc.main}" opacity="0.9"/>
+    <rect x="13" y="1" width="2" height="2" fill="${sc.accent}"/>
+  `;
+    }
+
+    function svgWrap(inner, bgColor) {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+    <rect width="16" height="16" rx="2" fill="${bgColor}"/>
+    ${inner}
+  </svg>`;
+    }
+
+    // 🔥 Dragon
+    function spriteFire(secondary) {
+      const c = TYPE_COLORS.fire;
+      return svgWrap(`
+    <!-- Horns -->
+    <rect x="4" y="1" width="1" height="2" fill="${c.accent}"/>
+    <rect x="11" y="1" width="1" height="2" fill="${c.accent}"/>
+    <!-- Head -->
+    <rect x="5" y="2" width="6" height="4" fill="${c.main}"/>
+    <rect x="6" y="3" width="1" height="1" fill="#fff"/>
+    <rect x="9" y="3" width="1" height="1" fill="#fff"/>
+    <rect x="7" y="5" width="2" height="1" fill="${c.dark}"/>
+    <!-- Body -->
+    <rect x="6" y="6" width="4" height="4" fill="${c.main}"/>
+    <rect x="5" y="7" width="1" height="2" fill="${c.dark}"/>
+    <rect x="10" y="7" width="1" height="2" fill="${c.dark}"/>
+    <!-- Belly -->
+    <rect x="7" y="7" width="2" height="2" fill="${c.accent}"/>
+    <!-- Wings -->
+    <rect x="3" y="6" width="2" height="3" fill="${c.dark}"/>
+    <rect x="11" y="6" width="2" height="3" fill="${c.dark}"/>
+    <!-- Legs -->
+    <rect x="6" y="10" width="1" height="2" fill="${c.main}"/>
+    <rect x="9" y="10" width="1" height="2" fill="${c.main}"/>
+    <!-- Feet -->
+    <rect x="5" y="12" width="2" height="1" fill="${c.dark}"/>
+    <rect x="9" y="12" width="2" height="1" fill="${c.dark}"/>
+    <!-- Tail -->
+    <rect x="11" y="9" width="2" height="1" fill="${c.main}"/>
+    <rect x="13" y="8" width="1" height="1" fill="${c.accent}"/>
+    <!-- Fire breath effect -->
+    <rect x="4" y="4" width="1" height="1" fill="${c.accent}" opacity="0.6"/>
+    ${makeSecondaryOverlay(secondary)}
+  `, c.bg);
+    }
+
+    // 💧 Serpent marin
+    function spriteWater(secondary) {
+      const c = TYPE_COLORS.water;
+      return svgWrap(`
+    <!-- Head -->
+    <rect x="4" y="3" width="4" height="3" fill="${c.main}"/>
+    <rect x="5" y="4" width="1" height="1" fill="#fff"/>
+    <rect x="7" y="4" width="1" height="1" fill="${c.dark}"/>
+    <!-- Crest -->
+    <rect x="4" y="2" width="2" height="1" fill="${c.accent}"/>
+    <!-- Body coil 1 -->
+    <rect x="7" y="5" width="3" height="2" fill="${c.main}"/>
+    <rect x="8" y="6" width="2" height="1" fill="${c.accent}"/>
+    <!-- Body coil 2 -->
+    <rect x="5" y="7" width="4" height="2" fill="${c.main}"/>
+    <rect x="6" y="8" width="2" height="1" fill="${c.accent}"/>
+    <!-- Body coil 3 -->
+    <rect x="8" y="9" width="3" height="2" fill="${c.main}"/>
+    <!-- Tail -->
+    <rect x="11" y="10" width="2" height="1" fill="${c.dark}"/>
+    <rect x="12" y="9" width="1" height="1" fill="${c.accent}"/>
+    <!-- Water drops -->
+    <rect x="2" y="5" width="1" height="1" fill="${c.accent}" opacity="0.5"/>
+    <rect x="12" y="4" width="1" height="1" fill="${c.accent}" opacity="0.5"/>
+    <rect x="3" y="10" width="1" height="1" fill="${c.accent}" opacity="0.4"/>
+    <!-- Waves -->
+    <rect x="3" y="12" width="2" height="1" fill="${c.dark}" opacity="0.4"/>
+    <rect x="7" y="13" width="3" height="1" fill="${c.dark}" opacity="0.3"/>
+    ${makeSecondaryOverlay(secondary)}
+  `, c.bg);
+    }
+
+    // 🌿 Treant
+    function spritePlant(secondary) {
+      const c = TYPE_COLORS.plant;
+      return svgWrap(`
+    <!-- Canopy -->
+    <rect x="4" y="1" width="8" height="3" fill="${c.main}"/>
+    <rect x="5" y="0" width="6" height="1" fill="${c.main}"/>
+    <rect x="3" y="2" width="1" height="2" fill="${c.dark}"/>
+    <rect x="12" y="2" width="1" height="2" fill="${c.dark}"/>
+    <!-- Leaves detail -->
+    <rect x="5" y="1" width="2" height="1" fill="${c.accent}"/>
+    <rect x="9" y="2" width="2" height="1" fill="${c.accent}"/>
+    <!-- Face -->
+    <rect x="6" y="4" width="4" height="3" fill="#8d6e4a"/>
+    <rect x="6" y="5" width="1" height="1" fill="#fff"/>
+    <rect x="9" y="5" width="1" height="1" fill="#fff"/>
+    <rect x="7" y="6" width="2" height="1" fill="#6d4e2a"/>
+    <!-- Trunk -->
+    <rect x="7" y="7" width="2" height="4" fill="#8d6e4a"/>
+    <rect x="6" y="8" width="1" height="2" fill="#6d4e2a"/>
+    <rect x="9" y="8" width="1" height="2" fill="#6d4e2a"/>
+    <!-- Roots -->
+    <rect x="5" y="11" width="2" height="1" fill="#6d4e2a"/>
+    <rect x="9" y="11" width="2" height="1" fill="#6d4e2a"/>
+    <rect x="4" y="12" width="2" height="1" fill="#5d3e1a"/>
+    <rect x="10" y="12" width="2" height="1" fill="#5d3e1a"/>
+    <!-- Flowers -->
+    <rect x="3" y="1" width="1" height="1" fill="#ff80ab"/>
+    <rect x="11" y="1" width="1" height="1" fill="#ff80ab"/>
+    ${makeSecondaryOverlay(secondary)}
+  `, c.bg);
+    }
+
+    // ⚡ Loup de foudre
+    function spriteElectric(secondary) {
+      const c = TYPE_COLORS.electric;
+      return svgWrap(`
+    <!-- Ears -->
+    <rect x="4" y="1" width="2" height="2" fill="${c.main}"/>
+    <rect x="10" y="1" width="2" height="2" fill="${c.main}"/>
+    <!-- Head -->
+    <rect x="5" y="3" width="6" height="3" fill="${c.main}"/>
+    <rect x="6" y="4" width="1" height="1" fill="#fff"/>
+    <rect x="9" y="4" width="1" height="1" fill="#fff"/>
+    <rect x="7" y="5" width="2" height="1" fill="#333"/>
+    <!-- Mane -->
+    <rect x="4" y="4" width="1" height="2" fill="${c.accent}"/>
+    <rect x="11" y="4" width="1" height="2" fill="${c.accent}"/>
+    <!-- Body -->
+    <rect x="4" y="6" width="8" height="3" fill="${c.main}"/>
+    <rect x="5" y="7" width="6" height="1" fill="${c.accent}"/>
+    <!-- Lightning accents -->
+    <rect x="3" y="7" width="1" height="1" fill="${c.accent}" opacity="0.7"/>
+    <rect x="12" y="7" width="1" height="1" fill="${c.accent}" opacity="0.7"/>
+    <!-- Front legs -->
+    <rect x="4" y="9" width="2" height="3" fill="${c.main}"/>
+    <rect x="10" y="9" width="2" height="3" fill="${c.main}"/>
+    <!-- Back legs -->
+    <rect x="5" y="12" width="1" height="1" fill="${c.dark}"/>
+    <rect x="10" y="12" width="1" height="1" fill="${c.dark}"/>
+    <!-- Tail -->
+    <rect x="12" y="6" width="1" height="1" fill="${c.main}"/>
+    <rect x="13" y="5" width="1" height="2" fill="${c.accent}"/>
+    <!-- Sparks -->
+    <rect x="2" y="3" width="1" height="1" fill="${c.accent}" opacity="0.5"/>
+    <rect x="13" y="2" width="1" height="1" fill="${c.accent}" opacity="0.5"/>
+    ${makeSecondaryOverlay(secondary)}
+  `, c.bg);
+    }
+
+    // 🪨 Golem
+    function spriteEarth(secondary) {
+      const c = TYPE_COLORS.earth;
+      return svgWrap(`
+    <!-- Head -->
+    <rect x="5" y="2" width="6" height="4" fill="${c.main}"/>
+    <rect x="4" y="3" width="1" height="2" fill="${c.dark}"/>
+    <rect x="11" y="3" width="1" height="2" fill="${c.dark}"/>
+    <rect x="6" y="3" width="1" height="1" fill="#fff"/>
+    <rect x="9" y="3" width="1" height="1" fill="#fff"/>
+    <rect x="7" y="5" width="2" height="1" fill="${c.dark}"/>
+    <!-- Cracks -->
+    <rect x="5" y="4" width="1" height="1" fill="${c.accent}"/>
+    <rect x="10" y="4" width="1" height="1" fill="${c.accent}"/>
+    <!-- Body -->
+    <rect x="4" y="6" width="8" height="4" fill="${c.main}"/>
+    <rect x="3" y="7" width="1" height="2" fill="${c.dark}"/>
+    <rect x="12" y="7" width="1" height="2" fill="${c.dark}"/>
+    <!-- Belt / detail -->
+    <rect x="5" y="7" width="6" height="1" fill="${c.accent}"/>
+    <rect x="6" y="8" width="4" height="1" fill="${c.dark}"/>
+    <!-- Arms -->
+    <rect x="2" y="6" width="2" height="3" fill="${c.main}"/>
+    <rect x="12" y="6" width="2" height="3" fill="${c.main}"/>
+    <rect x="1" y="8" width="1" height="2" fill="${c.dark}"/>
+    <rect x="14" y="8" width="1" height="2" fill="${c.dark}"/>
+    <!-- Legs -->
+    <rect x="5" y="10" width="2" height="3" fill="${c.main}"/>
+    <rect x="9" y="10" width="2" height="3" fill="${c.main}"/>
+    <rect x="4" y="12" width="3" height="1" fill="${c.dark}"/>
+    <rect x="9" y="12" width="3" height="1" fill="${c.dark}"/>
+    ${makeSecondaryOverlay(secondary)}
+  `, c.bg);
+    }
+
+    // 🌪️ Aigle
+    function spriteWind(secondary) {
+      const c = TYPE_COLORS.wind;
+      return svgWrap(`
+    <!-- Head -->
+    <rect x="6" y="2" width="4" height="3" fill="${c.main}"/>
+    <rect x="7" y="3" width="1" height="1" fill="#fff"/>
+    <rect x="9" y="3" width="1" height="1" fill="${c.dark}"/>
+    <!-- Beak -->
+    <rect x="10" y="3" width="2" height="1" fill="${c.accent}"/>
+    <!-- Crest -->
+    <rect x="6" y="1" width="2" height="1" fill="${c.accent}"/>
+    <!-- Body -->
+    <rect x="5" y="5" width="6" height="4" fill="${c.main}"/>
+    <rect x="6" y="6" width="4" height="2" fill="${c.accent}"/>
+    <!-- Left wing -->
+    <rect x="1" y="4" width="4" height="2" fill="${c.main}"/>
+    <rect x="0" y="3" width="2" height="1" fill="${c.dark}"/>
+    <rect x="2" y="5" width="2" height="1" fill="${c.accent}"/>
+    <!-- Right wing -->
+    <rect x="11" y="4" width="4" height="2" fill="${c.main}"/>
+    <rect x="14" y="3" width="2" height="1" fill="${c.dark}"/>
+    <rect x="12" y="5" width="2" height="1" fill="${c.accent}"/>
+    <!-- Tail -->
+    <rect x="6" y="9" width="4" height="2" fill="${c.dark}"/>
+    <rect x="7" y="11" width="2" height="1" fill="${c.main}"/>
+    <!-- Talons -->
+    <rect x="5" y="11" width="2" height="1" fill="${c.dark}"/>
+    <rect x="9" y="11" width="2" height="1" fill="${c.dark}"/>
+    <!-- Wind lines -->
+    <rect x="0" y="7" width="2" height="1" fill="${c.accent}" opacity="0.3"/>
+    <rect x="14" y="6" width="2" height="1" fill="${c.accent}" opacity="0.3"/>
+    ${makeSecondaryOverlay(secondary)}
+  `, c.bg);
+    }
+
+    // 🌑 Spectre
+    function spriteShadow(secondary) {
+      const c = TYPE_COLORS.shadow;
+      return svgWrap(`
+    <!-- Aura -->
+    <rect x="4" y="1" width="8" height="1" fill="${c.dark}" opacity="0.4"/>
+    <rect x="3" y="2" width="10" height="1" fill="${c.dark}" opacity="0.3"/>
+    <!-- Head -->
+    <rect x="5" y="2" width="6" height="4" fill="${c.main}"/>
+    <rect x="4" y="3" width="1" height="2" fill="${c.dark}"/>
+    <rect x="11" y="3" width="1" height="2" fill="${c.dark}"/>
+    <!-- Eyes (glowing) -->
+    <rect x="6" y="3" width="1" height="1" fill="#fff"/>
+    <rect x="9" y="3" width="1" height="1" fill="#fff"/>
+    <rect x="6" y="4" width="1" height="1" fill="${c.accent}" opacity="0.5"/>
+    <rect x="9" y="4" width="1" height="1" fill="${c.accent}" opacity="0.5"/>
+    <!-- Mouth -->
+    <rect x="7" y="5" width="2" height="1" fill="${c.dark}"/>
+    <!-- Body (ghostly) -->
+    <rect x="5" y="6" width="6" height="4" fill="${c.main}" opacity="0.85"/>
+    <rect x="4" y="7" width="1" height="2" fill="${c.dark}" opacity="0.6"/>
+    <rect x="11" y="7" width="1" height="2" fill="${c.dark}" opacity="0.6"/>
+    <!-- Wispy bottom -->
+    <rect x="5" y="10" width="2" height="1" fill="${c.main}" opacity="0.6"/>
+    <rect x="7" y="11" width="2" height="1" fill="${c.main}" opacity="0.4"/>
+    <rect x="9" y="10" width="2" height="1" fill="${c.main}" opacity="0.6"/>
+    <rect x="4" y="11" width="1" height="1" fill="${c.dark}" opacity="0.3"/>
+    <rect x="11" y="11" width="1" height="1" fill="${c.dark}" opacity="0.3"/>
+    <rect x="6" y="12" width="1" height="1" fill="${c.main}" opacity="0.2"/>
+    <rect x="9" y="12" width="1" height="1" fill="${c.main}" opacity="0.2"/>
+    <!-- Particles -->
+    <rect x="2" y="4" width="1" height="1" fill="${c.accent}" opacity="0.4"/>
+    <rect x="13" y="5" width="1" height="1" fill="${c.accent}" opacity="0.3"/>
+    <rect x="3" y="9" width="1" height="1" fill="${c.accent}" opacity="0.25"/>
+    ${makeSecondaryOverlay(secondary)}
+  `, c.bg);
+    }
+
+    // ✨ Cerf céleste
+    function spriteLight(secondary) {
+      const c = TYPE_COLORS.light;
+      return svgWrap(`
+    <!-- Antlers -->
+    <rect x="4" y="0" width="1" height="3" fill="${c.main}"/>
+    <rect x="3" y="0" width="1" height="1" fill="${c.accent}"/>
+    <rect x="5" y="1" width="1" height="1" fill="${c.accent}"/>
+    <rect x="11" y="0" width="1" height="3" fill="${c.main}"/>
+    <rect x="12" y="0" width="1" height="1" fill="${c.accent}"/>
+    <rect x="10" y="1" width="1" height="1" fill="${c.accent}"/>
+    <!-- Head -->
+    <rect x="5" y="3" width="6" height="3" fill="${c.main}"/>
+    <rect x="6" y="4" width="1" height="1" fill="#555"/>
+    <rect x="9" y="4" width="1" height="1" fill="#555"/>
+    <rect x="7" y="5" width="2" height="1" fill="${c.dark}"/>
+    <!-- Body -->
+    <rect x="4" y="6" width="8" height="4" fill="${c.main}"/>
+    <rect x="5" y="7" width="6" height="2" fill="${c.accent}"/>
+    <!-- Glow -->
+    <rect x="7" y="7" width="2" height="1" fill="#fff"/>
+    <!-- Legs -->
+    <rect x="4" y="10" width="2" height="3" fill="${c.main}"/>
+    <rect x="10" y="10" width="2" height="3" fill="${c.main}"/>
+    <rect x="5" y="12" width="1" height="1" fill="${c.dark}"/>
+    <rect x="10" y="12" width="1" height="1" fill="${c.dark}"/>
+    <!-- Tail -->
+    <rect x="12" y="7" width="1" height="2" fill="${c.accent}"/>
+    <rect x="13" y="7" width="1" height="1" fill="#fff" opacity="0.5"/>
+    <!-- Star particles -->
+    <rect x="2" y="2" width="1" height="1" fill="${c.accent}" opacity="0.5"/>
+    <rect x="14" y="3" width="1" height="1" fill="${c.accent}" opacity="0.4"/>
+    <rect x="1" y="8" width="1" height="1" fill="${c.accent}" opacity="0.3"/>
+    <rect x="14" y="9" width="1" height="1" fill="${c.accent}" opacity="0.3"/>
+    ${makeSecondaryOverlay(secondary)}
+  `, c.bg);
+    }
+
+    const SPRITE_FN = {
+      fire: spriteFire,
+      water: spriteWater,
+      plant: spritePlant,
+      electric: spriteElectric,
+      earth: spriteEarth,
+      wind: spriteWind,
+      shadow: spriteShadow,
+      light: spriteLight,
+    };
+
+    const TYPE_LABELS = {
+      fire: 'Feu',
+      water: 'Eau',
+      plant: 'Plante',
+      electric: 'Électrique',
+      earth: 'Terre',
+      wind: 'Vent',
+      shadow: 'Ombre',
+      light: 'Lumière',
+    };
+
+    // ── Render Grid ────────────────────────────────────────────────
+    function renderGrid(filter) {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+
+      const filtered = filter === 'all'
+        ? MONSTERS
+        : MONSTERS.filter(m => m.primary === filter);
+
+      filtered.forEach((m, i) => {
+        const card = document.createElement('div');
+        card.className = `card glow-${m.primary}`;
+        card.style.animationDelay = `${i * 0.04}s`;
+
+        const spriteFn = SPRITE_FN[m.primary];
+        const svg = spriteFn(m.secondary);
+
+        const badges = `<span class="type-badge badge-${m.primary}">${TYPE_LABELS[m.primary]}</span>`
+          + (m.secondary ? `<span class="type-badge badge-${m.secondary}">${TYPE_LABELS[m.secondary]}</span>` : '');
+
+        card.innerHTML = `
+      <div class="card-sprite">${svg}</div>
+      <div class="card-info">
+        <h3>${m.name}</h3>
+        <div>${badges}</div>
+        <p class="desc">${m.desc}</p>
+      </div>
+    `;
+
+        grid.appendChild(card);
+      });
+    }
+
+    // ── Filters ────────────────────────────────────────────────────
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderGrid(btn.dataset.filter);
+      });
+    });
+
+    // Initial render
+    renderGrid('all');
+  </script>
+
+</body>
+
+</html>

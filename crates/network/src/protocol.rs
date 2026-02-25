@@ -26,6 +26,8 @@ pub enum NetMessage {
     CancelQueue,
     /// Choix d'attaque du joueur (PvP interactif).
     PvpAttackChoice { attack_index: usize },
+    /// Le joueur abandonne le combat PvP (fuite).
+    PvpForfeit,
     /// Demander la version du serveur.
     VersionCheck,
     // ── Serveur → Client ────────────────────────────
@@ -51,6 +53,8 @@ pub enum NetMessage {
         xp_gained: u32,
         /// Le perdant est-il mort ? (pertinent si `battle_over`).
         loser_died: bool,
+        /// Le perdant a-t-il fui ? (pertinent si `battle_over`).
+        loser_fled: bool,
     },
     /// Données du monstre partenaire (reproduction — envoyé à chaque joueur).
     BreedingPartner { partner_monster: Monster },

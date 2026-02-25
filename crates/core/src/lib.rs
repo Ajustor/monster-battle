@@ -6,5 +6,5 @@ pub mod types;
 
 pub use attack::Attack;
 pub use battle::BattleState;
-pub use monster::Monster;
+pub use monster::{AgeStage, Monster};
 pub use types::ElementType;

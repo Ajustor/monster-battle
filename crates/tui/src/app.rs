@@ -43,6 +43,7 @@ enum NetworkEvent {
         victory: bool,
         xp_gained: u32,
         loser_died: bool,
+        loser_fled: bool,
     },
     /// Monstre du partenaire reçu (reproduction).
     BreedingPartnerReceived(Monster),
@@ -186,6 +187,7 @@ impl App {
         let mut last_frame = Instant::now();
         let mut last_msg_counter: u64 = 0;
         let mut had_battle = false;
+        let mut last_aging_check = Instant::now();
         // Style d'effet en attente : on le crée APRÈS le premier rendu du message.
         let mut pending_effect_style: Option<MessageStyle> = None;
         let mut pending_effect_player: Option<monster_battle_core::battle::BattleMonster> = None;
@@ -199,6 +201,12 @@ impl App {
             self.poll_network();
             self.poll_server_status();
             self.poll_version_check();
+
+            // Vérifier le vieillissement toutes les 60 secondes
+            if last_aging_check.elapsed() >= Duration::from_secs(60) {
+                last_aging_check = Instant::now();
+                self.check_all_aging();
+            }
 
             // Tick du combat interactif (animation HP, etc.)
             if let Some(ref mut battle) = self.battle_state {
@@ -609,10 +617,15 @@ impl App {
                         None => break, // Canal fermé → combat annulé
                     };
 
-                    // Envoyer le choix au serveur
-                    client
-                        .send(&NetMessage::PvpAttackChoice { attack_index })
-                        .await?;
+                    // usize::MAX = signal de forfait (fuite PvP)
+                    if attack_index == usize::MAX {
+                        client.send(&NetMessage::PvpForfeit).await?;
+                    } else {
+                        // Envoyer le choix au serveur
+                        client
+                            .send(&NetMessage::PvpAttackChoice { attack_index })
+                            .await?;
+                    }
 
                     // Attendre le résultat du tour du serveur
                     let msg = client.recv().await?;
@@ -625,6 +638,7 @@ impl App {
                             victory,
                             xp_gained,
                             loser_died,
+                            loser_fled,
                         } => {
                             let _ = tx.send(NetworkEvent::PvpTurnResult {
                                 messages,
@@ -634,6 +648,7 @@ impl App {
                                 victory,
                                 xp_gained,
                                 loser_died,
+                                loser_fled,
                             });
 
                             if battle_over {
@@ -813,6 +828,7 @@ impl App {
             None,
             End,
             Forfeit,
+            PvpForfeit,
             PvpSendAttack(usize),
         }
 
@@ -845,18 +861,26 @@ impl App {
                             }
                         }
                         KeyCode::Esc if battle.is_training => Action::Forfeit,
+                        KeyCode::Esc if is_pvp => Action::PvpForfeit,
                         _ => Action::None,
                     }
                 }
                 _ => match code {
                     KeyCode::Enter | KeyCode::Char(' ') => {
-                        if !battle.advance_message() && battle.is_over() {
+                        // En PvP, ne pas avancer si on attend la réponse du serveur
+                        if is_pvp
+                            && battle.phase == BattlePhase::Executing
+                            && battle.message_queue.is_empty()
+                        {
+                            Action::None
+                        } else if !battle.advance_message() && battle.is_over() {
                             Action::End
                         } else {
                             Action::None
                         }
                     }
                     KeyCode::Esc if battle.is_training => Action::Forfeit,
+                    KeyCode::Esc if is_pvp => Action::PvpForfeit,
                     _ => Action::None,
                 },
             }
@@ -879,6 +903,27 @@ impl App {
                 self.pvp_attack_tx = None;
                 self.current_screen = Screen::MainMenu;
                 self.message = Some("Vous avez fui le combat d'entraînement.".to_string());
+            }
+            Action::PvpForfeit => {
+                // Envoyer le forfait au serveur — le monstre NE meurt PAS
+                if let Some(ref tx) = self.pvp_attack_tx {
+                    // On réutilise le canal : envoyer un signal spécial
+                    // Le forfait est géré en envoyant PvpForfeit au serveur
+                    // via la tâche réseau. On envoie usize::MAX comme signal.
+                    let _ = tx.try_send(usize::MAX);
+                }
+                // Passer en mode "attente" avec un message de fuite
+                if let Some(ref mut battle) = self.battle_state {
+                    battle.phase = BattlePhase::Executing;
+                    battle.current_message = Some(monster_battle_core::battle::BattleMessage {
+                        text: "🏳️ Fuite en cours...".to_string(),
+                        style: MessageStyle::Info,
+                        player_hp: None,
+                        opponent_hp: None,
+                        anim_type: None,
+                    });
+                    battle.message_counter += 1;
+                }
             }
             Action::PvpSendAttack(idx) => {
                 // Envoyer le choix au serveur via le canal
@@ -1046,7 +1091,14 @@ impl App {
                 }
             ));
         } else if !battle.loser_died {
-            self.message = Some("Défaite à l'entraînement docile — pas de pénalité !".to_string());
+            if battle.is_training {
+                self.message =
+                    Some("Défaite à l'entraînement docile — pas de pénalité !".to_string());
+            } else {
+                self.message = Some(
+                    "🏳️ Vous avez fui le combat — votre monstre est sain et sauf.".to_string(),
+                );
+            }
         } else {
             self.message = Some("💀 Défaite... Votre monstre est mort.".to_string());
         }
@@ -1206,6 +1258,7 @@ impl App {
                 victory,
                 xp_gained,
                 loser_died,
+                loser_fled: _,
             } => {
                 if let Some(ref mut battle) = self.battle_state {
                     // Mettre à jour les PV réels depuis le serveur

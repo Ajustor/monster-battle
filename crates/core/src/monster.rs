@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use uuid::Uuid;
 
 use crate::types::{ElementType, Stats, Trait};
@@ -9,6 +10,54 @@ const BASE_MAX_AGE_DAYS: i64 = 30;
 
 /// Bonus de longévité en jours.
 const LONGEVITY_BONUS_DAYS: i64 = 15;
+
+/// Stade de vie d'un monstre, basé sur son âge relatif à sa durée de vie max.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AgeStage {
+    /// 0–15 % de la durée de vie : le monstre vient d'éclore.
+    Baby,
+    /// 15–40 % : il grandit et apprend.
+    Young,
+    /// 40–75 % : pleine maturité, pic de puissance.
+    Adult,
+    /// 75–100 % : le déclin s'installe.
+    Old,
+}
+
+impl AgeStage {
+    /// Icône emoji pour le stade de vie.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            AgeStage::Baby => "💳",
+            AgeStage::Young => "🌱",
+            AgeStage::Adult => "💪",
+            AgeStage::Old => "🧓",
+        }
+    }
+
+    /// Multiplicateur global de stats pour ce stade de vie.
+    /// Bébé = plus faible, Adulte = pic, Vieux = déclin.
+    pub fn stat_multiplier(&self) -> f64 {
+        match self {
+            AgeStage::Baby => 0.80,
+            AgeStage::Young => 0.95,
+            AgeStage::Adult => 1.10,
+            AgeStage::Old => 0.85,
+        }
+    }
+}
+
+impl fmt::Display for AgeStage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            AgeStage::Baby => "Bébé",
+            AgeStage::Young => "Jeune",
+            AgeStage::Adult => "Adulte",
+            AgeStage::Old => "Vieux",
+        };
+        write!(f, "{}", name)
+    }
+}
 
 /// Représente un monstre unique et irremplaçable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,6 +159,25 @@ impl Monster {
         }
     }
 
+    /// Retourne le stade de vie actuel du monstre.
+    pub fn age_stage(&self) -> AgeStage {
+        let ratio = self.age_days() as f64 / self.max_age_days() as f64;
+        if ratio < 0.15 {
+            AgeStage::Baby
+        } else if ratio < 0.40 {
+            AgeStage::Young
+        } else if ratio < 0.75 {
+            AgeStage::Adult
+        } else {
+            AgeStage::Old
+        }
+    }
+
+    /// Retourne le pourcentage de vie écoulée (0.0 – 1.0).
+    pub fn age_ratio(&self) -> f64 {
+        (self.age_days() as f64 / self.max_age_days() as f64).clamp(0.0, 1.0)
+    }
+
     /// Vérifie si le monstre devrait mourir de vieillesse et le tue le cas échéant.
     /// Retourne `true` si le monstre vient de mourir.
     pub fn check_aging(&mut self) -> bool {
@@ -124,24 +192,40 @@ impl Monster {
         }
     }
 
-    /// PV max effectifs (stats de base × facteur de niveau).
+    /// PV max effectifs (stats de base × facteur de niveau × facteur d'âge).
     pub fn max_hp(&self) -> u32 {
-        self.base_stats.hp + (self.level * 2)
+        let raw = self.base_stats.hp + (self.level * 2);
+        (raw as f64 * self.age_stage().stat_multiplier()) as u32
     }
 
-    /// Attaque effective (stats de base × facteur de niveau).
+    /// Attaque effective (stats de base × facteur de niveau × facteur d'âge).
     pub fn effective_attack(&self) -> u32 {
-        self.base_stats.attack + (self.level / 2)
+        let raw = self.base_stats.attack + (self.level / 2);
+        (raw as f64 * self.age_stage().stat_multiplier()) as u32
     }
 
-    /// Défense effective.
+    /// Défense effective (facteur d'âge inclus).
     pub fn effective_defense(&self) -> u32 {
-        self.base_stats.defense + (self.level / 2)
+        let raw = self.base_stats.defense + (self.level / 2);
+        (raw as f64 * self.age_stage().stat_multiplier()) as u32
     }
 
-    /// Vitesse effective.
+    /// Vitesse effective (facteur d'âge inclus).
     pub fn effective_speed(&self) -> u32 {
-        self.base_stats.speed + (self.level / 3)
+        let raw = self.base_stats.speed + (self.level / 3);
+        (raw as f64 * self.age_stage().stat_multiplier()) as u32
+    }
+
+    /// Attaque spéciale effective (facteur d'âge inclus).
+    pub fn effective_sp_attack(&self) -> u32 {
+        let raw = self.base_stats.special_attack + (self.level / 2);
+        (raw as f64 * self.age_stage().stat_multiplier()) as u32
+    }
+
+    /// Défense spéciale effective (facteur d'âge inclus).
+    pub fn effective_sp_defense(&self) -> u32 {
+        let raw = self.base_stats.special_defense + (self.level / 2);
+        (raw as f64 * self.age_stage().stat_multiplier()) as u32
     }
 
     /// XP nécessaire pour passer au niveau suivant.
@@ -219,14 +303,17 @@ impl Monster {
             Some(sec) => format!("{} / {}", self.primary_type, sec),
             None => format!("{}", self.primary_type),
         };
+        let stage = self.age_stage();
         format!(
-            "{} [{}] — Nv.{} — {} — PV: {}/{} — Âge: {}j/{}j — {}",
+            "{} [{}] — Nv.{} — {} — PV: {}/{} — {} {} ({}j/{}j) — {}",
             self.name,
             types,
             self.level,
             status,
             self.current_hp,
             self.max_hp(),
+            stage.icon(),
+            stage,
             self.age_days(),
             self.max_age_days(),
             if self.traits.is_empty() {

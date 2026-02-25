@@ -60,7 +60,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 
     let xp_bar_width = 20;
     let xp_pct = if m.xp_to_next_level() > 0 {
-        (m.xp as f64 / m.xp_to_next_level() as f64 * xp_bar_width as f64) as usize
+        ((m.xp as f64 / m.xp_to_next_level() as f64 * xp_bar_width as f64) as usize)
+            .min(xp_bar_width)
     } else {
         0
     };
@@ -74,6 +75,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 
     let hp_bar_width = 20;
     let hp_pct = (m.current_hp as f64 / m.max_hp() as f64 * hp_bar_width as f64) as usize;
+    let hp_pct = hp_pct.min(hp_bar_width);
     let hp_color = if hp_pct > hp_bar_width / 2 {
         "💚"
     } else if hp_pct > hp_bar_width / 4 {
@@ -109,20 +111,18 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         .split(inner);
 
     // ── Sprite ──────────────────────────────────────────────────
-    let sprite_color = element_color(m.primary_type);
-    let art = sprites::get_sprite(m.primary_type, m.secondary_type);
+    let grid = sprites::pixel::get_pixel_sprite(m.primary_type, m.secondary_type);
     let mut sprite_lines: Vec<Line> = vec![Line::from("")];
-    for line in &art {
-        sprite_lines.push(Line::from(Span::styled(
-            *line,
-            Style::default().fg(sprite_color),
-        )));
-    }
+    sprite_lines.extend(sprites::pixel::render_pixel_sprite(
+        grid,
+        m.primary_type,
+        m.secondary_type,
+    ));
     sprite_lines.push(Line::from(""));
     sprite_lines.push(Line::from(Span::styled(
         format!("  {} {}", type_icon, m.primary_type),
         Style::default()
-            .fg(sprite_color)
+            .fg(element_color(m.primary_type))
             .add_modifier(Modifier::BOLD),
     )));
     if let Some(sec) = m.secondary_type {
@@ -139,6 +139,27 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(sprite_widget, cols[0]);
 
     // ── Stats ───────────────────────────────────────────────────
+    let stage = m.age_stage();
+    let age_bar_width = 20;
+    let age_pct = (m.age_ratio() * age_bar_width as f64) as usize;
+    let age_pct = age_pct.min(age_bar_width);
+    let age_bar_color = match stage {
+        monster_battle_core::AgeStage::Baby => "💿",
+        monster_battle_core::AgeStage::Young => "🌱",
+        monster_battle_core::AgeStage::Adult => "💪",
+        monster_battle_core::AgeStage::Old => "🧓",
+    };
+    let age_bar = format!(
+        "{} [{}{}] {}j/{}j",
+        age_bar_color,
+        "█".repeat(age_pct),
+        "░".repeat(age_bar_width - age_pct),
+        m.age_days(),
+        m.max_age_days()
+    );
+
+    let stat_modifier = format!("{}% ({})", (stage.stat_multiplier() * 100.0) as i32, stage);
+
     let info = format!(
         r#"
   {} {}{}
@@ -153,7 +174,9 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 
   ── Infos ──────────────
   Traits     : {}
-  Âge        : {} / {} jours
+  Stade      : {} {}
+  Âge        : {}
+  Puissance  : {}
   Génération : {}
   Victoires  : {}  |  Défaites : {}
 "#,
@@ -166,11 +189,13 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         m.effective_attack(),
         m.effective_defense(),
         m.effective_speed(),
-        m.base_stats.special_attack,
-        m.base_stats.special_defense,
+        m.effective_sp_attack(),
+        m.effective_sp_defense(),
         traits_str,
-        m.age_days(),
-        m.max_age_days(),
+        stage.icon(),
+        stage,
+        age_bar,
+        stat_modifier,
         m.generation,
         m.wins,
         m.losses,
