@@ -126,18 +126,42 @@ impl Plugin for GamePlugin {
         // Initialiser GameData avec le répertoire de données approprié
         let data_dir = dirs_data_dir();
         app.insert_resource(GameData::new(data_dir))
+            .insert_resource(crate::ui::screens::training::TrainingWild(false))
             .add_systems(OnEnter(GameScreen::MainMenu), on_enter_main_menu)
             .add_systems(OnExit(GameScreen::MainMenu), cleanup_screen)
             .add_systems(OnEnter(GameScreen::MonsterList), on_enter_monster_list)
             .add_systems(OnExit(GameScreen::MonsterList), cleanup_screen)
             .add_systems(OnEnter(GameScreen::NewMonster), on_enter_new_monster)
             .add_systems(OnExit(GameScreen::NewMonster), cleanup_screen)
+            .add_systems(OnEnter(GameScreen::NamingMonster), on_enter_naming)
+            .add_systems(OnExit(GameScreen::NamingMonster), cleanup_screen)
+            .add_systems(OnEnter(GameScreen::SelectMonster), on_enter_select_monster)
+            .add_systems(OnExit(GameScreen::SelectMonster), cleanup_screen)
+            .add_systems(OnEnter(GameScreen::Training), on_enter_training)
+            .add_systems(OnExit(GameScreen::Training), cleanup_screen)
             .add_systems(OnEnter(GameScreen::Cemetery), on_enter_cemetery)
             .add_systems(OnExit(GameScreen::Cemetery), cleanup_screen)
             .add_systems(OnEnter(GameScreen::Help), on_enter_help)
             .add_systems(OnExit(GameScreen::Help), cleanup_screen)
             .add_systems(OnEnter(GameScreen::Battle), on_enter_battle)
-            .add_systems(OnExit(GameScreen::Battle), cleanup_screen);
+            .add_systems(OnExit(GameScreen::Battle), cleanup_screen)
+            .add_systems(OnEnter(GameScreen::PvpSearching), on_enter_pvp_searching)
+            .add_systems(OnExit(GameScreen::PvpSearching), cleanup_screen)
+            .add_systems(
+                OnEnter(GameScreen::BreedingSearching),
+                on_enter_breeding_searching,
+            )
+            .add_systems(OnExit(GameScreen::BreedingSearching), cleanup_screen)
+            .add_systems(
+                OnEnter(GameScreen::BreedingNaming),
+                on_enter_breeding_naming,
+            )
+            .add_systems(OnExit(GameScreen::BreedingNaming), cleanup_screen)
+            .add_systems(
+                OnEnter(GameScreen::BreedingResult),
+                on_enter_breeding_result,
+            )
+            .add_systems(OnExit(GameScreen::BreedingResult), cleanup_screen);
     }
 }
 
@@ -198,5 +222,37 @@ fn on_enter_help(mut data: ResMut<GameData>) {
 }
 
 fn on_enter_battle(_data: ResMut<GameData>) {
-    // Le BattleState est initialisé avant la transition.
+    // Le battle_state est déjà configuré avant la transition.
 }
+
+fn on_enter_naming(mut data: ResMut<GameData>) {
+    data.message = None;
+    // name_input est déjà vidé par l'écran précédent (NewMonster)
+}
+
+fn on_enter_select_monster(mut data: ResMut<GameData>) {
+    data.monster_select_index = 0;
+}
+
+fn on_enter_training(mut data: ResMut<GameData>) {
+    data.menu_index = 0;
+}
+
+fn on_enter_pvp_searching(mut data: ResMut<GameData>) {
+    data.message = None;
+}
+
+fn on_enter_breeding_searching(mut data: ResMut<GameData>) {
+    data.message = None;
+    data.remote_monster = None;
+}
+
+fn on_enter_breeding_naming(mut data: ResMut<GameData>) {
+    data.name_input.clear();
+    data.message = None;
+}
+
+fn on_enter_breeding_result(mut data: ResMut<GameData>) {
+    data.scroll_offset = 0;
+}
+// Le BattleState est initialisé avant la transition (par training ou pvp).

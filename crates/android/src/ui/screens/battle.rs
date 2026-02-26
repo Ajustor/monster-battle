@@ -9,7 +9,7 @@ use crate::ui::common::{self, colors, fonts};
 use monster_battle_core::battle::BattlePhase;
 
 /// Construit l'UI de combat.
-pub fn spawn_battle_ui(
+pub(crate) fn spawn_battle_ui(
     mut commands: Commands,
     data: Res<GameData>,
     mut images: ResMut<Assets<Image>>,
@@ -235,7 +235,7 @@ pub fn spawn_battle_ui(
 }
 
 /// Gestion des entrées en combat.
-pub fn handle_battle_input(
+pub(crate) fn handle_battle_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,

@@ -1,21 +1,36 @@
-//! Écran de la liste des monstres vivants.
+//! Écran de sélection du monstre (entraînement / PvP / reproduction).
 
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
-use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::sprites;
-use crate::ui::common::{colors, fonts};
 use monster_battle_storage::MonsterStorage;
 
-/// Construit l'UI de la liste des monstres.
-pub fn spawn_monster_list(
+use crate::game::{GameData, GameScreen, ScreenEntity, SelectMonsterTarget};
+use crate::sprites;
+use crate::ui::common::{colors, fonts};
+
+/// Marqueur pour les cartes de monstre cliquables.
+#[derive(Component)]
+pub(crate) struct MonsterCard {
+    index: usize,
+}
+
+/// Construit l'UI de sélection du monstre.
+pub(crate) fn spawn_select_monster(
     mut commands: Commands,
     data: Res<GameData>,
+    target: Option<Res<SelectMonsterTarget>>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
 ) {
     let monsters = data.storage.list_alive().unwrap_or_default();
+
+    let title = match target.as_deref() {
+        Some(SelectMonsterTarget::Training) => "⚔️  Choisir un monstre — Entraînement",
+        Some(SelectMonsterTarget::CombatPvP) => "🗡️  Choisir un monstre — Combat PvP",
+        Some(SelectMonsterTarget::Breeding) => "🧬 Choisir un monstre — Reproduction",
+        None => "Choisir un monstre",
+    };
 
     commands
         .spawn((
@@ -32,7 +47,7 @@ pub fn spawn_monster_list(
         .with_children(|parent| {
             // Titre
             parent.spawn((
-                Text::new("🐾 Mes Monstres"),
+                Text::new(title),
                 TextFont {
                     font_size: fonts::HEADING,
                     ..default()
@@ -46,7 +61,7 @@ pub fn spawn_monster_list(
 
             if monsters.is_empty() {
                 parent.spawn((
-                    Text::new("Aucun monstre vivant. Créez-en un depuis le menu !"),
+                    Text::new("Aucun monstre vivant !"),
                     TextFont {
                         font_size: fonts::BODY,
                         ..default()
@@ -80,9 +95,11 @@ pub fn spawn_monster_list(
                         BorderColor(border_color),
                         BorderRadius::all(Val::Px(8.0)),
                         BackgroundColor(colors::PANEL),
+                        MonsterCard { index: i },
+                        Interaction::default(),
                     ))
                     .with_children(|card| {
-                        // Sprite du monstre
+                        // Sprite
                         let grid =
                             sprites::get_pixel_sprite(monster.primary_type, monster.secondary_type);
                         let handle = atlas.get_or_create_front(
@@ -101,7 +118,7 @@ pub fn spawn_monster_list(
                             },
                         ));
 
-                        // Infos du monstre
+                        // Infos
                         card.spawn(Node {
                             flex_direction: FlexDirection::Column,
                             ..default()
@@ -145,17 +162,43 @@ pub fn spawn_monster_list(
                         });
                     });
             }
+
+            // Footer
+            parent.spawn((
+                Text::new("↑↓ Naviguer  ⏎ Sélectionner  Esc Retour"),
+                TextFont {
+                    font_size: fonts::SMALL,
+                    ..default()
+                },
+                TextColor(colors::TEXT_SECONDARY),
+                Node {
+                    margin: UiRect::top(Val::Px(12.0)),
+                    ..default()
+                },
+            ));
         });
 }
 
-/// Gestion des entrées de la liste des monstres.
-pub fn handle_monster_list_input(
+/// Gestion des entrées de sélection du monstre.
+pub(crate) fn handle_select_monster_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
+    target: Option<Res<SelectMonsterTarget>>,
+    interaction_query: Query<(&Interaction, &MonsterCard), Changed<Interaction>>,
 ) {
     let monster_count = data.storage.list_alive().map(|v| v.len()).unwrap_or(0);
 
+    // Toucher (mobile)
+    for (interaction, card) in &interaction_query {
+        if *interaction == Interaction::Pressed {
+            data.monster_select_index = card.index;
+            dispatch_selection(&mut data, &mut next_state, target.as_deref());
+            return;
+        }
+    }
+
+    // Clavier
     if keyboard.just_pressed(KeyCode::ArrowUp) && data.monster_select_index > 0 {
         data.monster_select_index -= 1;
     }
@@ -165,8 +208,36 @@ pub fn handle_monster_list_input(
     {
         data.monster_select_index += 1;
     }
-    if keyboard.just_pressed(KeyCode::KeyQ) || keyboard.just_pressed(KeyCode::Escape) {
+    if keyboard.just_pressed(KeyCode::Enter) && monster_count > 0 {
+        dispatch_selection(&mut data, &mut next_state, target.as_deref());
+    }
+    if keyboard.just_pressed(KeyCode::Escape) {
         next_state.set(GameScreen::MainMenu);
         data.menu_index = 0;
+    }
+}
+
+/// Redirige vers l'écran approprié après sélection du monstre.
+fn dispatch_selection(
+    data: &mut ResMut<GameData>,
+    next_state: &mut ResMut<NextState<GameScreen>>,
+    target: Option<&SelectMonsterTarget>,
+) {
+    match target {
+        Some(SelectMonsterTarget::Training) => {
+            data.menu_index = 0;
+            next_state.set(GameScreen::Training);
+        }
+        Some(SelectMonsterTarget::CombatPvP) => {
+            next_state.set(GameScreen::PvpSearching);
+        }
+        Some(SelectMonsterTarget::Breeding) => {
+            next_state.set(GameScreen::BreedingSearching);
+        }
+        None => {
+            // Fallback → entraînement
+            data.menu_index = 0;
+            next_state.set(GameScreen::Training);
+        }
     }
 }

@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
-use crate::game::{GameData, GameScreen, ScreenEntity};
+use crate::game::{GameData, GameScreen, ScreenEntity, SelectMonsterTarget};
 use crate::ui::common::{self, colors, fonts};
 
 /// Marqueur pour les boutons du menu.
@@ -13,7 +13,7 @@ pub struct MenuButton {
 }
 
 /// Construit l'UI du menu principal.
-pub fn spawn_menu(mut commands: Commands, data: Res<GameData>) {
+pub(crate) fn spawn_menu(mut commands: Commands, data: Res<GameData>) {
     let has_monster = data.has_living_monster();
 
     // Nœud racine
@@ -99,7 +99,8 @@ pub fn spawn_menu(mut commands: Commands, data: Res<GameData>) {
 ///
 /// Sur mobile : toucher un bouton = sélectionner + entrer.
 /// Clavier (desktop dev) : Up/Down + Enter.
-pub fn handle_menu_input(
+pub(crate) fn handle_menu_input(
+    mut commands: Commands,
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
@@ -112,7 +113,7 @@ pub fn handle_menu_input(
     for (interaction, button) in &interaction_query {
         if *interaction == Interaction::Pressed {
             data.menu_index = button.index;
-            activate_menu_entry(&mut data, &mut next_state, has_monster);
+            activate_menu_entry(&mut commands, &mut data, &mut next_state, has_monster);
             return;
         }
     }
@@ -129,7 +130,7 @@ pub fn handle_menu_input(
         }
     }
     if keyboard.just_pressed(KeyCode::Enter) {
-        activate_menu_entry(&mut data, &mut next_state, has_monster);
+        activate_menu_entry(&mut commands, &mut data, &mut next_state, has_monster);
     }
     if keyboard.just_pressed(KeyCode::KeyQ) {
         std::process::exit(0);
@@ -149,6 +150,7 @@ fn menu_entry_count(has_monster: bool) -> usize {
 }
 
 fn activate_menu_entry(
+    commands: &mut Commands,
     data: &mut ResMut<GameData>,
     next_state: &mut ResMut<NextState<GameScreen>>,
     has_monster: bool,
@@ -176,6 +178,7 @@ fn activate_menu_entry(
     // Entraînement / PvP / Reproduction (si monstre vivant)
     if has_monster {
         if data.menu_index == idx {
+            commands.insert_resource(SelectMonsterTarget::Training);
             data.monster_select_index = 0;
             next_state.set(GameScreen::SelectMonster);
             data.menu_index = 0;
@@ -184,6 +187,7 @@ fn activate_menu_entry(
         idx += 1;
 
         if data.menu_index == idx {
+            commands.insert_resource(SelectMonsterTarget::CombatPvP);
             data.monster_select_index = 0;
             next_state.set(GameScreen::SelectMonster);
             data.menu_index = 0;
@@ -192,6 +196,7 @@ fn activate_menu_entry(
         idx += 1;
 
         if data.menu_index == idx {
+            commands.insert_resource(SelectMonsterTarget::Breeding);
             data.monster_select_index = 0;
             next_state.set(GameScreen::SelectMonster);
             data.menu_index = 0;
