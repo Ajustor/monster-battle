@@ -89,8 +89,12 @@ pub struct GameData {
 impl GameData {
     /// Crée les données de jeu avec un répertoire de stockage.
     pub fn new(data_dir: impl AsRef<std::path::Path>) -> Self {
+        // S'assurer que le répertoire de données existe
+        log::info!("📂 GameData::new — data_dir={:?}", data_dir.as_ref());
+        let _ = std::fs::create_dir_all(data_dir.as_ref());
         let storage =
             LocalStorage::new(data_dir).expect("Impossible d'initialiser le stockage local");
+        log::info!("✅ GameData — storage initialisé avec succès");
         Self {
             storage,
             monster_select_index: 0,
@@ -168,10 +172,11 @@ impl Plugin for GamePlugin {
 /// Répertoire de données selon la plateforme.
 fn dirs_data_dir() -> std::path::PathBuf {
     // Sur Android : utiliser le dossier interne de l'app.
-    // Sur desktop : utiliser ~/.local/share/monster-battle
+    // Le chemin est /data/data/<package>/files
     #[cfg(target_os = "android")]
     {
-        std::path::PathBuf::from("/data/data/com.monsterbattle.app/files")
+        // Utiliser le vrai chemin interne de l'app (correspond au package dans le manifest)
+        std::path::PathBuf::from("/data/data/com.ajustor.monsterbattle/files")
     }
     #[cfg(not(target_os = "android"))]
     {
@@ -201,6 +206,10 @@ fn cleanup_screen(mut commands: Commands, query: Query<Entity, With<ScreenEntity
 // ═══════════════════════════════════════════════════════════════════
 
 fn on_enter_main_menu(mut data: ResMut<GameData>) {
+    log::info!(
+        "🎮 on_enter_main_menu — state=MainMenu, has_monster={}",
+        data.has_living_monster()
+    );
     data.menu_index = 0;
     data.message = None;
 }

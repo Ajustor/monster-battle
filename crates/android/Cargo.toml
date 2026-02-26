@@ -46,9 +46,13 @@ tokio.workspace = true
 # ── Erreurs ──────────────────────────────────────────────────────
 anyhow.workspace = true
 
+# ── Logging Android ──────────────────────────────────────────────
+log = "0.4"
+
 [target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.15"
 bevy = { version = "0.15", default-features = false, features = [
-  "android-game-activity",
+  "android-native-activity",
   "android_shared_stdcxx",
   "bevy_asset",
   "bevy_color",
@@ -71,14 +75,14 @@ desktop = []
 
 # ── Métadonnées Android (utilisées par xbuild) ──────────────────
 [package.metadata.android]
-runtime_libs = "native_activity"
-res = "res"
+runtime_libs = "game_activity"
 
-[package.metadata.android.sdk]
+[package.metadata.android.manifest]
+package = "com.ajustor.monsterbattle"
+
+[package.metadata.android.manifest.sdk]
 min_sdk_version = 21
 target_sdk_version = 34
 
-[package.metadata.android.application]
+[package.metadata.android.manifest.application]
 label = "Monster Battle"
-icon = "@mipmap/ic_launcher"
-theme = "@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"

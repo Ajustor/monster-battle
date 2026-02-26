@@ -7,6 +7,7 @@ PKG            := monster-battle-android
 ARCH           := arm64
 PLATFORM       := android
 TARGET         := aarch64-linux-android
+ANDROID_PKG    := com.ajustor.monsterbattle
 
 AAB            := target/x/release/android/$(PKG).aab
 APK_UNSIGNED   := target/x/release/android/$(PKG)-unsigned.apk
@@ -40,7 +41,7 @@ run:
 
 # ── Android ──────────────────────────────────────────────────────
 
-.PHONY: android-check android-build android-apk android-install android-run android-clean
+.PHONY: android-check android-build android-apk android-install android-deploy android-run android-clean
 
 ## Vérifier la compilation Android
 android-check:
@@ -105,7 +106,14 @@ android-apk: android-build $(KEYSTORE)
 
 ## Installer l'APK sur un appareil connecté
 android-install: android-apk
+	@adb devices | grep -q 'device$$' || (echo "❌ Aucun appareil détecté. Active le débogage USB et branche ton téléphone." && exit 1)
 	adb install -r $(APK)
+	@echo "✅ APK installé ! Lance l'app sur ton téléphone."
+
+## Installer + lancer + afficher les logs
+android-deploy: android-install
+	adb shell am start -n $(ANDROID_PKG)/android.app.NativeActivity
+	adb logcat -s MonsterBattle:* bevy:* wgpu:*
 
 ## Builder + lancer sur un appareil connecté (via xbuild)
 android-run:
@@ -150,7 +158,8 @@ help:
 	@echo "    make android-check  — Vérifier la compilation Android"
 	@echo "    make android-build  — Builder l'AAB Android (release)"
 	@echo "    make android-apk    — Convertir l'AAB en APK universel"
-	@echo "    make android-install— Installer l'APK sur l'appareil"
+	@echo "    make android-install — Installer l'APK sur l'appareil"
+	@echo "    make android-deploy — Installer + lancer + logs (adb)"
 	@echo "    make android-run    — Builder + lancer sur l'appareil"
 	@echo "    make android-clean  — Nettoyer les artefacts Android"
 	@echo ""

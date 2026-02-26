@@ -124,5 +124,6 @@ impl Plugin for UiPlugin {
 
 /// Spawn la caméra 2D principale.
 fn spawn_camera(mut commands: Commands) {
+    log::info!("📷 spawn_camera — création Camera2d");
     commands.spawn(Camera2d);
 }

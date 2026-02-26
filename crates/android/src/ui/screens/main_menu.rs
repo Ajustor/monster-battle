@@ -15,6 +15,7 @@ pub struct MenuButton {
 /// Construit l'UI du menu principal.
 pub(crate) fn spawn_menu(mut commands: Commands, data: Res<GameData>) {
     let has_monster = data.has_living_monster();
+    log::info!("🖥️ spawn_menu — has_monster={}", has_monster);
 
     // Nœud racine
     commands

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.ajustor.monsterbattle">
 
+  <uses-permission android:name="android.permission.INTERNET" />
+
   <application android:label="Monster Battle" android:icon="@mipmap/ic_launcher" android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" android:hasCode="false">
 
     <activity android:name="android.app.NativeActivity" android:configChanges="orientation|keyboardHidden|screenSize" android:exported="true">

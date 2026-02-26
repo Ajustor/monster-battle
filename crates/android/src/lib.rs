@@ -24,6 +24,17 @@ use game::{GamePlugin, GameScreen};
 /// Sur Android, l'activité native appelle cette fonction via `android_activity`.
 #[bevy_main]
 fn main() {
+    // Initialiser le logger Android (logcat) avant tout le reste
+    #[cfg(target_os = "android")]
+    {
+        android_logger::init_once(
+            android_logger::Config::default()
+                .with_max_level(log::LevelFilter::Info)
+                .with_tag("MonsterBattle"),
+        );
+        log::info!("🐉 Monster Battle — démarrage Android");
+    }
+
     App::new()
         .add_plugins(
             DefaultPlugins
