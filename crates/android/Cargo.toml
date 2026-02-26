@@ -68,3 +68,17 @@ bevy = { version = "0.15", default-features = false, features = [
 default = []
 # Activer pour le build desktop (test/dev)
 desktop = []
+
+# ── Métadonnées Android (utilisées par xbuild) ──────────────────
+[package.metadata.android]
+runtime_libs = "native_activity"
+res = "res"
+
+[package.metadata.android.sdk]
+min_sdk_version = 21
+target_sdk_version = 34
+
+[package.metadata.android.application]
+label = "Monster Battle"
+icon = "@mipmap/ic_launcher"
+theme = "@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"

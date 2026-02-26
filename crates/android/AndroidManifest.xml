@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.ajustor.monsterbattle">
+
+  <application android:label="Monster Battle" android:icon="@mipmap/ic_launcher" android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" android:hasCode="false">
+
+    <activity android:name="android.app.NativeActivity" android:configChanges="orientation|keyboardHidden|screenSize" android:exported="true">
+
+      <meta-data android:name="android.app.lib_name" android:value="monster_battle_android" />
+
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

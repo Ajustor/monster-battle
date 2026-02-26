@@ -16,6 +16,9 @@ APK            := target/x/release/android/$(PKG).apk
 BUILD_TOOLS    := $(HOME)/Android/Sdk/build-tools/36.1.0
 ZIPALIGN       := $(BUILD_TOOLS)/zipalign
 APKSIGNER      := $(BUILD_TOOLS)/apksigner
+AAPT2          := $(BUILD_TOOLS)/aapt2
+ANDROID_JAR    := $(HOME)/Android/Sdk/platforms/android-36/android.jar
+RES_DIR        := crates/android/res
 KEYSTORE       := target/x/release/android/debug.keystore
 KEYSTORE_PASS  := android
 
@@ -58,10 +61,32 @@ $(KEYSTORE):
 		-keyalg RSA -keysize 2048 -validity 10000 \
 		-dname "CN=Debug,O=Debug,C=US"
 
-## Signer et zipaligner l'APK
+## Signer et zipaligner l'APK (avec icône)
 android-apk: android-build $(KEYSTORE)
 	@# xbuild produit un APK nommé .aab — on le copie d'abord
 	cp $(AAB) $(APK_UNSIGNED)
+	@# Compiler les ressources (icônes) via aapt2
+	@rm -rf target/x/release/android/compiled_res target/x/release/android/res-overlay.apk target/x/release/android/res-tmp
+	@mkdir -p target/x/release/android/compiled_res
+	$(AAPT2) compile --dir $(RES_DIR) -o target/x/release/android/compiled_res/
+	$(AAPT2) link \
+		-I $(ANDROID_JAR) \
+		--manifest crates/android/AndroidManifest.xml \
+		-o target/x/release/android/res-overlay.apk \
+		target/x/release/android/compiled_res/*.flat
+	@# Extraire les ressources compilées et les injecter dans l'APK
+	@mkdir -p target/x/release/android/res-tmp
+	cd target/x/release/android/res-tmp && unzip -o ../res-overlay.apk
+	python3 -c "\
+	import zipfile, os; \
+	apk='target/x/release/android/$(notdir $(APK_UNSIGNED))'; \
+	tmp='target/x/release/android/res-tmp'; \
+	z=zipfile.ZipFile(apk,'a'); \
+	z.write(os.path.join(tmp,'resources.arsc'),'resources.arsc'); \
+	[z.write(os.path.join(dp,f),os.path.relpath(os.path.join(dp,f),tmp)) for dp,_,fns in os.walk(os.path.join(tmp,'res')) for f in fns]; \
+	z.close(); \
+	print('  📦 Ressources injectées dans APK')"
+	@rm -rf target/x/release/android/compiled_res target/x/release/android/res-overlay.apk target/x/release/android/res-tmp
 	@# Zipalign (alignement 4 bytes, requis par Android)
 	$(ZIPALIGN) -f -p 4 $(APK_UNSIGNED) $(APK_ALIGNED)
 	@# Signer avec apksigner
