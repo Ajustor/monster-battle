@@ -576,9 +576,51 @@ async fn run_combat_loop(
         let battle_over = matches!(battle.phase, BattlePhase::Victory | BattlePhase::Defeat);
         let player_a_wins = battle.phase == BattlePhase::Victory;
 
+        // Construire les messages pour chaque joueur
+        let mut msgs_a = messages.clone();
+        let mut msgs_b: Vec<BattleMessage> =
+            messages.iter().map(|m| m.flip_perspective()).collect();
+
+        // Ajouter les messages de fin personnalisés pour chaque joueur
+        if battle_over {
+            let xp = battle.xp_gained;
+
+            let victory_msg = BattleMessage {
+                text: "🏆 Vous avez gagné le combat !".to_string(),
+                style: MessageStyle::Victory,
+                player_hp: None,
+                opponent_hp: None,
+                anim_type: None,
+            };
+            let xp_msg = BattleMessage {
+                text: format!("📖 +{} XP !", xp),
+                style: MessageStyle::Info,
+                player_hp: None,
+                opponent_hp: None,
+                anim_type: None,
+            };
+            let defeat_msg = BattleMessage {
+                text: "Vous avez perdu le combat...".to_string(),
+                style: MessageStyle::Defeat,
+                player_hp: None,
+                opponent_hp: None,
+                anim_type: None,
+            };
+
+            if player_a_wins {
+                msgs_a.push(victory_msg);
+                msgs_a.push(xp_msg);
+                msgs_b.push(defeat_msg);
+            } else {
+                msgs_b.push(victory_msg);
+                msgs_b.push(xp_msg);
+                msgs_a.push(defeat_msg);
+            }
+        }
+
         // Envoyer les messages à player_a (perspective directe)
         let result_a = NetMessage::PvpTurnResult {
-            messages: messages.clone(),
+            messages: msgs_a,
             player_hp: battle.player.current_hp,
             opponent_hp: battle.opponent.current_hp,
             battle_over,
@@ -589,9 +631,8 @@ async fn run_combat_loop(
         };
 
         // Envoyer les messages à player_b (perspective inversée)
-        let flipped_messages: Vec<_> = messages.iter().map(|m| m.flip_perspective()).collect();
         let result_b = NetMessage::PvpTurnResult {
-            messages: flipped_messages,
+            messages: msgs_b,
             player_hp: battle.opponent.current_hp,
             opponent_hp: battle.player.current_hp,
             battle_over,

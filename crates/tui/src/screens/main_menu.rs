@@ -12,7 +12,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let has_monster = app.has_living_monster();
 
     let mut items: Vec<&str> = Vec::new();
-    items.push("🐾 Mon Monstre");
+    items.push("🐾 Mes Monstres");
     if !has_monster {
         items.push("🥚 Nouveau Monstre");
     }

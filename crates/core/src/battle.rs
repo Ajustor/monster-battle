@@ -568,8 +568,18 @@ impl BattleState {
 
         // ── Calcul des dégâts ───────────────────────────────────────
         let effective_atk = atk_stat * if berserk_active { 1.5 } else { 1.0 };
-        let base_damage =
-            ((effective_atk * 2.0) / (def_stat + effective_atk) * attack.power as f64).max(1.0);
+        let atk_level = if is_player {
+            self.player.level
+        } else {
+            self.opponent.level
+        } as f64;
+        let level_factor = 1.0 + atk_level * 0.02;
+        let base_damage = ((effective_atk * 2.0) / (def_stat + effective_atk)
+            * attack.power as f64
+            * level_factor
+            / 3.0
+            + 1.0)
+            .max(1.0);
 
         let mut type_mult = attack.element.effectiveness_against(&def_element);
         if let Some(sec) = def_secondary {
@@ -769,12 +779,14 @@ impl BattleState {
             // XP pour le vainqueur (l'adversaire) — doublé car kill en PvP
             self.xp_gained = (50 + (self.player.level * 5)) * 2;
             self.phase = BattlePhase::Defeat;
-            self.queue_end_messages(false);
+            // NOTE : pas de queue_end_messages ici — le serveur génère
+            // des messages de fin personnalisés pour chaque joueur.
         } else if self.opponent.current_hp == 0 {
             // XP doublé car kill en PvP
             self.xp_gained = (50 + (self.opponent.level * 5)) * 2;
             self.phase = BattlePhase::Victory;
-            self.queue_end_messages(true);
+            // NOTE : pas de queue_end_messages ici — le serveur génère
+            // des messages de fin personnalisés pour chaque joueur.
         } else {
             self.turn += 1;
             self.phase = BattlePhase::PlayerChooseAttack;

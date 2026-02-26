@@ -14,6 +14,17 @@ use ratatui::Frame;
 
 use crate::app::App;
 
+/// Cible après la sélection d'un monstre.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SelectMonsterTarget {
+    /// Entraînement contre un bot.
+    Training,
+    /// Combat PvP.
+    CombatPvP,
+    /// Reproduction.
+    Breeding,
+}
+
 /// Les différents écrans de l'application.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Screen {
@@ -28,6 +39,8 @@ pub enum Screen {
         /// Index du type élémentaire choisi.
         type_index: usize,
     },
+    /// Sélection du monstre avant une action (entraînement, PvP, reproduction).
+    SelectMonster(SelectMonsterTarget),
     /// Entraînement contre un bot.
     /// `wild` = false : docile (50% XP, pas de mort) / `wild` = true : sauvage (100% XP, mort possible).
     Training { wild: bool },
@@ -66,6 +79,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Screen::Cemetery => cemetery::draw(frame, chunks[1], app),
         Screen::Help => help::draw(frame, chunks[1], app),
         Screen::Battle => battle::draw(frame, chunks[1], app),
+        Screen::SelectMonster(target) => common::draw_select_monster(frame, chunks[1], app, target),
         Screen::Training { wild } => training::draw_select(frame, chunks[1], app, *wild),
         Screen::Combat(phase) => match phase {
             pvp::PvpPhase::Searching => pvp::draw_searching(frame, chunks[1], app),

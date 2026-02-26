@@ -23,6 +23,7 @@ use monster_battle_storage::{LocalStorage, MonsterStorage};
 
 use crate::screens;
 use crate::screens::Screen;
+use crate::screens::SelectMonsterTarget;
 use crate::screens::breeding::BreedPhase;
 use crate::screens::pvp::PvpPhase;
 
@@ -117,6 +118,9 @@ pub struct App {
     net_task: Option<tokio::task::JoinHandle<()>>,
     /// Canal pour envoyer les choix d'attaque PvP à la tâche réseau.
     pvp_attack_tx: Option<tokio::sync::mpsc::Sender<usize>>,
+
+    /// Index de sélection du monstre (écran SelectMonster).
+    pub monster_select_index: usize,
 }
 
 impl App {
@@ -153,6 +157,7 @@ impl App {
             net_rx: None,
             net_task: None,
             pvp_attack_tx: None,
+            monster_select_index: 0,
         })
     }
 
@@ -414,6 +419,53 @@ impl App {
             return;
         }
 
+        // Sélection du monstre (Entraînement, Combat PvP, Reproduction)
+        if let Screen::SelectMonster(ref target) = self.current_screen {
+            let target = target.clone();
+            let monster_count = self.storage.list_alive().map(|v| v.len()).unwrap_or(0);
+            match code {
+                KeyCode::Up => {
+                    if self.monster_select_index > 0 {
+                        self.monster_select_index -= 1;
+                        crate::audio::sfx_menu_move();
+                    }
+                }
+                KeyCode::Down => {
+                    if monster_count > 0 && self.monster_select_index < monster_count - 1 {
+                        self.monster_select_index += 1;
+                        crate::audio::sfx_menu_move();
+                    }
+                }
+                KeyCode::Enter => {
+                    if monster_count > 0 {
+                        crate::audio::sfx_menu_select();
+                        match target {
+                            SelectMonsterTarget::Training => {
+                                self.current_screen = Screen::Training { wild: false };
+                                self.menu_index = 0;
+                            }
+                            SelectMonsterTarget::CombatPvP => {
+                                crate::audio::play_battle_music();
+                                self.run_pvp();
+                            }
+                            SelectMonsterTarget::Breeding => {
+                                crate::audio::play_breeding_music();
+                                self.run_breeding();
+                            }
+                        }
+                    }
+                }
+                KeyCode::Esc => {
+                    self.current_screen = Screen::MainMenu;
+                    self.menu_index = 0;
+                    self.message = None;
+                    crate::audio::play_title_music();
+                }
+                _ => {}
+            }
+            return;
+        }
+
         // Erreurs PvP/Breeding
         if matches!(
             self.current_screen,
@@ -449,16 +501,45 @@ impl App {
             return;
         }
 
+        // Écran « Mes Monstres » — navigation propre
+        if self.current_screen == Screen::MonsterList {
+            let monster_count = self.storage.list_alive().map(|v| v.len()).unwrap_or(0);
+            match code {
+                KeyCode::Char('m') | KeyCode::Char('M') => {
+                    crate::audio::toggle_mute();
+                }
+                KeyCode::Up => {
+                    if self.monster_select_index > 0 {
+                        self.monster_select_index -= 1;
+                        crate::audio::sfx_menu_move();
+                    }
+                }
+                KeyCode::Down => {
+                    if monster_count > 1
+                        && self.monster_select_index < monster_count.saturating_sub(1)
+                    {
+                        self.monster_select_index += 1;
+                        crate::audio::sfx_menu_move();
+                    }
+                }
+                KeyCode::Char('f') | KeyCode::Char('F') => {
+                    self.feed_monster();
+                }
+                KeyCode::Char('q') | KeyCode::Esc => {
+                    self.current_screen = Screen::MainMenu;
+                    self.menu_index = 0;
+                    self.message = None;
+                    crate::audio::play_title_music();
+                }
+                _ => {}
+            }
+            return;
+        }
+
         // Navigation standard
         match code {
             KeyCode::Char('m') | KeyCode::Char('M') => {
                 crate::audio::toggle_mute();
-                return;
-            }
-            KeyCode::Char('f') | KeyCode::Char('F')
-                if self.current_screen == Screen::MonsterList =>
-            {
-                self.feed_monster();
                 return;
             }
             KeyCode::Char('q') | KeyCode::Esc => {
@@ -523,8 +604,9 @@ impl App {
         // Le menu est dynamique, recalculer les options
         let mut idx = 0;
 
-        // 0 : Mon Monstre
+        // 0 : Mes Monstres
         if self.menu_index == idx {
+            self.monster_select_index = 0;
             self.current_screen = Screen::MonsterList;
             self.menu_index = 0;
             crate::audio::play_exploration_music();
@@ -532,7 +614,7 @@ impl App {
         }
         idx += 1;
 
-        // 1 (si pas de monstre) : Nouveau Monstre
+        // 1 : Nouveau Monstre (seulement si aucun monstre vivant)
         if !has_monster {
             if self.menu_index == idx {
                 self.current_screen = Screen::NewMonster;
@@ -542,27 +624,30 @@ impl App {
             idx += 1;
         }
 
-        // Entraînement (si monstre vivant)
+        // Entraînement (si monstre vivant) — sélection du monstre d'abord
         if has_monster {
             if self.menu_index == idx {
-                self.current_screen = Screen::Training { wild: false };
+                self.monster_select_index = 0;
+                self.current_screen = Screen::SelectMonster(SelectMonsterTarget::Training);
                 self.menu_index = 0;
                 return;
             }
             idx += 1;
 
-            // Combat PvP — connexion directe au serveur relais
+            // Combat PvP — sélection du monstre d'abord
             if self.menu_index == idx {
-                crate::audio::play_battle_music();
-                self.run_pvp();
+                self.monster_select_index = 0;
+                self.current_screen = Screen::SelectMonster(SelectMonsterTarget::CombatPvP);
+                self.menu_index = 0;
                 return;
             }
             idx += 1;
 
-            // Reproduction — connexion directe au serveur relais
+            // Reproduction — sélection du monstre d'abord
             if self.menu_index == idx {
-                crate::audio::play_breeding_music();
-                self.run_breeding();
+                self.monster_select_index = 0;
+                self.current_screen = Screen::SelectMonster(SelectMonsterTarget::Breeding);
+                self.menu_index = 0;
                 return;
             }
             idx += 1;
@@ -606,12 +691,13 @@ impl App {
             }
         };
 
+        let idx = self.monster_select_index.min(monsters.len() - 1);
         self.current_screen = Screen::Combat(PvpPhase::Searching);
-        self.fighter_id = Some(monsters[0].id);
+        self.fighter_id = Some(monsters[idx].id);
 
         let server_addr = self.server_address.clone();
-        let my_monster = monsters[0].clone();
-        let player_name = monsters[0].name.clone();
+        let my_monster = monsters[idx].clone();
+        let player_name = monsters[idx].name.clone();
         let (tx, rx) = mpsc::channel();
 
         // Canal pour envoyer les choix d'attaque au serveur pendant le combat
@@ -771,11 +857,13 @@ impl App {
             }
         };
 
+        let idx = self.monster_select_index.min(monsters.len() - 1);
         self.current_screen = Screen::Breeding(BreedPhase::Searching);
+        self.fighter_id = Some(monsters[idx].id);
 
         let server_addr = self.server_address.clone();
-        let my_monster = monsters[0].clone();
-        let player_name = monsters[0].name.clone();
+        let my_monster = monsters[idx].clone();
+        let player_name = monsters[idx].name.clone();
         let (tx, rx) = mpsc::channel();
 
         let handle = self.tokio_rt.spawn(async move {
@@ -839,9 +927,11 @@ impl App {
         use monster_battle_core::genetics::generate_starter_stats;
         use monster_battle_core::types::ElementType;
 
-        // Limite : un seul monstre vivant
         if self.has_living_monster() {
-            self.message = Some("Vous avez déjà un monstre vivant !".to_string());
+            self.message = Some(
+                "Vous avez déjà un monstre vivant ! Obtenez-en d'autres via la reproduction."
+                    .to_string(),
+            );
             self.current_screen = Screen::MainMenu;
             self.menu_index = 0;
             return;
@@ -880,11 +970,14 @@ impl App {
             }
         };
 
+        let idx = self.monster_select_index.min(monsters.len() - 1);
+        let fighter = &monsters[idx];
+
         let types = ElementType::all();
         let bot_type = types[self.menu_index % types.len()];
 
         // Créer un bot du même niveau que le joueur (±2)
-        let player_level = monsters[0].level;
+        let player_level = fighter.level;
         let bot_level = player_level.saturating_sub(2).max(1);
         let mut bot_stats = generate_starter_stats(bot_type);
         bot_stats.hp += bot_level * 2;
@@ -896,8 +989,8 @@ impl App {
 
         // Lancer le combat interactif
         // is_training = true (docile, 50% XP) / false (sauvage, 100% XP)
-        self.fighter_id = Some(monsters[0].id);
-        let battle = BattleState::new(&monsters[0], &bot, !wild);
+        self.fighter_id = Some(fighter.id);
+        let battle = BattleState::new(fighter, &bot, !wild);
         self.battle_state = Some(battle);
         self.current_screen = Screen::Battle;
     }
@@ -1273,17 +1366,24 @@ impl App {
             }
         };
 
+        // Retrouver le monstre sélectionné par son UUID
+        let parent = if let Some(id) = self.fighter_id {
+            monsters.iter().find(|m| m.id == id).unwrap_or(&monsters[0])
+        } else {
+            &monsters[0]
+        };
+
         let child_name = self.name_input.trim().to_string();
         self.name_input.clear();
 
         let mut log = Vec::new();
         log.push(format!(
             "🧬 Reproduction entre {} et {} !",
-            monsters[0].name, remote.name
+            parent.name, remote.name
         ));
         log.push(String::new());
 
-        match breed(&monsters[0], &remote, child_name) {
+        match breed(parent, &remote, child_name) {
             Ok(result) => {
                 log.push(result.description.clone());
                 log.push(String::new());
@@ -1379,9 +1479,15 @@ impl App {
                 // NE PAS nettoyer la tâche réseau — elle reste active pour le combat PvP
 
                 if let Ok(monsters) = self.storage.list_alive() {
-                    if !monsters.is_empty() {
+                    // Retrouver le monstre sélectionné par son UUID
+                    let fighter = self
+                        .fighter_id
+                        .and_then(|id| monsters.iter().find(|m| m.id == id))
+                        .or(monsters.first());
+
+                    if let Some(fighter) = fighter {
                         // Lancer le combat interactif (BattleState local pour l'affichage)
-                        let battle = BattleState::new(&monsters[0], &opponent_monster, false);
+                        let battle = BattleState::new(fighter, &opponent_monster, false);
                         self.battle_state = Some(battle);
                         self.current_screen = Screen::Battle;
                     } else {
@@ -1528,7 +1634,10 @@ impl App {
             }
         };
 
-        let monster = &mut monsters[0];
+        let idx = self
+            .monster_select_index
+            .min(monsters.len().saturating_sub(1));
+        let monster = &mut monsters[idx];
         let hunger_before = monster.hunger_level();
         let hunger_after = monster.feed();
 

@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
 };
 
 use monster_battle_core::types::ElementType;
@@ -39,9 +39,76 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    // On n'a qu'un seul monstre, affichons ses détails
-    let m = &monsters[0];
+    let selected = app
+        .monster_select_index
+        .min(monsters.len().saturating_sub(1));
 
+    if monsters.len() == 1 {
+        // Un seul monstre : afficher directement la fiche détaillée
+        draw_monster_detail(frame, area, &monsters[0]);
+        return;
+    }
+
+    // Plusieurs monstres : liste à gauche + détail à droite
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(36), Constraint::Min(30)])
+        .split(area);
+
+    // ── Liste des monstres (gauche) ─────────────────────────
+    let list_items: Vec<ListItem> = monsters
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let is_selected = i == selected;
+            let cursor = if is_selected { "▸ " } else { "  " };
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+
+            let secondary = m
+                .secondary_type
+                .map(|t| format!("/{}", t.icon()))
+                .unwrap_or_default();
+
+            let line = format!(
+                "{}{}{} {} Nv.{} PV{}/{}",
+                cursor,
+                m.primary_type.icon(),
+                secondary,
+                m.name,
+                m.level,
+                m.current_hp,
+                m.max_hp(),
+            );
+            ListItem::new(Line::from(Span::styled(line, style)))
+        })
+        .collect();
+
+    let list = List::new(list_items).block(
+        Block::default()
+            .title(format!(" Mes Monstres ({}) ", monsters.len()))
+            .title_style(
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Green)),
+    );
+
+    frame.render_widget(list, cols[0]);
+
+    // ── Détail du monstre sélectionné (droite) ──────────────
+    draw_monster_detail(frame, cols[1], &monsters[selected]);
+}
+
+/// Affiche la fiche détaillée d'un monstre dans la zone donnée.
+fn draw_monster_detail(frame: &mut Frame, area: Rect, m: &monster_battle_core::Monster) {
     let type_icon = m.primary_type.icon();
     let secondary = m
         .secondary_type

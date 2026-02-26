@@ -358,7 +358,7 @@ impl Monster {
     /// PV max effectifs (stats de base × facteur de niveau × facteur d'âge).
     /// Note : les PV max ne sont PAS affectés par la faim pour éviter une spirale de mort.
     pub fn max_hp(&self) -> u32 {
-        let raw = self.base_stats.hp + (self.level * 2);
+        let raw = (self.base_stats.hp + (self.level * 2)) * 2;
         (raw as f64 * self.age_stage().stat_multiplier()) as u32
     }
 
