@@ -8,6 +8,9 @@ use ratatui::{
 
 use crate::app::App;
 use crate::screens::Screen;
+use crate::screens::SelectMonsterTarget;
+
+use monster_battle_storage::MonsterStorage;
 
 /// Dessine le header commun à tous les écrans.
 pub fn draw_header(frame: &mut Frame, area: Rect) {
@@ -43,16 +46,10 @@ pub fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
                 "Tapez le nom de votre monstre | Enter Valider | Esc Annuler".to_string()
             }
             Screen::Combat(phase) => match phase {
-                crate::screens::pvp::PvpPhase::SelectMonster => {
-                    "↑↓ Naviguer | Enter Sélectionner | Esc Annuler".to_string()
-                }
                 crate::screens::pvp::PvpPhase::Error(_) => "Enter ou Esc pour revenir".to_string(),
                 _ => "Esc Annuler".to_string(),
             },
             Screen::Breeding(phase) => match phase {
-                crate::screens::breeding::BreedPhase::SelectMonster => {
-                    "↑↓ Naviguer | Enter Sélectionner | Esc Annuler".to_string()
-                }
                 crate::screens::breeding::BreedPhase::NamingChild => {
                     "Tapez le nom du bébé | Enter Valider | Esc Annuler".to_string()
                 }
@@ -88,7 +85,7 @@ pub fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
                 }
             }
             Screen::MonsterList => "↑↓ Naviguer | f Nourrir | q Retour".to_string(),
-            Screen::TrainingSelectMonster => {
+            Screen::SelectMonster(_) => {
                 "↑↓ Naviguer | Enter Sélectionner | Esc Annuler".to_string()
             }
             Screen::Help => "↑↓ Défiler | q Retour".to_string(),
@@ -130,4 +127,114 @@ pub fn draw_placeholder(frame: &mut Frame, area: Rect, text: &str) {
         .wrap(Wrap { trim: true })
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(p, area);
+}
+
+/// Titre et couleur selon la cible de sélection.
+fn select_monster_style(target: &SelectMonsterTarget) -> (&'static str, Color) {
+    match target {
+        SelectMonsterTarget::Training => (" ⚔️  Choisir un monstre — Entraînement ", Color::Yellow),
+        SelectMonsterTarget::CombatPvP => (" 🗡️  Choisir un monstre — Combat PvP ", Color::Red),
+        SelectMonsterTarget::Breeding => (" 🧬 Choisir un monstre — Reproduction ", Color::Magenta),
+    }
+}
+
+/// Dessine l'écran mutualisé de sélection de monstre.
+pub fn draw_select_monster(frame: &mut Frame, area: Rect, app: &App, target: &SelectMonsterTarget) {
+    let (title, color) = select_monster_style(target);
+    let monsters = app.storage.list_alive().unwrap_or_default();
+
+    if monsters.is_empty() {
+        let paragraph = Paragraph::new("Aucun monstre vivant !")
+            .style(Style::default().fg(Color::Red))
+            .block(
+                Block::default()
+                    .title(title)
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(color)),
+            );
+        frame.render_widget(paragraph, area);
+        return;
+    }
+
+    let mut lines: Vec<Line> = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "  Choisissez le monstre à envoyer :",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+    ];
+
+    for (i, m) in monsters.iter().enumerate() {
+        let is_selected = i == app.monster_select_index;
+        let cursor = if is_selected { "▸ " } else { "  " };
+        let style = if is_selected {
+            Style::default().fg(color).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+
+        let secondary = m
+            .secondary_type
+            .map(|t| format!("/{}", t.icon()))
+            .unwrap_or_default();
+
+        let line = format!(
+            "{}  {}{} {}  Nv.{}  PV {}/{}  ATK {} DEF {} SPD {}",
+            cursor,
+            m.primary_type.icon(),
+            secondary,
+            m.name,
+            m.level,
+            m.current_hp,
+            m.max_hp(),
+            m.effective_attack(),
+            m.effective_defense(),
+            m.effective_speed(),
+        );
+
+        lines.push(Line::from(Span::styled(line, style)));
+
+        if is_selected {
+            let traits_str = if m.traits.is_empty() {
+                "Aucun".to_string()
+            } else {
+                m.traits
+                    .iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "       S.ATK {} S.DEF {}  Traits: {}  W/L: {}/{}",
+                    m.effective_sp_attack(),
+                    m.effective_sp_defense(),
+                    traits_str,
+                    m.wins,
+                    m.losses,
+                ),
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  ↑↓ Naviguer | Enter Sélectionner | Esc Annuler",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let paragraph = Paragraph::new(lines).block(
+        Block::default()
+            .title(title)
+            .title_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(color)),
+    );
+
+    frame.render_widget(paragraph, area);
 }

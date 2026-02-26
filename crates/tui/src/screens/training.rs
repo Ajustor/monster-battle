@@ -137,14 +137,3 @@ pub fn draw_select(frame: &mut Frame, area: Rect, app: &App, wild: bool) {
 
     frame.render_widget(list, chunks[2]);
 }
-
-/// Écran de sélection du monstre pour l'entraînement.
-pub fn draw_select_monster(frame: &mut Frame, area: Rect, app: &App) {
-    super::pvp::draw_monster_selection(
-        frame,
-        area,
-        app,
-        " ⚔️  Choisir un monstre — Entraînement ",
-        Color::Yellow,
-    );
-}

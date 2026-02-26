@@ -23,6 +23,7 @@ use monster_battle_storage::{LocalStorage, MonsterStorage};
 
 use crate::screens;
 use crate::screens::Screen;
+use crate::screens::SelectMonsterTarget;
 use crate::screens::breeding::BreedPhase;
 use crate::screens::pvp::PvpPhase;
 
@@ -418,8 +419,9 @@ impl App {
             return;
         }
 
-        // Sélection du monstre pour l'entraînement
-        if self.current_screen == Screen::TrainingSelectMonster {
+        // Sélection du monstre (Entraînement, Combat PvP, Reproduction)
+        if let Screen::SelectMonster(ref target) = self.current_screen {
+            let target = target.clone();
             let monster_count = self.storage.list_alive().map(|v| v.len()).unwrap_or(0);
             match code {
                 KeyCode::Up => {
@@ -437,51 +439,19 @@ impl App {
                 KeyCode::Enter => {
                     if monster_count > 0 {
                         crate::audio::sfx_menu_select();
-                        self.current_screen = Screen::Training { wild: false };
-                        self.menu_index = 0;
-                    }
-                }
-                KeyCode::Esc => {
-                    self.current_screen = Screen::MainMenu;
-                    self.menu_index = 0;
-                    self.message = None;
-                    crate::audio::play_title_music();
-                }
-                _ => {}
-            }
-            return;
-        }
-
-        // Sélection du monstre (Combat PvP ou Reproduction)
-        if matches!(
-            self.current_screen,
-            Screen::Combat(PvpPhase::SelectMonster) | Screen::Breeding(BreedPhase::SelectMonster)
-        ) {
-            let monster_count = self.storage.list_alive().map(|v| v.len()).unwrap_or(0);
-            match code {
-                KeyCode::Up => {
-                    if self.monster_select_index > 0 {
-                        self.monster_select_index -= 1;
-                        crate::audio::sfx_menu_move();
-                    }
-                }
-                KeyCode::Down => {
-                    if monster_count > 0 && self.monster_select_index < monster_count - 1 {
-                        self.monster_select_index += 1;
-                        crate::audio::sfx_menu_move();
-                    }
-                }
-                KeyCode::Enter => {
-                    if monster_count > 0 {
-                        crate::audio::sfx_menu_select();
-                        let is_combat =
-                            matches!(self.current_screen, Screen::Combat(PvpPhase::SelectMonster));
-                        if is_combat {
-                            crate::audio::play_battle_music();
-                            self.run_pvp();
-                        } else {
-                            crate::audio::play_breeding_music();
-                            self.run_breeding();
+                        match target {
+                            SelectMonsterTarget::Training => {
+                                self.current_screen = Screen::Training { wild: false };
+                                self.menu_index = 0;
+                            }
+                            SelectMonsterTarget::CombatPvP => {
+                                crate::audio::play_battle_music();
+                                self.run_pvp();
+                            }
+                            SelectMonsterTarget::Breeding => {
+                                crate::audio::play_breeding_music();
+                                self.run_breeding();
+                            }
                         }
                     }
                 }
@@ -644,19 +614,21 @@ impl App {
         }
         idx += 1;
 
-        // 1 : Nouveau Monstre (toujours visible)
-        if self.menu_index == idx {
-            self.current_screen = Screen::NewMonster;
-            self.menu_index = 0;
-            return;
+        // 1 : Nouveau Monstre (seulement si aucun monstre vivant)
+        if !has_monster {
+            if self.menu_index == idx {
+                self.current_screen = Screen::NewMonster;
+                self.menu_index = 0;
+                return;
+            }
+            idx += 1;
         }
-        idx += 1;
 
         // Entraînement (si monstre vivant) — sélection du monstre d'abord
         if has_monster {
             if self.menu_index == idx {
                 self.monster_select_index = 0;
-                self.current_screen = Screen::TrainingSelectMonster;
+                self.current_screen = Screen::SelectMonster(SelectMonsterTarget::Training);
                 self.menu_index = 0;
                 return;
             }
@@ -665,7 +637,7 @@ impl App {
             // Combat PvP — sélection du monstre d'abord
             if self.menu_index == idx {
                 self.monster_select_index = 0;
-                self.current_screen = Screen::Combat(PvpPhase::SelectMonster);
+                self.current_screen = Screen::SelectMonster(SelectMonsterTarget::CombatPvP);
                 self.menu_index = 0;
                 return;
             }
@@ -674,7 +646,7 @@ impl App {
             // Reproduction — sélection du monstre d'abord
             if self.menu_index == idx {
                 self.monster_select_index = 0;
-                self.current_screen = Screen::Breeding(BreedPhase::SelectMonster);
+                self.current_screen = Screen::SelectMonster(SelectMonsterTarget::Breeding);
                 self.menu_index = 0;
                 return;
             }
@@ -954,6 +926,16 @@ impl App {
     fn create_starter_monster(&mut self, type_index: usize) {
         use monster_battle_core::genetics::generate_starter_stats;
         use monster_battle_core::types::ElementType;
+
+        if self.has_living_monster() {
+            self.message = Some(
+                "Vous avez déjà un monstre vivant ! Obtenez-en d'autres via la reproduction."
+                    .to_string(),
+            );
+            self.current_screen = Screen::MainMenu;
+            self.menu_index = 0;
+            return;
+        }
 
         let types = ElementType::all();
         let chosen_type = types[type_index % types.len()];

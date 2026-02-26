@@ -14,6 +14,17 @@ use ratatui::Frame;
 
 use crate::app::App;
 
+/// Cible après la sélection d'un monstre.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SelectMonsterTarget {
+    /// Entraînement contre un bot.
+    Training,
+    /// Combat PvP.
+    CombatPvP,
+    /// Reproduction.
+    Breeding,
+}
+
 /// Les différents écrans de l'application.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Screen {
@@ -28,11 +39,11 @@ pub enum Screen {
         /// Index du type élémentaire choisi.
         type_index: usize,
     },
+    /// Sélection du monstre avant une action (entraînement, PvP, reproduction).
+    SelectMonster(SelectMonsterTarget),
     /// Entraînement contre un bot.
     /// `wild` = false : docile (50% XP, pas de mort) / `wild` = true : sauvage (100% XP, mort possible).
     Training { wild: bool },
-    /// Sélection du monstre pour l'entraînement.
-    TrainingSelectMonster,
     /// Interface de combat PvP.
     Combat(pvp::PvpPhase),
     /// Interface de reproduction.
@@ -68,10 +79,9 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Screen::Cemetery => cemetery::draw(frame, chunks[1], app),
         Screen::Help => help::draw(frame, chunks[1], app),
         Screen::Battle => battle::draw(frame, chunks[1], app),
+        Screen::SelectMonster(target) => common::draw_select_monster(frame, chunks[1], app, target),
         Screen::Training { wild } => training::draw_select(frame, chunks[1], app, *wild),
-        Screen::TrainingSelectMonster => training::draw_select_monster(frame, chunks[1], app),
         Screen::Combat(phase) => match phase {
-            pvp::PvpPhase::SelectMonster => pvp::draw_select_monster(frame, chunks[1], app),
             pvp::PvpPhase::Searching => pvp::draw_searching(frame, chunks[1], app),
             pvp::PvpPhase::Matched { opponent_name } => {
                 pvp::draw_matched(frame, chunks[1], app, opponent_name)
@@ -79,9 +89,6 @@ pub fn draw(frame: &mut Frame, app: &App) {
             pvp::PvpPhase::Error(e) => pvp::draw_error(frame, chunks[1], e),
         },
         Screen::Breeding(phase) => match phase {
-            breeding::BreedPhase::SelectMonster => {
-                breeding::draw_select_monster(frame, chunks[1], app)
-            }
             breeding::BreedPhase::Searching => breeding::draw_searching(frame, chunks[1], app),
             breeding::BreedPhase::Matched { opponent_name } => {
                 breeding::draw_matched(frame, chunks[1], app, opponent_name)
