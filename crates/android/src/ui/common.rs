@@ -1,26 +1,43 @@
 //! Composants UI communs — en-tête, pied de page, styles partagés.
 
+use std::sync::Arc;
+
 use bevy::input::touch::TouchPhase;
 use bevy::prelude::*;
-use bevy::text::Font;
+use bevy::text::cosmic_text::fontdb;
+use bevy::text::{CosmicFontSystem, Font};
 
 use crate::game::ScreenEntity;
 
 // ═══════════════════════════════════════════════════════════════════
-//  Police personnalisée (DejaVu Sans — support Latin complet)
+//  Polices personnalisées (DejaVu Sans + Noto Emoji)
 // ═══════════════════════════════════════════════════════════════════
 
 /// Données de la police DejaVu Sans embarquée dans le binaire.
 const FONT_DATA: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
 
-/// Système de démarrage : remplace la police par défaut de Bevy
-/// par DejaVu Sans (support complet des accents français et symboles).
-pub fn setup_custom_font(mut fonts: ResMut<Assets<Font>>) {
+/// Données de la police Noto Emoji (monochrome) pour les icônes.
+const EMOJI_FONT_DATA: &[u8] = include_bytes!("../../assets/fonts/NotoEmoji-Regular.ttf");
+
+/// Système de démarrage : charge DejaVu Sans comme police par défaut
+/// et Noto Emoji comme police de fallback pour les icônes.
+pub fn setup_custom_font(
+    mut fonts: ResMut<Assets<Font>>,
+    mut font_system: ResMut<CosmicFontSystem>,
+) {
     let font = Font::try_from_bytes(FONT_DATA.to_vec())
         .expect("Impossible de charger la police DejaVu Sans");
     // Remplacer la police à l'ID par défaut → tous les TextFont::default() l'utiliseront
     fonts.insert(Handle::<Font>::default().id(), font);
     log::info!("Police DejaVu Sans chargee avec succes");
+
+    // Charger la police emoji dans la base de données de cosmic_text.
+    // cosmic_text utilise automatiquement les polices chargées comme fallback
+    // quand un glyphe n'est pas trouvé dans la police principale.
+    font_system
+        .db_mut()
+        .load_font_source(fontdb::Source::Binary(Arc::new(EMOJI_FONT_DATA.to_vec())));
+    log::info!("Police Noto Emoji chargee comme fallback");
 }
 
 // ═══════════════════════════════════════════════════════════════════
