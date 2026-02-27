@@ -30,6 +30,7 @@ def main():
     # Copy everything from original APK EXCEPT the overlay files
     for item in src.infolist():
         if item.filename not in overlay_files:
+            # resources.arsc from the original must also be stored uncompressed
             dst.writestr(item, src.read(item.filename))
 
     # Write the overlay's AndroidManifest.xml (has android:icon reference)
@@ -37,10 +38,14 @@ def main():
     if os.path.exists(manifest_path):
         dst.write(manifest_path, "AndroidManifest.xml")
 
-    # Write the overlay's resources.arsc
+    # Write the overlay's resources.arsc — MUST be stored uncompressed
+    # and 4-byte aligned (required by Android R+ / API 30+)
     arsc_path = os.path.join(tmp, "resources.arsc")
     if os.path.exists(arsc_path):
-        dst.write(arsc_path, "resources.arsc")
+        info = zipfile.ZipInfo("resources.arsc")
+        info.compress_type = zipfile.ZIP_STORED  # uncompressed
+        with open(arsc_path, "rb") as f:
+            dst.writestr(info, f.read())
 
     # Write all resource files (mipmap icons, etc.)
     for rf in res_files:
