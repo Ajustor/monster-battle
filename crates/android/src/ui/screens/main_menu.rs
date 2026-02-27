@@ -23,11 +23,12 @@ pub(crate) fn spawn_menu(mut commands: Commands, data: Res<GameData>) {
             common::screen_root(),
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::MainMenu),
         ))
         .with_children(|parent| {
             // Titre
             parent.spawn((
-                Text::new("🐉 Monster Battle"),
+                Text::new("~ Monster Battle ~"),
                 TextFont {
                     font_size: fonts::TITLE,
                     ..default()
@@ -40,19 +41,19 @@ pub(crate) fn spawn_menu(mut commands: Commands, data: Res<GameData>) {
             ));
 
             // Entrées du menu
-            let mut entries: Vec<(&str, bool)> = vec![("🐾 Mes Monstres", true)];
+            let mut entries: Vec<(&str, bool)> = vec![("Mes Monstres", true)];
 
             if !has_monster {
-                entries.push(("🥚 Nouveau Monstre", true));
+                entries.push(("Nouveau Monstre", true));
             }
             if has_monster {
-                entries.push(("⚔️  Entraînement", true));
-                entries.push(("🗡️  Combat PvP", true));
-                entries.push(("🧬 Reproduction", true));
+                entries.push(("Entrainement", true));
+                entries.push(("Combat PvP", true));
+                entries.push(("Reproduction", true));
             }
-            entries.push(("💀 Cimetière", true));
-            entries.push(("❓ Aide", true));
-            entries.push(("🚪 Quitter", true));
+            entries.push(("Cimetiere", true));
+            entries.push(("Aide", true));
+            entries.push(("Quitter", true));
 
             for (i, (label, _enabled)) in entries.iter().enumerate() {
                 let selected = i == data.menu_index % entries.len();
@@ -81,6 +82,7 @@ pub(crate) fn spawn_menu(mut commands: Commands, data: Res<GameData>) {
                         BackgroundColor(bg_color),
                         BorderRadius::all(Val::Px(8.0)),
                         MenuButton { index: i },
+                        Interaction::default(),
                     ))
                     .with_children(|p| {
                         p.spawn((

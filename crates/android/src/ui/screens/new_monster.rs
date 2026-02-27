@@ -6,13 +6,17 @@ use bevy::state::state::NextState;
 use monster_battle_core::types::ElementType;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{colors, fonts};
+use crate::ui::common::{SAFE_TOP, colors, fonts};
 
 /// Marqueur pour les boutons de type.
 #[derive(Component)]
 pub(crate) struct TypeButton {
     index: usize,
 }
+
+/// Marqueur pour le bouton retour.
+#[derive(Component)]
+pub(crate) struct NewMonsterBackButton;
 
 /// Construit l'UI de sélection du type de starter.
 pub(crate) fn spawn_new_monster(mut commands: Commands, data: Res<GameData>) {
@@ -24,16 +28,22 @@ pub(crate) fn spawn_new_monster(mut commands: Commands, data: Res<GameData>) {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(16.0)),
+                padding: UiRect::new(
+                    Val::Px(16.0),
+                    Val::Px(16.0),
+                    Val::Px(SAFE_TOP),
+                    Val::Px(16.0),
+                ),
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::NewMonster),
         ))
         .with_children(|parent| {
             // Titre
             parent.spawn((
-                Text::new("🥚 Choisir un type de starter"),
+                Text::new("Choisir un type de starter"),
                 TextFont {
                     font_size: fonts::HEADING,
                     ..default()
@@ -75,7 +85,7 @@ pub(crate) fn spawn_new_monster(mut commands: Commands, data: Res<GameData>) {
                     ))
                     .with_children(|btn| {
                         btn.spawn((
-                            Text::new(format!("{} {}", t.icon(), t)),
+                            Text::new(format!("{}", t)),
                             TextFont {
                                 font_size: fonts::BODY,
                                 ..default()
@@ -85,19 +95,31 @@ pub(crate) fn spawn_new_monster(mut commands: Commands, data: Res<GameData>) {
                     });
             }
 
-            // Pied de page
-            parent.spawn((
-                Text::new("↑↓ Naviguer  ⏎ Confirmer  Esc Retour"),
-                TextFont {
-                    font_size: fonts::SMALL,
-                    ..default()
-                },
-                TextColor(colors::TEXT_SECONDARY),
-                Node {
-                    margin: UiRect::top(Val::Px(16.0)),
-                    ..default()
-                },
-            ));
+            // Bouton retour (tactile)
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
+                        margin: UiRect::top(Val::Px(16.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(colors::PANEL),
+                    BorderRadius::all(Val::Px(8.0)),
+                    NewMonsterBackButton,
+                    Interaction::default(),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new("< Retour"),
+                        TextFont {
+                            font_size: fonts::BODY,
+                            ..default()
+                        },
+                        TextColor(colors::TEXT_PRIMARY),
+                    ));
+                });
         });
 }
 
@@ -107,9 +129,19 @@ pub(crate) fn handle_new_monster_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
     interaction_query: Query<(&Interaction, &TypeButton), Changed<Interaction>>,
+    back_query: Query<&Interaction, (Changed<Interaction>, With<NewMonsterBackButton>)>,
 ) {
     let types = ElementType::all();
     let type_count = types.len();
+
+    // Toucher retour
+    for interaction in &back_query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(GameScreen::MainMenu);
+            data.menu_index = 0;
+            return;
+        }
+    }
 
     // Toucher (mobile)
     for (interaction, button) in &interaction_query {

@@ -78,15 +78,7 @@ android-apk: android-build $(KEYSTORE)
 	@# Extraire les ressources compilées et les injecter dans l'APK
 	@mkdir -p target/x/release/android/res-tmp
 	cd target/x/release/android/res-tmp && unzip -o ../res-overlay.apk
-	python3 -c "\
-	import zipfile, os; \
-	apk='target/x/release/android/$(notdir $(APK_UNSIGNED))'; \
-	tmp='target/x/release/android/res-tmp'; \
-	z=zipfile.ZipFile(apk,'a'); \
-	z.write(os.path.join(tmp,'resources.arsc'),'resources.arsc'); \
-	[z.write(os.path.join(dp,f),os.path.relpath(os.path.join(dp,f),tmp)) for dp,_,fns in os.walk(os.path.join(tmp,'res')) for f in fns]; \
-	z.close(); \
-	print('  📦 Ressources injectées dans APK')"
+	python3 scripts/inject_resources.py target/x/release/android/$(notdir $(APK_UNSIGNED)) target/x/release/android/res-tmp
 	@rm -rf target/x/release/android/compiled_res target/x/release/android/res-overlay.apk target/x/release/android/res-tmp
 	@# Zipalign (alignement 4 bytes, requis par Android)
 	$(ZIPALIGN) -f -p 4 $(APK_UNSIGNED) $(APK_ALIGNED)

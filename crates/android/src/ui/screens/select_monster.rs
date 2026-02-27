@@ -7,13 +7,17 @@ use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity, SelectMonsterTarget};
 use crate::sprites;
-use crate::ui::common::{colors, fonts};
+use crate::ui::common::{SAFE_TOP, colors, fonts};
 
 /// Marqueur pour les cartes de monstre cliquables.
 #[derive(Component)]
 pub(crate) struct MonsterCard {
     index: usize,
 }
+
+/// Marqueur pour le bouton retour.
+#[derive(Component)]
+pub(crate) struct SelectBackButton;
 
 /// Construit l'UI de sélection du monstre.
 pub(crate) fn spawn_select_monster(
@@ -26,9 +30,9 @@ pub(crate) fn spawn_select_monster(
     let monsters = data.storage.list_alive().unwrap_or_default();
 
     let title = match target.as_deref() {
-        Some(SelectMonsterTarget::Training) => "⚔️  Choisir un monstre — Entraînement",
-        Some(SelectMonsterTarget::CombatPvP) => "🗡️  Choisir un monstre — Combat PvP",
-        Some(SelectMonsterTarget::Breeding) => "🧬 Choisir un monstre — Reproduction",
+        Some(SelectMonsterTarget::Training) => "Choisir un monstre -- Entrainement",
+        Some(SelectMonsterTarget::CombatPvP) => "Choisir un monstre -- Combat PvP",
+        Some(SelectMonsterTarget::Breeding) => "Choisir un monstre -- Reproduction",
         None => "Choisir un monstre",
     };
 
@@ -38,11 +42,17 @@ pub(crate) fn spawn_select_monster(
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(12.0)),
+                padding: UiRect::new(
+                    Val::Px(12.0),
+                    Val::Px(12.0),
+                    Val::Px(SAFE_TOP),
+                    Val::Px(12.0),
+                ),
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::SelectMonster),
         ))
         .with_children(|parent| {
             // Titre
@@ -126,16 +136,13 @@ pub(crate) fn spawn_select_monster(
                         .with_children(|info| {
                             let secondary = monster
                                 .secondary_type
-                                .map(|t| format!("/{}", t.icon()))
+                                .map(|t| format!("/{}", t))
                                 .unwrap_or_default();
 
                             info.spawn((
                                 Text::new(format!(
-                                    "{}{} {}  Nv.{}",
-                                    monster.primary_type.icon(),
-                                    secondary,
-                                    monster.name,
-                                    monster.level,
+                                    "[{}{}] {}  Nv.{}",
+                                    monster.primary_type, secondary, monster.name, monster.level,
                                 )),
                                 TextFont {
                                     font_size: fonts::BODY,
@@ -163,19 +170,31 @@ pub(crate) fn spawn_select_monster(
                     });
             }
 
-            // Footer
-            parent.spawn((
-                Text::new("↑↓ Naviguer  ⏎ Sélectionner  Esc Retour"),
-                TextFont {
-                    font_size: fonts::SMALL,
-                    ..default()
-                },
-                TextColor(colors::TEXT_SECONDARY),
-                Node {
-                    margin: UiRect::top(Val::Px(12.0)),
-                    ..default()
-                },
-            ));
+            // Bouton retour (tactile)
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
+                        margin: UiRect::top(Val::Px(12.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(colors::PANEL),
+                    BorderRadius::all(Val::Px(8.0)),
+                    SelectBackButton,
+                    Interaction::default(),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new("< Retour"),
+                        TextFont {
+                            font_size: fonts::BODY,
+                            ..default()
+                        },
+                        TextColor(colors::TEXT_PRIMARY),
+                    ));
+                });
         });
 }
 
@@ -186,8 +205,18 @@ pub(crate) fn handle_select_monster_input(
     mut next_state: ResMut<NextState<GameScreen>>,
     target: Option<Res<SelectMonsterTarget>>,
     interaction_query: Query<(&Interaction, &MonsterCard), Changed<Interaction>>,
+    back_query: Query<&Interaction, (Changed<Interaction>, With<SelectBackButton>)>,
 ) {
     let monster_count = data.storage.list_alive().map(|v| v.len()).unwrap_or(0);
+
+    // Toucher retour
+    for interaction in &back_query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(GameScreen::MainMenu);
+            data.menu_index = 0;
+            return;
+        }
+    }
 
     // Toucher (mobile)
     for (interaction, card) in &interaction_query {

@@ -10,7 +10,7 @@ use monster_battle_core::types::ElementType;
 use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{colors, fonts};
+use crate::ui::common::{SAFE_TOP, colors, fonts};
 
 /// Ressource indiquant si le mode sauvage est actif.
 #[derive(Resource)]
@@ -26,12 +26,12 @@ pub(crate) struct BotTypeButton {
 #[derive(Component)]
 pub(crate) struct ModeToggleButton;
 
+/// Marqueur pour le bouton retour.
+#[derive(Component)]
+pub(crate) struct TrainingBackButton;
+
 /// Construit l'UI d'entraînement.
-pub(crate) fn spawn_training(
-    mut commands: Commands,
-    data: Res<GameData>,
-    wild: Res<TrainingWild>,
-) {
+pub(crate) fn spawn_training(mut commands: Commands, data: Res<GameData>, wild: Res<TrainingWild>) {
     let monsters = data.storage.list_alive().unwrap_or_default();
     let selected_idx = data.monster_select_index;
     let monster = monsters.get(selected_idx).or(monsters.first());
@@ -44,11 +44,17 @@ pub(crate) fn spawn_training(
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(12.0)),
+                padding: UiRect::new(
+                    Val::Px(12.0),
+                    Val::Px(12.0),
+                    Val::Px(SAFE_TOP),
+                    Val::Px(12.0),
+                ),
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::Training),
         ))
         .with_children(|parent| {
             // Info monstre du joueur
@@ -67,8 +73,7 @@ pub(crate) fn spawn_training(
                     .with_children(|p| {
                         p.spawn((
                             Text::new(format!(
-                                "Votre monstre : {} {} — Nv.{} — PV {}/{}",
-                                m.primary_type.icon(),
+                                "Votre monstre : {} -- Nv.{} -- PV {}/{}",
                                 m.name,
                                 m.level,
                                 m.current_hp,
@@ -88,13 +93,13 @@ pub(crate) fn spawn_training(
                 (
                     "SAUVAGE",
                     colors::ACCENT_RED,
-                    "100% XP — ⚠️ Défaite = mort du monstre",
+                    "100% XP -- /!\\ Defaite = mort du monstre",
                 )
             } else {
                 (
                     "DOCILE",
                     colors::ACCENT_GREEN,
-                    "50% XP — ✅ Pas de risque de mort",
+                    "50% XP -- Pas de risque de mort",
                 )
             };
 
@@ -117,7 +122,7 @@ pub(crate) fn spawn_training(
                 ))
                 .with_children(|block| {
                     block.spawn((
-                        Text::new(format!("Mode : ◀ {} ▶", mode_label)),
+                        Text::new(format!("Mode : < {} >", mode_label)),
                         TextFont {
                             font_size: fonts::BODY,
                             ..default()
@@ -179,9 +184,9 @@ pub(crate) fn spawn_training(
                 let indicator = if let Some(m) = monster {
                     let eff = m.primary_type.effectiveness_against(t);
                     if eff > 1.0 {
-                        " ✅ avantagé"
+                        " [+] avantage"
                     } else if eff < 1.0 {
-                        " ❌ désavantagé"
+                        " [-] desavantage"
                     } else {
                         ""
                     }
@@ -204,7 +209,7 @@ pub(crate) fn spawn_training(
                     ))
                     .with_children(|btn| {
                         btn.spawn((
-                            Text::new(format!("{} Bot {}{}", t.icon(), t, indicator)),
+                            Text::new(format!("Bot {}{}", t, indicator)),
                             TextFont {
                                 font_size: fonts::BODY,
                                 ..default()
@@ -214,19 +219,31 @@ pub(crate) fn spawn_training(
                     });
             }
 
-            // Footer
-            parent.spawn((
-                Text::new("↑↓ Adversaire  ←→ Mode  ⏎ Combattre  Esc Retour"),
-                TextFont {
-                    font_size: fonts::SMALL,
-                    ..default()
-                },
-                TextColor(colors::TEXT_SECONDARY),
-                Node {
-                    margin: UiRect::top(Val::Px(8.0)),
-                    ..default()
-                },
-            ));
+            // Bouton retour (tactile)
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
+                        margin: UiRect::top(Val::Px(8.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(colors::PANEL),
+                    BorderRadius::all(Val::Px(8.0)),
+                    TrainingBackButton,
+                    Interaction::default(),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new("< Retour"),
+                        TextFont {
+                            font_size: fonts::BODY,
+                            ..default()
+                        },
+                        TextColor(colors::TEXT_PRIMARY),
+                    ));
+                });
         });
 }
 
@@ -237,10 +254,23 @@ pub(crate) fn handle_training_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
     type_buttons: Query<(&Interaction, &BotTypeButton), Changed<Interaction>>,
-    mode_buttons: Query<(&Interaction, &ModeToggleButton), (Changed<Interaction>, Without<BotTypeButton>)>,
+    mode_buttons: Query<
+        (&Interaction, &ModeToggleButton),
+        (Changed<Interaction>, Without<BotTypeButton>),
+    >,
+    back_query: Query<&Interaction, (Changed<Interaction>, With<TrainingBackButton>)>,
 ) {
     let types = ElementType::all();
     let type_count = types.len();
+
+    // Toucher retour
+    for interaction in &back_query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(GameScreen::MainMenu);
+            data.menu_index = 0;
+            return;
+        }
+    }
 
     // Toucher toggle mode
     for (interaction, _) in &mode_buttons {
@@ -298,9 +328,7 @@ fn start_training_fight(
     };
 
     let selected_idx = data.monster_select_index;
-    let player_monster = monsters
-        .get(selected_idx)
-        .unwrap_or(&monsters[0]);
+    let player_monster = monsters.get(selected_idx).unwrap_or(&monsters[0]);
 
     let types = ElementType::all();
     let bot_type = types[data.menu_index % types.len()];

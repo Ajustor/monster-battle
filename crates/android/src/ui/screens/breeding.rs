@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{colors, fonts};
+use crate::ui::common::{SAFE_TOP, colors, fonts};
 
 // ═══════════════════════════════════════════════════════════════════
 //  Breeding Searching
@@ -26,15 +26,21 @@ pub(crate) fn spawn_breeding_searching(mut commands: Commands) {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
-                padding: UiRect::all(Val::Px(24.0)),
+                padding: UiRect::new(
+                    Val::Px(24.0),
+                    Val::Px(24.0),
+                    Val::Px(SAFE_TOP),
+                    Val::Px(24.0),
+                ),
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::BreedingSearching),
         ))
         .with_children(|parent| {
             parent.spawn((
-                Text::new("🧬 Reproduction"),
+                Text::new("Reproduction"),
                 TextFont {
                     font_size: fonts::TITLE,
                     ..default()
@@ -47,7 +53,7 @@ pub(crate) fn spawn_breeding_searching(mut commands: Commands) {
             ));
 
             parent.spawn((
-                Text::new("⏳ Recherche d'un partenaire de reproduction..."),
+                Text::new("Recherche d'un partenaire de reproduction..."),
                 TextFont {
                     font_size: fonts::BODY,
                     ..default()
@@ -133,6 +139,10 @@ pub(crate) fn handle_breeding_searching_input(
 #[derive(Component)]
 pub(crate) struct ConfirmButton;
 
+/// Marqueur pour le bouton retour (nommage reproduction).
+#[derive(Component)]
+pub(crate) struct BreedingNamingBackButton;
+
 /// Construit l'UI de nommage du bébé.
 pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>) {
     commands
@@ -142,15 +152,21 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
-                padding: UiRect::all(Val::Px(16.0)),
+                padding: UiRect::new(
+                    Val::Px(16.0),
+                    Val::Px(16.0),
+                    Val::Px(SAFE_TOP),
+                    Val::Px(16.0),
+                ),
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::BreedingNaming),
         ))
         .with_children(|parent| {
             parent.spawn((
-                Text::new("🧬 La reproduction a réussi !"),
+                Text::new("La reproduction a reussi !"),
                 TextFont {
                     font_size: fonts::HEADING,
                     ..default()
@@ -227,7 +243,7 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
                 ))
                 .with_children(|btn| {
                     btn.spawn((
-                        Text::new("✅ Confirmer"),
+                        Text::new("Confirmer"),
                         TextFont {
                             font_size: fonts::BODY,
                             ..default()
@@ -252,19 +268,31 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
                 ));
             }
 
-            // Footer
-            parent.spawn((
-                Text::new("⏎ Confirmer  Esc Annuler"),
-                TextFont {
-                    font_size: fonts::SMALL,
-                    ..default()
-                },
-                TextColor(colors::TEXT_SECONDARY),
-                Node {
-                    margin: UiRect::top(Val::Px(16.0)),
-                    ..default()
-                },
-            ));
+            // Bouton retour (tactile)
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
+                        margin: UiRect::top(Val::Px(16.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(colors::PANEL),
+                    BorderRadius::all(Val::Px(8.0)),
+                    BreedingNamingBackButton,
+                    Interaction::default(),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new("< Annuler"),
+                        TextFont {
+                            font_size: fonts::BODY,
+                            ..default()
+                        },
+                        TextColor(colors::TEXT_PRIMARY),
+                    ));
+                });
         });
 }
 
@@ -275,7 +303,20 @@ pub(crate) fn handle_breeding_naming_input(
     key_events: EventReader<KeyboardInput>,
     mut next_state: ResMut<NextState<GameScreen>>,
     interaction_query: Query<(&Interaction, &ConfirmButton), Changed<Interaction>>,
+    back_query: Query<&Interaction, (Changed<Interaction>, With<BreedingNamingBackButton>)>,
 ) {
+    // Toucher annuler/retour
+    for interaction in &back_query {
+        if *interaction == Interaction::Pressed {
+            data.name_input.clear();
+            data.remote_monster = None;
+            data.message = None;
+            next_state.set(GameScreen::MainMenu);
+            data.menu_index = 0;
+            return;
+        }
+    }
+
     // Toucher confirmer
     for (interaction, _) in &interaction_query {
         if *interaction == Interaction::Pressed {
@@ -355,15 +396,21 @@ pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>)
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(16.0)),
+                padding: UiRect::new(
+                    Val::Px(16.0),
+                    Val::Px(16.0),
+                    Val::Px(SAFE_TOP),
+                    Val::Px(16.0),
+                ),
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::BreedingResult),
         ))
         .with_children(|parent| {
             parent.spawn((
-                Text::new("🧬 Résultat de la reproduction"),
+                Text::new("Resultat de la reproduction"),
                 TextFont {
                     font_size: fonts::HEADING,
                     ..default()
@@ -379,7 +426,7 @@ pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>)
             if let Some(ref baby) = data.breed_result {
                 let secondary = baby
                     .secondary_type
-                    .map(|t| format!("/{}", t.icon()))
+                    .map(|t| format!("/{}", t))
                     .unwrap_or_default();
 
                 parent
@@ -400,11 +447,8 @@ pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>)
                     .with_children(|card| {
                         card.spawn((
                             Text::new(format!(
-                                "{}{} {}  Nv.{}",
-                                baby.primary_type.icon(),
-                                secondary,
-                                baby.name,
-                                baby.level,
+                                "[{}{}] {}  Nv.{}",
+                                baby.primary_type, secondary, baby.name, baby.level,
                             )),
                             TextFont {
                                 font_size: fonts::BODY,
@@ -429,7 +473,7 @@ pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>)
                         ));
 
                         card.spawn((
-                            Text::new(format!("Génération {}", baby.generation)),
+                            Text::new(format!("Generation {}", baby.generation)),
                             TextFont {
                                 font_size: fonts::SMALL,
                                 ..default()
@@ -481,7 +525,7 @@ pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>)
                 ))
                 .with_children(|btn| {
                     btn.spawn((
-                        Text::new("⏎ Retour au menu"),
+                        Text::new("Retour au menu"),
                         TextFont {
                             font_size: fonts::BODY,
                             ..default()

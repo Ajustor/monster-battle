@@ -131,6 +131,7 @@ impl Plugin for GamePlugin {
         let data_dir = dirs_data_dir();
         app.insert_resource(GameData::new(data_dir))
             .insert_resource(crate::ui::screens::training::TrainingWild(false))
+            .enable_state_scoped_entities::<GameScreen>()
             .add_systems(OnEnter(GameScreen::MainMenu), on_enter_main_menu)
             .add_systems(OnExit(GameScreen::MainMenu), cleanup_screen)
             .add_systems(OnEnter(GameScreen::MonsterList), on_enter_monster_list)

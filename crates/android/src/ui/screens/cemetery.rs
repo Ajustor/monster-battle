@@ -7,7 +7,11 @@ use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::sprites;
-use crate::ui::common::{colors, fonts};
+use crate::ui::common::{SAFE_TOP, colors, fonts};
+
+/// Marqueur pour le bouton retour.
+#[derive(Component)]
+pub(crate) struct CemeteryBackButton;
 
 /// Construit l'UI du cimetière.
 pub(crate) fn spawn_cemetery(
@@ -24,16 +28,22 @@ pub(crate) fn spawn_cemetery(
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(12.0)),
+                padding: UiRect::new(
+                    Val::Px(12.0),
+                    Val::Px(12.0),
+                    Val::Px(SAFE_TOP),
+                    Val::Px(12.0),
+                ),
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::Cemetery),
         ))
         .with_children(|parent| {
             // Titre
             parent.spawn((
-                Text::new(format!("💀 Cimetière ({})", dead.len())),
+                Text::new(format!("Cimetiere ({})", dead.len())),
                 TextFont {
                     font_size: fonts::HEADING,
                     ..default()
@@ -111,10 +121,8 @@ pub(crate) fn spawn_cemetery(
                                 .with_children(|info| {
                                     info.spawn((
                                         Text::new(format!(
-                                            "💀 {} {} — Nv.{}",
-                                            monster.primary_type.icon(),
-                                            monster.name,
-                                            monster.level,
+                                            "[x] {} {} -- Nv.{}",
+                                            monster.primary_type, monster.name, monster.level,
                                         )),
                                         TextFont {
                                             font_size: fonts::BODY,
@@ -141,19 +149,31 @@ pub(crate) fn spawn_cemetery(
                     });
             }
 
-            // Footer
-            parent.spawn((
-                Text::new("Esc Retour"),
-                TextFont {
-                    font_size: fonts::SMALL,
-                    ..default()
-                },
-                TextColor(colors::TEXT_SECONDARY),
-                Node {
-                    margin: UiRect::top(Val::Px(12.0)),
-                    ..default()
-                },
-            ));
+            // Bouton retour (tactile)
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
+                        margin: UiRect::top(Val::Px(12.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(colors::PANEL),
+                    BorderRadius::all(Val::Px(8.0)),
+                    CemeteryBackButton,
+                    Interaction::default(),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new("< Retour"),
+                        TextFont {
+                            font_size: fonts::BODY,
+                            ..default()
+                        },
+                        TextColor(colors::TEXT_PRIMARY),
+                    ));
+                });
         });
 }
 
@@ -162,7 +182,16 @@ pub(crate) fn handle_cemetery_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
+    back_query: Query<(&Interaction, &CemeteryBackButton), Changed<Interaction>>,
 ) {
+    for (interaction, _) in &back_query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(GameScreen::MainMenu);
+            data.menu_index = 0;
+            return;
+        }
+    }
+
     if keyboard.just_pressed(KeyCode::ArrowUp) {
         data.scroll_offset = data.scroll_offset.saturating_sub(1);
     }

@@ -4,7 +4,11 @@ use bevy::prelude::*;
 use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{colors, fonts};
+use crate::ui::common::{SAFE_TOP, colors, fonts};
+
+/// Marqueur pour le bouton retour.
+#[derive(Component)]
+pub(crate) struct HelpBackButton;
 
 /// Construit l'UI d'aide.
 pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>) {
@@ -16,17 +20,23 @@ pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>) {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(12.0)),
+                padding: UiRect::new(
+                    Val::Px(12.0),
+                    Val::Px(12.0),
+                    Val::Px(SAFE_TOP),
+                    Val::Px(12.0),
+                ),
                 overflow: Overflow::clip_y(),
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::Help),
         ))
         .with_children(|parent| {
             // Titre
             parent.spawn((
-                Text::new("❓ Aide — Comment jouer"),
+                Text::new("Aide -- Comment jouer"),
                 TextFont {
                     font_size: fonts::HEADING,
                     ..default()
@@ -41,100 +51,97 @@ pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>) {
             // Contenu d'aide (sections)
             let sections: &[(&str, Color, &[&str])] = &[
                 (
-                    "🐉 Bienvenue dans Monster Battle !",
+                    "Bienvenue dans Monster Battle !",
                     colors::ACCENT_YELLOW,
                     &[],
                 ),
                 (
-                    "── But du jeu ──",
+                    "-- But du jeu --",
                     colors::ACCENT_GREEN,
                     &[
-                        "Élevez un monstre unique, nourrissez-le, entraînez-le",
+                        "Elevez un monstre unique, nourrissez-le, entrainez-le",
                         "et affrontez d'autres joueurs en combat PvP !",
                         "Votre monstre est mortel : il vieillit et peut mourir",
                         "de vieillesse, de faim ou au combat.",
-                        "Reproduisez-le pour créer une lignée plus puissante.",
+                        "Reproduisez-le pour creer une lignee plus puissante.",
                     ],
                 ),
                 (
-                    "── Cycle de vie ──",
+                    "-- Cycle de vie --",
                     colors::ACCENT_GREEN,
                     &[
-                        "💿 Bébé (0-15%)    → Stats ×80%",
-                        "🌱 Jeune (15-40%)  → Stats ×95%",
-                        "💪 Adulte (40-75%) → Stats ×110%  ← pic",
-                        "🧓 Vieux (75-100%) → Stats ×85%",
-                        "💀 Mort au-delà de ~30 jours de vie",
+                        "Bebe (0-15%)    > Stats x80%",
+                        "Jeune (15-40%)  > Stats x95%",
+                        "Adulte (40-75%) > Stats x110%  < pic",
+                        "Vieux (75-100%) > Stats x85%",
+                        "Mort au-dela de ~30 jours de vie",
                     ],
                 ),
                 (
-                    "── Système de faim ──",
+                    "-- Systeme de faim --",
                     colors::ACCENT_GREEN,
                     &[
-                        "🍽️ A faim          → Stats normales (×100%)",
-                        "😊 Rassasié (<12h) → Boost ! (×115%)",
-                        "🤢 Trop mangé (3×) → Malus (×85%)",
-                        "💀 Affamé (3+ jours) → Mort de faim !",
+                        "A faim          > Stats normales (x100%)",
+                        "Rassasie (<12h) > Boost ! (x115%)",
+                        "Trop mange (3x) > Malus (x85%)",
+                        "Affame (3+ jours) > Mort de faim !",
                         "",
                         "Nourrissez votre monstre depuis sa fiche (F).",
-                        "Attention : 3 repas en 12h = gavage → malus.",
+                        "Attention : 3 repas en 12h = gavage > malus.",
                     ],
                 ),
                 (
-                    "── Combat ──",
+                    "-- Combat --",
                     colors::ACCENT_GREEN,
                     &[
-                        "⚔️  Entraînement docile : 50% XP, pas de mort",
-                        "⚔️  Entraînement sauvage : 100% XP, mort possible",
-                        "🗡️  PvP en ligne : 200% XP si KO, mort du perdant",
-                        "🏳️  Fuite PvP : pas de mort, adversaire +100% XP",
+                        "Entrainement docile : 50% XP, pas de mort",
+                        "Entrainement sauvage : 100% XP, mort possible",
+                        "PvP en ligne : 200% XP si KO, mort du perdant",
+                        "Fuite PvP : pas de mort, adversaire +100% XP",
                         "",
-                        "Les stats déterminent l'ordre d'attaque et les dégâts.",
-                        "Les types élémentaires créent des avantages.",
+                        "Les stats determinent l'ordre d'attaque et les degats.",
+                        "Les types elementaires creent des avantages.",
                     ],
                 ),
                 (
-                    "── Types élémentaires ──",
+                    "-- Types elementaires --",
                     colors::ACCENT_GREEN,
                     &[
-                        "🔥 Feu > 🌿 Plante > 💧 Eau > 🔥 Feu",
-                        "⚡ Électrique > 💧 Eau   🌍 Terre > ⚡ Électrique",
-                        "🌀 Vent > 🌍 Terre   🌑 Ombre > 🌟 Lumière > 🌑 Ombre",
+                        "Feu > Plante > Eau > Feu",
+                        "Electrique > Eau   Terre > Electrique",
+                        "Vent > Terre   Ombre > Lumiere > Ombre",
                     ],
                 ),
                 (
-                    "── Reproduction ──",
+                    "-- Reproduction --",
                     colors::ACCENT_GREEN,
                     &[
-                        "🧬 Croisez votre monstre avec un autre joueur.",
-                        "Le bébé hérite des types, stats et traits.",
-                        "Des mutations peuvent apparaître !",
+                        "Croisez votre monstre avec un autre joueur.",
+                        "Le bebe herite des types, stats et traits.",
+                        "Des mutations peuvent apparaitre !",
                         "Le type secondaire est transmis par reproduction.",
                     ],
                 ),
                 (
-                    "── Traits génétiques ──",
+                    "-- Traits genetiques --",
                     colors::ACCENT_GREEN,
                     &[
-                        "🎯 CriticalStrike  → +crit (20% vs 8%)",
-                        "😡 Berserk         → ×1.5 ATK sous 25% PV",
-                        "💨 Evasion         → 12% d'esquive",
-                        "🌵 Thorns          → 15% dégâts renvoyés",
-                        "💪 Tenacity        → 15% survie à 1 PV",
-                        "🩹 Regeneration    → 5% PV max régénérés/tour",
-                        "📚 FastLearner     → XP ×1.5",
-                        "🕰️  Longevity       → +15 jours de vie",
+                        "CriticalStrike  > +crit (20% vs 8%)",
+                        "Berserk         > x1.5 ATK sous 25% PV",
+                        "Evasion         > 12% d'esquive",
+                        "Thorns          > 15% degats renvoyes",
+                        "Tenacity        > 15% survie a 1 PV",
+                        "Regeneration    > 5% PV max regeneres/tour",
+                        "FastLearner     > XP x1.5",
+                        "Longevity       > +15 jours de vie",
                     ],
                 ),
                 (
-                    "── Commandes ──",
+                    "-- Commandes --",
                     colors::ACCENT_GREEN,
                     &[
-                        "↑↓      Naviguer",
-                        "←→      Docile / Sauvage (entraînement)",
-                        "Enter   Sélectionner / Confirmer",
-                        "Esc     Retour / Quitter",
-                        "F       Nourrir (fiche monstre)",
+                        "Toucher un bouton pour selectionner",
+                        "Bouton < Retour pour revenir",
                     ],
                 ),
             ];
@@ -196,19 +203,31 @@ pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>) {
                     }
                 });
 
-            // Footer
-            parent.spawn((
-                Text::new("↑↓ Défiler  Esc/Q Retour"),
-                TextFont {
-                    font_size: fonts::SMALL,
-                    ..default()
-                },
-                TextColor(colors::TEXT_SECONDARY),
-                Node {
-                    margin: UiRect::top(Val::Px(12.0)),
-                    ..default()
-                },
-            ));
+            // Bouton retour (tactile)
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
+                        margin: UiRect::top(Val::Px(12.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(colors::PANEL),
+                    BorderRadius::all(Val::Px(8.0)),
+                    HelpBackButton,
+                    Interaction::default(),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new("< Retour"),
+                        TextFont {
+                            font_size: fonts::BODY,
+                            ..default()
+                        },
+                        TextColor(colors::TEXT_PRIMARY),
+                    ));
+                });
         });
 }
 
@@ -217,7 +236,18 @@ pub(crate) fn handle_help_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
+    back_query: Query<(&Interaction, &HelpBackButton), Changed<Interaction>>,
 ) {
+    for (interaction, _) in &back_query {
+        if *interaction == Interaction::Pressed {
+            data.scroll_offset = 0;
+            data.message = None;
+            next_state.set(GameScreen::MainMenu);
+            data.menu_index = 0;
+            return;
+        }
+    }
+
     if keyboard.just_pressed(KeyCode::ArrowUp) {
         data.scroll_offset = data.scroll_offset.saturating_sub(1);
     }

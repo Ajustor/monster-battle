@@ -10,6 +10,8 @@
 //! Les sprites pixel-art 16×16 sont convertis en textures Bevy au runtime
 //! via le module [`sprites`].
 
+pub mod audio;
+pub mod connection;
 pub mod game;
 pub mod screens;
 pub mod sprites;
@@ -53,5 +55,7 @@ fn main() {
         .add_plugins(GamePlugin)
         .add_plugins(ui::UiPlugin)
         .add_plugins(sprites::SpritePlugin)
+        .add_plugins(audio::AudioPlugin)
+        .add_plugins(connection::ConnectionPlugin)
         .run();
 }

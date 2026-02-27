@@ -1,8 +1,8 @@
 //! Écran de saisie du nom du monstre.
 
-use bevy::prelude::*;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{Key, KeyboardInput};
+use bevy::prelude::*;
 use bevy::state::state::NextState;
 
 use monster_battle_core::Monster;
@@ -11,11 +11,15 @@ use monster_battle_core::types::ElementType;
 use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{colors, fonts};
+use crate::ui::common::{SAFE_TOP, colors, fonts};
 
 /// Marqueur pour le bouton « Confirmer ».
 #[derive(Component)]
 pub(crate) struct ConfirmButton;
+
+/// Marqueur pour le bouton retour.
+#[derive(Component)]
+pub(crate) struct NamingBackButton;
 
 /// Construit l'UI de saisie du nom.
 pub(crate) fn spawn_naming(mut commands: Commands, data: Res<GameData>) {
@@ -28,12 +32,18 @@ pub(crate) fn spawn_naming(mut commands: Commands, data: Res<GameData>) {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(16.0)),
+                padding: UiRect::new(
+                    Val::Px(16.0),
+                    Val::Px(16.0),
+                    Val::Px(SAFE_TOP),
+                    Val::Px(16.0),
+                ),
                 align_items: AlignItems::Center,
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::NamingMonster),
         ))
         .with_children(|parent| {
             // Info type choisi
@@ -50,7 +60,7 @@ pub(crate) fn spawn_naming(mut commands: Commands, data: Res<GameData>) {
                 ))
                 .with_children(|p| {
                     p.spawn((
-                        Text::new(format!("Type choisi : {} {}", chosen.icon(), chosen)),
+                        Text::new(format!("Type choisi : {}", chosen)),
                         TextFont {
                             font_size: fonts::BODY,
                             ..default()
@@ -139,7 +149,7 @@ pub(crate) fn spawn_naming(mut commands: Commands, data: Res<GameData>) {
                 ))
                 .with_children(|btn| {
                     btn.spawn((
-                        Text::new("✅ Confirmer"),
+                        Text::new("Confirmer"),
                         TextFont {
                             font_size: fonts::BODY,
                             ..default()
@@ -164,19 +174,31 @@ pub(crate) fn spawn_naming(mut commands: Commands, data: Res<GameData>) {
                 ));
             }
 
-            // Footer
-            parent.spawn((
-                Text::new("⏎ Confirmer  Esc Retour"),
-                TextFont {
-                    font_size: fonts::SMALL,
-                    ..default()
-                },
-                TextColor(colors::TEXT_SECONDARY),
-                Node {
-                    margin: UiRect::top(Val::Px(16.0)),
-                    ..default()
-                },
-            ));
+            // Bouton retour (tactile)
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
+                        margin: UiRect::top(Val::Px(16.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(colors::PANEL),
+                    BorderRadius::all(Val::Px(8.0)),
+                    NamingBackButton,
+                    Interaction::default(),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new("< Retour"),
+                        TextFont {
+                            font_size: fonts::BODY,
+                            ..default()
+                        },
+                        TextColor(colors::TEXT_PRIMARY),
+                    ));
+                });
         });
 }
 
@@ -187,7 +209,18 @@ pub(crate) fn handle_naming_input(
     key_events: EventReader<KeyboardInput>,
     mut next_state: ResMut<NextState<GameScreen>>,
     interaction_query: Query<(&Interaction, &ConfirmButton), Changed<Interaction>>,
+    back_query: Query<&Interaction, (Changed<Interaction>, With<NamingBackButton>)>,
 ) {
+    // Toucher retour
+    for interaction in &back_query {
+        if *interaction == Interaction::Pressed {
+            data.name_input.clear();
+            data.message = None;
+            next_state.set(GameScreen::NewMonster);
+            return;
+        }
+    }
+
     // Toucher le bouton confirmer
     for (interaction, _) in &interaction_query {
         if *interaction == Interaction::Pressed {
@@ -256,7 +289,7 @@ fn try_create_monster(data: &mut ResMut<GameData>, next_state: &mut ResMut<NextS
 
     match data.storage.save(&monster) {
         Ok(()) => {
-            data.message = Some(format!("🥚 {} est né ! Prenez-en soin.", name));
+            data.message = Some(format!("{} est ne ! Prenez-en soin.", name));
         }
         Err(e) => {
             data.message = Some(format!("Erreur : {}", e));

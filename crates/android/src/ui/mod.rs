@@ -117,8 +117,8 @@ impl Plugin for UiPlugin {
                 Update,
                 help::handle_help_input.run_if(in_state(GameScreen::Help)),
             )
-            // ── Caméra 2D ───────────────────────────────────────
-            .add_systems(Startup, spawn_camera);
+            // ── Caméra 2D + Police ─────────────────────────────
+            .add_systems(Startup, (spawn_camera, common::setup_custom_font));
     }
 }
 

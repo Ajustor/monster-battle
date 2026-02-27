@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{colors, fonts};
+use crate::ui::common::{SAFE_TOP, colors, fonts};
 
 // ═══════════════════════════════════════════════════════════════════
 //  PvP Searching
@@ -20,15 +20,21 @@ pub(crate) fn spawn_pvp_searching(mut commands: Commands) {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
-                padding: UiRect::all(Val::Px(24.0)),
+                padding: UiRect::new(
+                    Val::Px(24.0),
+                    Val::Px(24.0),
+                    Val::Px(SAFE_TOP),
+                    Val::Px(24.0),
+                ),
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            bevy::state::state_scoped::StateScoped(GameScreen::PvpSearching),
         ))
         .with_children(|parent| {
             parent.spawn((
-                Text::new("⚔️  Combat PvP"),
+                Text::new("Combat PvP"),
                 TextFont {
                     font_size: fonts::TITLE,
                     ..default()
@@ -41,7 +47,7 @@ pub(crate) fn spawn_pvp_searching(mut commands: Commands) {
             ));
 
             parent.spawn((
-                Text::new("⏳ Recherche d'un adversaire..."),
+                Text::new("Recherche d'un adversaire..."),
                 TextFont {
                     font_size: fonts::BODY,
                     ..default()

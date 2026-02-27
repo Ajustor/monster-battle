@@ -1,8 +1,36 @@
 //! Composants UI communs — en-tête, pied de page, styles partagés.
 
 use bevy::prelude::*;
+use bevy::text::Font;
 
 use crate::game::ScreenEntity;
+
+// ═══════════════════════════════════════════════════════════════════
+//  Police personnalisée (DejaVu Sans — support Latin complet)
+// ═══════════════════════════════════════════════════════════════════
+
+/// Données de la police DejaVu Sans embarquée dans le binaire.
+const FONT_DATA: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
+
+/// Système de démarrage : remplace la police par défaut de Bevy
+/// par DejaVu Sans (support complet des accents français et symboles).
+pub fn setup_custom_font(mut fonts: ResMut<Assets<Font>>) {
+    let font = Font::try_from_bytes(FONT_DATA.to_vec())
+        .expect("Impossible de charger la police DejaVu Sans");
+    // Remplacer la police à l'ID par défaut → tous les TextFont::default() l'utiliseront
+    fonts.insert(Handle::<Font>::default().id(), font);
+    log::info!("Police DejaVu Sans chargee avec succes");
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Marge de sécurité pour l'encoche caméra (safe area)
+// ═══════════════════════════════════════════════════════════════════
+
+/// Marge haute pour éviter l'encoche caméra sur Android.
+#[cfg(target_os = "android")]
+pub const SAFE_TOP: f32 = 48.0;
+#[cfg(not(target_os = "android"))]
+pub const SAFE_TOP: f32 = 16.0;
 
 // ═══════════════════════════════════════════════════════════════════
 //  Constantes de style
@@ -41,6 +69,7 @@ pub mod fonts {
 // ═══════════════════════════════════════════════════════════════════
 
 /// Crée un nœud racine plein écran pour un écran.
+/// Inclut une marge haute pour éviter l'encoche caméra sur Android.
 pub fn screen_root() -> Node {
     Node {
         width: Val::Percent(100.0),
@@ -48,16 +77,21 @@ pub fn screen_root() -> Node {
         flex_direction: FlexDirection::Column,
         align_items: AlignItems::Center,
         justify_content: JustifyContent::FlexStart,
-        padding: UiRect::all(Val::Px(16.0)),
+        padding: UiRect::new(
+            Val::Px(16.0),
+            Val::Px(16.0),
+            Val::Px(SAFE_TOP),
+            Val::Px(16.0),
+        ),
         ..default()
     }
 }
 
-/// Crée un en-tête « 🐉 Monster Battle ».
+/// Crée un en-tête « Monster Battle ».
 pub fn spawn_header(commands: &mut Commands) -> Entity {
     commands
         .spawn((
-            Text::new("🐉 Monster Battle"),
+            Text::new("~ Monster Battle ~"),
             TextFont {
                 font_size: fonts::TITLE,
                 ..default()
