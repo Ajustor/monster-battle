@@ -4,9 +4,10 @@ use bevy::input::ButtonState;
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
 use bevy::state::state::NextState;
+use bevy::window::Ime;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_TOP, colors, fonts};
+use crate::ui::common::{InputDisplayText, SAFE_BOTTOM, SAFE_TOP, TextInputField, colors, fonts};
 
 // ═══════════════════════════════════════════════════════════════════
 //  Breeding Searching
@@ -30,7 +31,7 @@ pub(crate) fn spawn_breeding_searching(mut commands: Commands) {
                     Val::Px(24.0),
                     Val::Px(24.0),
                     Val::Px(SAFE_TOP),
-                    Val::Px(24.0),
+                    Val::Px(SAFE_BOTTOM),
                 ),
                 ..default()
             },
@@ -156,7 +157,7 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
                     Val::Px(16.0),
                     Val::Px(16.0),
                     Val::Px(SAFE_TOP),
-                    Val::Px(16.0),
+                    Val::Px(SAFE_BOTTOM),
                 ),
                 ..default()
             },
@@ -165,6 +166,38 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
             bevy::state::state_scoped::StateScoped(GameScreen::BreedingNaming),
         ))
         .with_children(|parent| {
+            // Bouton retour (haut gauche)
+            parent
+                .spawn(Node {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Row,
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                })
+                .with_children(|bar| {
+                    bar.spawn((
+                        Node {
+                            padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
+                            ..default()
+                        },
+                        BackgroundColor(colors::PANEL),
+                        BorderRadius::all(Val::Px(6.0)),
+                        BreedingNamingBackButton,
+                        Interaction::default(),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn((
+                            Text::new("< Annuler"),
+                            TextFont {
+                                font_size: fonts::SMALL,
+                                ..default()
+                            },
+                            TextColor(colors::TEXT_PRIMARY),
+                        ));
+                    });
+                });
+
+            // Titre
             parent.spawn((
                 Text::new("La reproduction a reussi !"),
                 TextFont {
@@ -191,7 +224,7 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
                 },
             ));
 
-            // Champ de saisie visuel
+            // Champ de saisie visuel (tap = ouvrir clavier système)
             parent
                 .spawn((
                     Node {
@@ -204,12 +237,14 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
                     BackgroundColor(colors::PANEL),
                     BorderColor(colors::ACCENT_MAGENTA),
                     BorderRadius::all(Val::Px(8.0)),
+                    TextInputField,
+                    Interaction::default(),
                 ))
                 .with_children(|p| {
                     let display = if data.name_input.is_empty() {
-                        "Tapez un nom...".to_string()
+                        "Toucher pour saisir...".to_string()
                     } else {
-                        format!("{}█", data.name_input)
+                        format!("{}|", data.name_input)
                     };
                     let color = if data.name_input.is_empty() {
                         colors::TEXT_SECONDARY
@@ -223,6 +258,7 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
                             ..default()
                         },
                         TextColor(color),
+                        InputDisplayText,
                     ));
                 });
 
@@ -267,32 +303,6 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
                     },
                 ));
             }
-
-            // Bouton retour (tactile)
-            parent
-                .spawn((
-                    Node {
-                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
-                        margin: UiRect::top(Val::Px(16.0)),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    BackgroundColor(colors::PANEL),
-                    BorderRadius::all(Val::Px(8.0)),
-                    BreedingNamingBackButton,
-                    Interaction::default(),
-                ))
-                .with_children(|btn| {
-                    btn.spawn((
-                        Text::new("< Annuler"),
-                        TextFont {
-                            font_size: fonts::BODY,
-                            ..default()
-                        },
-                        TextColor(colors::TEXT_PRIMARY),
-                    ));
-                });
         });
 }
 
@@ -301,6 +311,7 @@ pub(crate) fn handle_breeding_naming_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     key_events: EventReader<KeyboardInput>,
+    mut ime_events: EventReader<Ime>,
     mut next_state: ResMut<NextState<GameScreen>>,
     interaction_query: Query<(&Interaction, &ConfirmButton), Changed<Interaction>>,
     back_query: Query<&Interaction, (Changed<Interaction>, With<BreedingNamingBackButton>)>,
@@ -322,6 +333,17 @@ pub(crate) fn handle_breeding_naming_input(
         if *interaction == Interaction::Pressed {
             try_confirm_breeding_name(&mut data, &mut next_state);
             return;
+        }
+    }
+
+    // Gestion IME (clavier virtuel Android)
+    for event in ime_events.read() {
+        if let Ime::Commit { value, .. } = event {
+            for c in value.chars() {
+                if !c.is_control() && data.name_input.len() < 20 {
+                    data.name_input.push(c);
+                }
+            }
         }
     }
 
@@ -400,7 +422,7 @@ pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>)
                     Val::Px(16.0),
                     Val::Px(16.0),
                     Val::Px(SAFE_TOP),
-                    Val::Px(16.0),
+                    Val::Px(SAFE_BOTTOM),
                 ),
                 ..default()
             },
@@ -409,6 +431,37 @@ pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>)
             bevy::state::state_scoped::StateScoped(GameScreen::BreedingResult),
         ))
         .with_children(|parent| {
+            // Bouton retour (haut gauche)
+            parent
+                .spawn(Node {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Row,
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                })
+                .with_children(|bar| {
+                    bar.spawn((
+                        Node {
+                            padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
+                            ..default()
+                        },
+                        BackgroundColor(colors::ACCENT_YELLOW),
+                        BorderRadius::all(Val::Px(6.0)),
+                        BackButton,
+                        Interaction::default(),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn((
+                            Text::new("< Retour"),
+                            TextFont {
+                                font_size: fonts::SMALL,
+                                ..default()
+                            },
+                            TextColor(Color::BLACK),
+                        ));
+                    });
+                });
+
             parent.spawn((
                 Text::new("Resultat de la reproduction"),
                 TextFont {
@@ -507,32 +560,6 @@ pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>)
                     },
                 ));
             }
-
-            // Bouton retour
-            parent
-                .spawn((
-                    Node {
-                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
-                        margin: UiRect::top(Val::Px(16.0)),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    BackgroundColor(colors::ACCENT_YELLOW),
-                    BorderRadius::all(Val::Px(8.0)),
-                    BackButton,
-                    Interaction::default(),
-                ))
-                .with_children(|btn| {
-                    btn.spawn((
-                        Text::new("Retour au menu"),
-                        TextFont {
-                            font_size: fonts::BODY,
-                            ..default()
-                        },
-                        TextColor(Color::BLACK),
-                    ));
-                });
         });
 }
 

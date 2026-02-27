@@ -52,6 +52,8 @@ log = "0.4"
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.15"
+# ── JNI (pour InputMethodManager Android) ────────────────────────
+jni = "0.21"
 # Forcer shared-stdcxx pour rodio/cpal (évite conflit avec bevy)
 rodio = { version = "0.19", default-features = false, features = [
   "cpal-shared-stdcxx",

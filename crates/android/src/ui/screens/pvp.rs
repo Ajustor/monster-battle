@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_TOP, colors, fonts};
+use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, colors, fonts};
 
 // ═══════════════════════════════════════════════════════════════════
 //  PvP Searching
@@ -24,7 +24,7 @@ pub(crate) fn spawn_pvp_searching(mut commands: Commands) {
                     Val::Px(24.0),
                     Val::Px(24.0),
                     Val::Px(SAFE_TOP),
-                    Val::Px(24.0),
+                    Val::Px(SAFE_BOTTOM),
                 ),
                 ..default()
             },

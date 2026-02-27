@@ -91,7 +91,7 @@ fn spawn_status_bar(mut commands: Commands) {
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                bottom: Val::Px(4.0),
+                bottom: Val::Px(8.0),
                 left: Val::Px(0.0),
                 width: Val::Percent(100.0),
                 justify_content: JustifyContent::Center,

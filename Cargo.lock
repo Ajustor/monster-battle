@@ -2884,6 +2884,7 @@ dependencies = [
  "anyhow",
  "bevy",
  "chrono",
+ "jni",
  "log",
  "monster-battle-audio",
  "monster-battle-core",

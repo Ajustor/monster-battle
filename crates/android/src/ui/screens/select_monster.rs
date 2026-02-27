@@ -7,7 +7,7 @@ use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity, SelectMonsterTarget};
 use crate::sprites;
-use crate::ui::common::{SAFE_TOP, colors, fonts};
+use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts};
 
 /// Marqueur pour les cartes de monstre cliquables.
 #[derive(Component)]
@@ -46,7 +46,7 @@ pub(crate) fn spawn_select_monster(
                     Val::Px(12.0),
                     Val::Px(12.0),
                     Val::Px(SAFE_TOP),
-                    Val::Px(12.0),
+                    Val::Px(SAFE_BOTTOM),
                 ),
                 ..default()
             },
@@ -55,6 +55,37 @@ pub(crate) fn spawn_select_monster(
             bevy::state::state_scoped::StateScoped(GameScreen::SelectMonster),
         ))
         .with_children(|parent| {
+            // Bouton retour (haut gauche)
+            parent
+                .spawn(Node {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Row,
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                })
+                .with_children(|bar| {
+                    bar.spawn((
+                        Node {
+                            padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
+                            ..default()
+                        },
+                        BackgroundColor(colors::PANEL),
+                        BorderRadius::all(Val::Px(6.0)),
+                        SelectBackButton,
+                        Interaction::default(),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn((
+                            Text::new("< Retour"),
+                            TextFont {
+                                font_size: fonts::SMALL,
+                                ..default()
+                            },
+                            TextColor(colors::TEXT_PRIMARY),
+                        ));
+                    });
+                });
+
             // Titre
             parent.spawn((
                 Text::new(title),
@@ -81,119 +112,112 @@ pub(crate) fn spawn_select_monster(
                 return;
             }
 
-            // Liste des monstres
-            for (i, monster) in monsters.iter().enumerate() {
-                let selected = i == data.monster_select_index;
-                let border_color = if selected {
-                    colors::ACCENT_YELLOW
-                } else {
-                    colors::BORDER
-                };
-
-                parent
-                    .spawn((
-                        Node {
-                            width: Val::Percent(100.0),
-                            padding: UiRect::all(Val::Px(10.0)),
-                            margin: UiRect::bottom(Val::Px(6.0)),
-                            flex_direction: FlexDirection::Row,
-                            align_items: AlignItems::Center,
-                            column_gap: Val::Px(12.0),
-                            border: UiRect::all(Val::Px(2.0)),
-                            ..default()
-                        },
-                        BorderColor(border_color),
-                        BorderRadius::all(Val::Px(8.0)),
-                        BackgroundColor(colors::PANEL),
-                        MonsterCard { index: i },
-                        Interaction::default(),
-                    ))
-                    .with_children(|card| {
-                        // Sprite
-                        let grid =
-                            sprites::get_pixel_sprite(monster.primary_type, monster.secondary_type);
-                        let handle = atlas.get_or_create_front(
-                            monster.primary_type,
-                            monster.secondary_type,
-                            grid,
-                            &mut images,
-                        );
-
-                        card.spawn((
-                            ImageNode::new(handle),
-                            Node {
-                                width: Val::Px(64.0),
-                                height: Val::Px(64.0),
-                                ..default()
-                            },
-                        ));
-
-                        // Infos
-                        card.spawn(Node {
-                            flex_direction: FlexDirection::Column,
-                            ..default()
-                        })
-                        .with_children(|info| {
-                            let secondary = monster
-                                .secondary_type
-                                .map(|t| format!("/{}", t))
-                                .unwrap_or_default();
-
-                            info.spawn((
-                                Text::new(format!(
-                                    "[{}{}] {}  Nv.{}",
-                                    monster.primary_type, secondary, monster.name, monster.level,
-                                )),
-                                TextFont {
-                                    font_size: fonts::BODY,
-                                    ..default()
-                                },
-                                TextColor(colors::TEXT_PRIMARY),
-                            ));
-
-                            info.spawn((
-                                Text::new(format!(
-                                    "PV {}/{}  ATK {} DEF {} SPD {}",
-                                    monster.current_hp,
-                                    monster.max_hp(),
-                                    monster.effective_attack(),
-                                    monster.effective_defense(),
-                                    monster.effective_speed(),
-                                )),
-                                TextFont {
-                                    font_size: fonts::SMALL,
-                                    ..default()
-                                },
-                                TextColor(colors::TEXT_SECONDARY),
-                            ));
-                        });
-                    });
-            }
-
-            // Bouton retour (tactile)
+            // Liste des monstres (scrollable)
             parent
                 .spawn((
                     Node {
-                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
-                        margin: UiRect::top(Val::Px(12.0)),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        overflow: Overflow::scroll_y(),
+                        flex_grow: 1.0,
                         ..default()
                     },
-                    BackgroundColor(colors::PANEL),
-                    BorderRadius::all(Val::Px(8.0)),
-                    SelectBackButton,
-                    Interaction::default(),
+                    ScrollPosition::default(),
+                    ScrollableContent,
                 ))
-                .with_children(|btn| {
-                    btn.spawn((
-                        Text::new("< Retour"),
-                        TextFont {
-                            font_size: fonts::BODY,
-                            ..default()
-                        },
-                        TextColor(colors::TEXT_PRIMARY),
-                    ));
+                .with_children(|scroll| {
+                    for (i, monster) in monsters.iter().enumerate() {
+                        let selected = i == data.monster_select_index;
+                        let border_color = if selected {
+                            colors::ACCENT_YELLOW
+                        } else {
+                            colors::BORDER
+                        };
+
+                        scroll
+                            .spawn((
+                                Node {
+                                    width: Val::Percent(100.0),
+                                    padding: UiRect::all(Val::Px(10.0)),
+                                    margin: UiRect::bottom(Val::Px(6.0)),
+                                    flex_direction: FlexDirection::Row,
+                                    align_items: AlignItems::Center,
+                                    column_gap: Val::Px(12.0),
+                                    border: UiRect::all(Val::Px(2.0)),
+                                    ..default()
+                                },
+                                BorderColor(border_color),
+                                BorderRadius::all(Val::Px(8.0)),
+                                BackgroundColor(colors::PANEL),
+                                MonsterCard { index: i },
+                                Interaction::default(),
+                            ))
+                            .with_children(|card| {
+                                // Sprite
+                                let grid = sprites::get_pixel_sprite(
+                                    monster.primary_type,
+                                    monster.secondary_type,
+                                );
+                                let handle = atlas.get_or_create_front(
+                                    monster.primary_type,
+                                    monster.secondary_type,
+                                    grid,
+                                    &mut images,
+                                );
+
+                                card.spawn((
+                                    ImageNode::new(handle),
+                                    Node {
+                                        width: Val::Px(64.0),
+                                        height: Val::Px(64.0),
+                                        ..default()
+                                    },
+                                ));
+
+                                // Infos
+                                card.spawn(Node {
+                                    flex_direction: FlexDirection::Column,
+                                    ..default()
+                                })
+                                .with_children(|info| {
+                                    let secondary = monster
+                                        .secondary_type
+                                        .map(|t| format!("/{}", t))
+                                        .unwrap_or_default();
+
+                                    info.spawn((
+                                        Text::new(format!(
+                                            "[{}{}] {}  Nv.{}",
+                                            monster.primary_type,
+                                            secondary,
+                                            monster.name,
+                                            monster.level,
+                                        )),
+                                        TextFont {
+                                            font_size: fonts::BODY,
+                                            ..default()
+                                        },
+                                        TextColor(colors::TEXT_PRIMARY),
+                                    ));
+
+                                    info.spawn((
+                                        Text::new(format!(
+                                            "PV {}/{}  ATK {} DEF {} SPD {}",
+                                            monster.current_hp,
+                                            monster.max_hp(),
+                                            monster.effective_attack(),
+                                            monster.effective_defense(),
+                                            monster.effective_speed(),
+                                        )),
+                                        TextFont {
+                                            font_size: fonts::SMALL,
+                                            ..default()
+                                        },
+                                        TextColor(colors::TEXT_SECONDARY),
+                                    ));
+                                });
+                            });
+                    }
                 });
         });
 }

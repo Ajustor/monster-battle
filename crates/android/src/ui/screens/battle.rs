@@ -5,8 +5,9 @@ use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::sprites;
-use crate::ui::common::{self, SAFE_TOP, colors, fonts};
-use monster_battle_core::battle::BattlePhase;
+use crate::ui::common::{self, SAFE_BOTTOM, SAFE_TOP, colors, fonts};
+use monster_battle_core::battle::{BattlePhase, BattleState};
+use monster_battle_storage::MonsterStorage;
 
 /// Marqueur pour les boutons d'attaque.
 #[derive(Component)]
@@ -33,7 +34,16 @@ pub(crate) fn spawn_battle_ui(
         Some(b) => b,
         None => return,
     };
+    spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas);
+}
 
+/// Logique interne de création de l'UI de combat (réutilisable).
+fn spawn_battle_ui_inner(
+    commands: &mut Commands,
+    battle: &BattleState,
+    mut images: &mut Assets<Image>,
+    atlas: &mut sprites::MonsterSpriteAtlas,
+) {
     commands
         .spawn((
             Node {
@@ -45,7 +55,7 @@ pub(crate) fn spawn_battle_ui(
                     Val::Px(12.0),
                     Val::Px(12.0),
                     Val::Px(SAFE_TOP),
-                    Val::Px(12.0),
+                    Val::Px(SAFE_BOTTOM),
                 ),
                 ..default()
             },
@@ -277,8 +287,8 @@ pub(crate) fn spawn_battle_ui(
                                 ));
                             });
                     }
-                    BattlePhase::Victory => {
-                        // Bouton retour après victoire
+                    BattlePhase::Victory if battle.is_over() => {
+                        // Bouton retour après victoire (tous les messages affichés)
                         actions
                             .spawn((
                                 Node {
@@ -304,8 +314,8 @@ pub(crate) fn spawn_battle_ui(
                                 ));
                             });
                     }
-                    BattlePhase::Defeat => {
-                        // Bouton retour après défaite
+                    BattlePhase::Defeat if battle.is_over() => {
+                        // Bouton retour après défaite (tous les messages affichés)
                         actions
                             .spawn((
                                 Node {
@@ -365,90 +375,208 @@ pub(crate) fn spawn_battle_ui(
 
 /// Gestion des entrées en combat.
 pub(crate) fn handle_battle_input(
+    mut commands: Commands,
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
+    mut images: ResMut<Assets<Image>>,
+    mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
     attack_query: Query<(&Interaction, &AttackButton), Changed<Interaction>>,
     flee_query: Query<&Interaction, (Changed<Interaction>, With<FleeButton>)>,
     continue_query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
+    screen_entities: Query<Entity, With<ScreenEntity>>,
 ) {
-    let battle = match &mut data.battle_state {
-        Some(b) => b,
-        None => {
-            next_state.set(GameScreen::MainMenu);
-            return;
+    // ── Résultat des interactions ──────────────────────────────────
+    enum Action {
+        None,
+        Rebuild,
+        EndBattle,
+        Flee,
+    }
+
+    let action = {
+        let battle = match data.battle_state.as_mut() {
+            Some(b) => b,
+            None => {
+                next_state.set(GameScreen::MainMenu);
+                return;
+            }
+        };
+
+        if battle.is_over() {
+            // Combat terminé — tout appui renvoie au menu
+            let mut pressed = false;
+            for interaction in &continue_query {
+                if *interaction == Interaction::Pressed {
+                    pressed = true;
+                    break;
+                }
+            }
+            if pressed || keyboard.just_pressed(KeyCode::Enter) {
+                Action::EndBattle
+            } else {
+                Action::None
+            }
+        } else {
+            match battle.phase {
+                BattlePhase::PlayerChooseAttack => {
+                    let attack_count = battle.player.attacks.len();
+                    let mut act = Action::None;
+
+                    // Toucher bouton attaque (mobile)
+                    for (interaction, btn) in &attack_query {
+                        if *interaction == Interaction::Pressed {
+                            battle.player_attack(btn.index);
+                            act = Action::Rebuild;
+                            break;
+                        }
+                    }
+
+                    // Toucher bouton fuir (mobile)
+                    if matches!(act, Action::None) {
+                        for interaction in &flee_query {
+                            if *interaction == Interaction::Pressed {
+                                act = Action::Flee;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Clavier
+                    if matches!(act, Action::None) {
+                        if keyboard.just_pressed(KeyCode::ArrowUp) && battle.attack_menu_index > 0 {
+                            battle.attack_menu_index -= 1;
+                            act = Action::Rebuild;
+                        }
+                        if keyboard.just_pressed(KeyCode::ArrowDown)
+                            && battle.attack_menu_index < attack_count.saturating_sub(1)
+                        {
+                            battle.attack_menu_index += 1;
+                            act = Action::Rebuild;
+                        }
+                        if keyboard.just_pressed(KeyCode::Enter) {
+                            let idx = battle.attack_menu_index;
+                            battle.player_attack(idx);
+                            act = Action::Rebuild;
+                        }
+                        if keyboard.just_pressed(KeyCode::Escape) {
+                            act = Action::Flee;
+                        }
+                    }
+
+                    act
+                }
+                _ => {
+                    // Intro, Executing, Victory/Defeat avec messages restants
+                    let mut act = Action::None;
+
+                    // Toucher « Continuer » (mobile)
+                    for interaction in &continue_query {
+                        if *interaction == Interaction::Pressed {
+                            battle.advance_message();
+                            act = Action::Rebuild;
+                            break;
+                        }
+                    }
+
+                    // Clavier
+                    if matches!(act, Action::None) {
+                        if keyboard.just_pressed(KeyCode::Enter)
+                            || keyboard.just_pressed(KeyCode::Space)
+                        {
+                            battle.advance_message();
+                            act = Action::Rebuild;
+                        }
+                        if keyboard.just_pressed(KeyCode::Escape) {
+                            act = Action::Flee;
+                        }
+                    }
+
+                    act
+                }
+            }
         }
     };
 
-    match battle.phase {
-        BattlePhase::PlayerChooseAttack => {
-            let attack_count = battle.player.attacks.len();
-
-            // Toucher bouton attaque (mobile)
-            for (interaction, btn) in &attack_query {
-                if *interaction == Interaction::Pressed {
-                    battle.attack_menu_index = btn.index;
-                    // L'attaque sera traitée par le système de combat.
-                    return;
-                }
+    // ── Exécuter l'action ──────────────────────────────────────────
+    match action {
+        Action::None => {}
+        Action::Rebuild => {
+            // Supprimer l'ancienne UI
+            for entity in &screen_entities {
+                commands.entity(entity).despawn_recursive();
             }
-
-            // Toucher bouton fuir (mobile)
-            for interaction in &flee_query {
-                if *interaction == Interaction::Pressed {
-                    data.battle_state = None;
-                    next_state.set(GameScreen::MainMenu);
-                    return;
-                }
-            }
-
-            if keyboard.just_pressed(KeyCode::ArrowUp) && battle.attack_menu_index > 0 {
-                battle.attack_menu_index -= 1;
-            }
-            if keyboard.just_pressed(KeyCode::ArrowDown)
-                && battle.attack_menu_index < attack_count.saturating_sub(1)
-            {
-                battle.attack_menu_index += 1;
-            }
-            if keyboard.just_pressed(KeyCode::Enter) {
-                // L'attaque sera traitée par le système de combat.
-            }
-            if keyboard.just_pressed(KeyCode::Escape) {
-                data.battle_state = None;
-                next_state.set(GameScreen::MainMenu);
+            // Reconstruire avec l'état mis à jour
+            if let Some(ref battle) = data.battle_state {
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas);
             }
         }
-        BattlePhase::Victory | BattlePhase::Defeat => {
-            // Toucher « Retour au menu » (mobile)
-            for interaction in &continue_query {
-                if *interaction == Interaction::Pressed {
-                    data.battle_state = None;
-                    next_state.set(GameScreen::MainMenu);
-                    return;
-                }
-            }
-
-            if keyboard.just_pressed(KeyCode::Enter) {
-                data.battle_state = None;
-                next_state.set(GameScreen::MainMenu);
-            }
+        Action::EndBattle => {
+            apply_battle_results(&mut data);
+            next_state.set(GameScreen::MainMenu);
         }
-        _ => {
-            // Toucher « Continuer » (mobile)
-            for interaction in &continue_query {
-                if *interaction == Interaction::Pressed {
-                    // Avancer dans les messages.
-                    return;
-                }
-            }
-
-            if keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::Space) {
-                // Avancer dans les messages.
-            }
-            if keyboard.just_pressed(KeyCode::Escape) {
-                data.battle_state = None;
-                next_state.set(GameScreen::MainMenu);
-            }
+        Action::Flee => {
+            data.battle_state = None;
+            data.message = Some("Vous avez fui le combat.".to_string());
+            next_state.set(GameScreen::MainMenu);
         }
+    }
+}
+
+/// Applique les résultats du combat (XP, victoire/défaite, mort éventuelle).
+fn apply_battle_results(data: &mut GameData) {
+    let battle = match data.battle_state.take() {
+        Some(b) => b,
+        None => return,
+    };
+
+    let mut monsters = match data.storage.list_alive() {
+        Ok(m) if !m.is_empty() => m,
+        _ => return,
+    };
+
+    let idx = data.monster_select_index;
+    let fighter = if let Some(f) = monsters.get_mut(idx) {
+        f
+    } else if let Some(f) = monsters.first_mut() {
+        f
+    } else {
+        return;
+    };
+
+    let is_victory = battle.phase == BattlePhase::Victory;
+
+    if is_victory {
+        fighter.wins += 1;
+        fighter.gain_xp(battle.xp_gained);
+        fighter.current_hp = fighter.max_hp();
+    } else {
+        fighter.losses += 1;
+        if battle.loser_died {
+            fighter.died_at = Some(chrono::Utc::now());
+        } else {
+            // Entraînement docile ou fuite : soigner le monstre
+            fighter.current_hp = fighter.max_hp();
+        }
+    }
+
+    let _ = data.storage.save(fighter);
+
+    if is_victory {
+        data.message = Some(format!(
+            "🏆 Victoire ! +{} XP{}",
+            battle.xp_gained,
+            if battle.is_training {
+                " (entraînement docile)"
+            } else {
+                ""
+            }
+        ));
+    } else if !battle.loser_died {
+        if battle.is_training {
+            data.message = Some("Défaite à l'entraînement docile — pas de pénalité !".to_string());
+        }
+    } else {
+        data.message = Some("💀 Défaite... Votre monstre est mort.".to_string());
     }
 }

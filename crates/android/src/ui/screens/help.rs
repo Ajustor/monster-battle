@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_TOP, colors, fonts};
+use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts};
 
 /// Marqueur pour le bouton retour.
 #[derive(Component)]
@@ -24,9 +24,8 @@ pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>) {
                     Val::Px(12.0),
                     Val::Px(12.0),
                     Val::Px(SAFE_TOP),
-                    Val::Px(12.0),
+                    Val::Px(SAFE_BOTTOM),
                 ),
-                overflow: Overflow::clip_y(),
                 ..default()
             },
             BackgroundColor(colors::BACKGROUND),
@@ -34,6 +33,37 @@ pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>) {
             bevy::state::state_scoped::StateScoped(GameScreen::Help),
         ))
         .with_children(|parent| {
+            // Bouton retour (haut gauche)
+            parent
+                .spawn(Node {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Row,
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                })
+                .with_children(|bar| {
+                    bar.spawn((
+                        Node {
+                            padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
+                            ..default()
+                        },
+                        BackgroundColor(colors::PANEL),
+                        BorderRadius::all(Val::Px(6.0)),
+                        HelpBackButton,
+                        Interaction::default(),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn((
+                            Text::new("< Retour"),
+                            TextFont {
+                                font_size: fonts::SMALL,
+                                ..default()
+                            },
+                            TextColor(colors::TEXT_PRIMARY),
+                        ));
+                    });
+                });
+
             // Titre
             parent.spawn((
                 Text::new("Aide -- Comment jouer"),
@@ -148,12 +178,17 @@ pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>) {
 
             // Conteneur scrollable
             parent
-                .spawn(Node {
-                    width: Val::Percent(100.0),
-                    flex_direction: FlexDirection::Column,
-                    overflow: Overflow::clip_y(),
-                    ..default()
-                })
+                .spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        overflow: Overflow::scroll_y(),
+                        flex_grow: 1.0,
+                        ..default()
+                    },
+                    ScrollPosition::default(),
+                    ScrollableContent,
+                ))
                 .with_children(|scroll| {
                     for (title, title_color, lines) in sections {
                         // Titre de section
@@ -201,32 +236,6 @@ pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>) {
                             }
                         }
                     }
-                });
-
-            // Bouton retour (tactile)
-            parent
-                .spawn((
-                    Node {
-                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
-                        margin: UiRect::top(Val::Px(12.0)),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    BackgroundColor(colors::PANEL),
-                    BorderRadius::all(Val::Px(8.0)),
-                    HelpBackButton,
-                    Interaction::default(),
-                ))
-                .with_children(|btn| {
-                    btn.spawn((
-                        Text::new("< Retour"),
-                        TextFont {
-                            font_size: fonts::BODY,
-                            ..default()
-                        },
-                        TextColor(colors::TEXT_PRIMARY),
-                    ));
                 });
         });
 }

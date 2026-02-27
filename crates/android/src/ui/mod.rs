@@ -47,7 +47,14 @@ impl Plugin for UiPlugin {
             .add_systems(OnEnter(GameScreen::NamingMonster), naming::spawn_naming)
             .add_systems(
                 Update,
-                naming::handle_naming_input.run_if(in_state(GameScreen::NamingMonster)),
+                (
+                    naming::handle_naming_input,
+                    common::handle_input_field_tap,
+                    common::update_input_display,
+                    common::retry_show_keyboard
+                        .run_if(resource_exists::<common::KeyboardRetryTimer>),
+                )
+                    .run_if(in_state(GameScreen::NamingMonster)),
             )
             // ── Sélection du monstre ────────────────────────────
             .add_systems(
@@ -94,7 +101,14 @@ impl Plugin for UiPlugin {
             )
             .add_systems(
                 Update,
-                breeding::handle_breeding_naming_input.run_if(in_state(GameScreen::BreedingNaming)),
+                (
+                    breeding::handle_breeding_naming_input,
+                    common::handle_input_field_tap,
+                    common::update_input_display,
+                    common::retry_show_keyboard
+                        .run_if(resource_exists::<common::KeyboardRetryTimer>),
+                )
+                    .run_if(in_state(GameScreen::BreedingNaming)),
             )
             // ── Breeding Result ─────────────────────────────────
             .add_systems(
@@ -117,6 +131,9 @@ impl Plugin for UiPlugin {
                 Update,
                 help::handle_help_input.run_if(in_state(GameScreen::Help)),
             )
+            // ── Scroll tactile (global) ─────────────────────────
+            .init_resource::<common::TouchScrollState>()
+            .add_systems(Update, common::handle_touch_scroll)
             // ── Caméra 2D + Police ─────────────────────────────
             .add_systems(Startup, (spawn_camera, common::setup_custom_font));
     }

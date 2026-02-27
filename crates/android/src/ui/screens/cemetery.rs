@@ -7,7 +7,7 @@ use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::sprites;
-use crate::ui::common::{SAFE_TOP, colors, fonts};
+use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts};
 
 /// Marqueur pour le bouton retour.
 #[derive(Component)]
@@ -32,7 +32,7 @@ pub(crate) fn spawn_cemetery(
                     Val::Px(12.0),
                     Val::Px(12.0),
                     Val::Px(SAFE_TOP),
-                    Val::Px(12.0),
+                    Val::Px(SAFE_BOTTOM),
                 ),
                 ..default()
             },
@@ -41,6 +41,37 @@ pub(crate) fn spawn_cemetery(
             bevy::state::state_scoped::StateScoped(GameScreen::Cemetery),
         ))
         .with_children(|parent| {
+            // Bouton retour (haut gauche)
+            parent
+                .spawn(Node {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Row,
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                })
+                .with_children(|bar| {
+                    bar.spawn((
+                        Node {
+                            padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
+                            ..default()
+                        },
+                        BackgroundColor(colors::PANEL),
+                        BorderRadius::all(Val::Px(6.0)),
+                        CemeteryBackButton,
+                        Interaction::default(),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn((
+                            Text::new("< Retour"),
+                            TextFont {
+                                font_size: fonts::SMALL,
+                                ..default()
+                            },
+                            TextColor(colors::TEXT_PRIMARY),
+                        ));
+                    });
+                });
+
             // Titre
             parent.spawn((
                 Text::new(format!("Cimetiere ({})", dead.len())),
@@ -70,12 +101,17 @@ pub(crate) fn spawn_cemetery(
             } else {
                 // Conteneur scrollable
                 parent
-                    .spawn(Node {
-                        width: Val::Percent(100.0),
-                        flex_direction: FlexDirection::Column,
-                        overflow: Overflow::clip_y(),
-                        ..default()
-                    })
+                    .spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            flex_direction: FlexDirection::Column,
+                            overflow: Overflow::scroll_y(),
+                            flex_grow: 1.0,
+                            ..default()
+                        },
+                        ScrollPosition::default(),
+                        ScrollableContent,
+                    ))
                     .with_children(|list| {
                         for monster in &dead {
                             list.spawn((
@@ -148,32 +184,6 @@ pub(crate) fn spawn_cemetery(
                         }
                     });
             }
-
-            // Bouton retour (tactile)
-            parent
-                .spawn((
-                    Node {
-                        padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
-                        margin: UiRect::top(Val::Px(12.0)),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    BackgroundColor(colors::PANEL),
-                    BorderRadius::all(Val::Px(8.0)),
-                    CemeteryBackButton,
-                    Interaction::default(),
-                ))
-                .with_children(|btn| {
-                    btn.spawn((
-                        Text::new("< Retour"),
-                        TextFont {
-                            font_size: fonts::BODY,
-                            ..default()
-                        },
-                        TextColor(colors::TEXT_PRIMARY),
-                    ));
-                });
         });
 }
 

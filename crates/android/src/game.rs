@@ -129,44 +129,39 @@ impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         // Initialiser GameData avec le répertoire de données approprié
         let data_dir = dirs_data_dir();
+        // Le nettoyage des entités d'écran est géré automatiquement par
+        // `StateScoped` + `enable_state_scoped_entities` (despawn_recursive).
+        // Ne PAS utiliser de cleanup_screen manuel avec despawn() non-récursif
+        // car l'ordre d'exécution avec StateScoped est ambigu dans ExitSchedules.
         app.insert_resource(GameData::new(data_dir))
             .insert_resource(crate::ui::screens::training::TrainingWild(false))
             .enable_state_scoped_entities::<GameScreen>()
             .add_systems(OnEnter(GameScreen::MainMenu), on_enter_main_menu)
-            .add_systems(OnExit(GameScreen::MainMenu), cleanup_screen)
             .add_systems(OnEnter(GameScreen::MonsterList), on_enter_monster_list)
-            .add_systems(OnExit(GameScreen::MonsterList), cleanup_screen)
             .add_systems(OnEnter(GameScreen::NewMonster), on_enter_new_monster)
-            .add_systems(OnExit(GameScreen::NewMonster), cleanup_screen)
             .add_systems(OnEnter(GameScreen::NamingMonster), on_enter_naming)
-            .add_systems(OnExit(GameScreen::NamingMonster), cleanup_screen)
+            .add_systems(OnEnter(GameScreen::NamingMonster), enable_ime)
+            .add_systems(OnExit(GameScreen::NamingMonster), disable_ime)
             .add_systems(OnEnter(GameScreen::SelectMonster), on_enter_select_monster)
-            .add_systems(OnExit(GameScreen::SelectMonster), cleanup_screen)
             .add_systems(OnEnter(GameScreen::Training), on_enter_training)
-            .add_systems(OnExit(GameScreen::Training), cleanup_screen)
             .add_systems(OnEnter(GameScreen::Cemetery), on_enter_cemetery)
-            .add_systems(OnExit(GameScreen::Cemetery), cleanup_screen)
             .add_systems(OnEnter(GameScreen::Help), on_enter_help)
-            .add_systems(OnExit(GameScreen::Help), cleanup_screen)
             .add_systems(OnEnter(GameScreen::Battle), on_enter_battle)
-            .add_systems(OnExit(GameScreen::Battle), cleanup_screen)
             .add_systems(OnEnter(GameScreen::PvpSearching), on_enter_pvp_searching)
-            .add_systems(OnExit(GameScreen::PvpSearching), cleanup_screen)
             .add_systems(
                 OnEnter(GameScreen::BreedingSearching),
                 on_enter_breeding_searching,
             )
-            .add_systems(OnExit(GameScreen::BreedingSearching), cleanup_screen)
             .add_systems(
                 OnEnter(GameScreen::BreedingNaming),
                 on_enter_breeding_naming,
             )
-            .add_systems(OnExit(GameScreen::BreedingNaming), cleanup_screen)
+            .add_systems(OnEnter(GameScreen::BreedingNaming), enable_ime)
+            .add_systems(OnExit(GameScreen::BreedingNaming), disable_ime)
             .add_systems(
                 OnEnter(GameScreen::BreedingResult),
                 on_enter_breeding_result,
-            )
-            .add_systems(OnExit(GameScreen::BreedingResult), cleanup_screen);
+            );
     }
 }
 
@@ -187,20 +182,14 @@ fn dirs_data_dir() -> std::path::PathBuf {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Marqueur pour le nettoyage des entités d'écran
+//  Marqueur pour les entités d'écran (conservé pour compatibilité)
 // ═══════════════════════════════════════════════════════════════════
 
 /// Marqueur ajouté à toutes les entités créées par un écran.
-/// Détruites automatiquement lors de la sortie de l'écran.
+/// Le nettoyage est géré par `StateScoped` + `enable_state_scoped_entities`
+/// qui utilise `despawn_recursive` automatiquement.
 #[derive(Component)]
 pub struct ScreenEntity;
-
-/// Système de nettoyage générique — supprime toutes les entités marquées.
-fn cleanup_screen(mut commands: Commands, query: Query<Entity, With<ScreenEntity>>) {
-    for entity in &query {
-        commands.entity(entity).despawn();
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════
 //  Systèmes d'entrée d'écran (stubs — à implémenter par écran)
@@ -264,5 +253,26 @@ fn on_enter_breeding_naming(mut data: ResMut<GameData>) {
 
 fn on_enter_breeding_result(mut data: ResMut<GameData>) {
     data.scroll_offset = 0;
+}
+
+/// Active le clavier système pour les écrans de saisie de texte.
+fn enable_ime(mut commands: Commands, mut windows: Query<&mut Window>) {
+    if let Ok(mut window) = windows.get_single_mut() {
+        window.ime_enabled = true;
+    }
+    // Insérer le timer de ré-essai (la vue peut ne pas être prête immédiatement)
+    commands.insert_resource(crate::ui::common::KeyboardRetryTimer {
+        frames_remaining: 10,
+    });
+    crate::ui::common::show_system_keyboard();
+}
+
+/// Désactive le clavier système.
+fn disable_ime(mut commands: Commands, mut windows: Query<&mut Window>) {
+    if let Ok(mut window) = windows.get_single_mut() {
+        window.ime_enabled = false;
+    }
+    commands.remove_resource::<crate::ui::common::KeyboardRetryTimer>();
+    crate::ui::common::hide_system_keyboard();
 }
 // Le BattleState est initialisé avant la transition (par training ou pvp).
