@@ -4,7 +4,9 @@ use bevy::prelude::*;
 use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts};
+use crate::ui::common::{
+    KEYBOARD_SCROLL_STEP, SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts,
+};
 
 /// Marqueur pour le bouton retour.
 #[derive(Component)]
@@ -246,10 +248,10 @@ pub(crate) fn handle_help_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
     back_query: Query<(&Interaction, &HelpBackButton), Changed<Interaction>>,
+    mut scroll_query: Query<&mut ScrollPosition, With<ScrollableContent>>,
 ) {
     for (interaction, _) in &back_query {
         if *interaction == Interaction::Pressed {
-            data.scroll_offset = 0;
             data.message = None;
             next_state.set(GameScreen::MainMenu);
             data.menu_index = 0;
@@ -258,13 +260,16 @@ pub(crate) fn handle_help_input(
     }
 
     if keyboard.just_pressed(KeyCode::ArrowUp) {
-        data.scroll_offset = data.scroll_offset.saturating_sub(1);
+        for mut scroll_pos in &mut scroll_query {
+            scroll_pos.offset_y = (scroll_pos.offset_y - KEYBOARD_SCROLL_STEP).max(0.0);
+        }
     }
     if keyboard.just_pressed(KeyCode::ArrowDown) {
-        data.scroll_offset += 1;
+        for mut scroll_pos in &mut scroll_query {
+            scroll_pos.offset_y += KEYBOARD_SCROLL_STEP;
+        }
     }
     if keyboard.just_pressed(KeyCode::Escape) || keyboard.just_pressed(KeyCode::KeyQ) {
-        data.scroll_offset = 0;
         data.message = None;
         next_state.set(GameScreen::MainMenu);
         data.menu_index = 0;

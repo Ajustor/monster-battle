@@ -225,6 +225,9 @@ pub struct TouchScrollState {
 /// Seuil de déplacement avant de déclencher le scroll (évite les taps accidentels).
 const SCROLL_DRAG_THRESHOLD: f32 = 8.0;
 
+/// Pas de défilement en pixels pour les touches clavier (Up/Down).
+pub const KEYBOARD_SCROLL_STEP: f32 = 40.0;
+
 /// Système de scroll tactile — convertit les glissements en défilement.
 pub fn handle_touch_scroll(
     mut touch_events: EventReader<TouchInput>,

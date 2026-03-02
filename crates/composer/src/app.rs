@@ -571,7 +571,25 @@ impl App {
 
     fn save_project(&mut self) {
         let dir = project::projects_dir();
-        let filename = format!("{}.json", self.project.name);
+        // Sanitiser le nom pour éviter les traversées de chemin
+        let safe_name: String = self
+            .project
+            .name
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let safe_name = safe_name.trim().to_string();
+        if safe_name.is_empty() {
+            self.status = String::from("Erreur : nom de projet invalide.");
+            return;
+        }
+        let filename = format!("{}.json", safe_name);
         let path = dir.join(&filename);
         match self.project.save(&path) {
             Ok(()) => {

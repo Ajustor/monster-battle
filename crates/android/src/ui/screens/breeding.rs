@@ -7,7 +7,10 @@ use bevy::state::state::NextState;
 use bevy::window::Ime;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{InputDisplayText, SAFE_BOTTOM, SAFE_TOP, TextInputField, colors, fonts};
+use crate::ui::common::{
+    InputDisplayText, KEYBOARD_SCROLL_STEP, SAFE_BOTTOM, SAFE_TOP, ScrollableContent,
+    TextInputField, colors, fonts,
+};
 
 // ═══════════════════════════════════════════════════════════════════
 //  Breeding Searching
@@ -569,6 +572,7 @@ pub(crate) fn handle_breeding_result_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
     interaction_query: Query<(&Interaction, &BackButton), Changed<Interaction>>,
+    mut scroll_query: Query<&mut ScrollPosition, With<ScrollableContent>>,
 ) {
     for (interaction, _) in &interaction_query {
         if *interaction == Interaction::Pressed {
@@ -578,10 +582,14 @@ pub(crate) fn handle_breeding_result_input(
     }
 
     if keyboard.just_pressed(KeyCode::ArrowUp) {
-        data.scroll_offset = data.scroll_offset.saturating_sub(1);
+        for mut scroll_pos in &mut scroll_query {
+            scroll_pos.offset_y = (scroll_pos.offset_y - KEYBOARD_SCROLL_STEP).max(0.0);
+        }
     }
     if keyboard.just_pressed(KeyCode::ArrowDown) {
-        data.scroll_offset += 1;
+        for mut scroll_pos in &mut scroll_query {
+            scroll_pos.offset_y += KEYBOARD_SCROLL_STEP;
+        }
     }
     if keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::Escape) {
         go_back(&mut data, &mut next_state);

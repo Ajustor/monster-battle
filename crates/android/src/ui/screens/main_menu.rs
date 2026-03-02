@@ -1,5 +1,6 @@
 //! Écran du menu principal.
 
+use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
@@ -108,6 +109,7 @@ pub(crate) fn handle_menu_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
     interaction_query: Query<(&Interaction, &MenuButton), Changed<Interaction>>,
+    mut exit_events: EventWriter<AppExit>,
 ) {
     let has_monster = data.has_living_monster();
     let entry_count = menu_entry_count(has_monster);
@@ -116,7 +118,7 @@ pub(crate) fn handle_menu_input(
     for (interaction, button) in &interaction_query {
         if *interaction == Interaction::Pressed {
             data.menu_index = button.index;
-            activate_menu_entry(&mut commands, &mut data, &mut next_state, has_monster);
+            activate_menu_entry(&mut commands, &mut data, &mut next_state, has_monster, &mut exit_events);
             return;
         }
     }
@@ -133,10 +135,10 @@ pub(crate) fn handle_menu_input(
         }
     }
     if keyboard.just_pressed(KeyCode::Enter) {
-        activate_menu_entry(&mut commands, &mut data, &mut next_state, has_monster);
+        activate_menu_entry(&mut commands, &mut data, &mut next_state, has_monster, &mut exit_events);
     }
     if keyboard.just_pressed(KeyCode::KeyQ) {
-        std::process::exit(0);
+        exit_events.send(AppExit::Success);
     }
 }
 
@@ -157,6 +159,7 @@ fn activate_menu_entry(
     data: &mut ResMut<GameData>,
     next_state: &mut ResMut<NextState<GameScreen>>,
     has_monster: bool,
+    exit_events: &mut EventWriter<AppExit>,
 ) {
     let mut idx = 0;
 
@@ -226,6 +229,6 @@ fn activate_menu_entry(
 
     // Quitter
     if data.menu_index == idx {
-        std::process::exit(0);
+        exit_events.send(AppExit::Success);
     }
 }

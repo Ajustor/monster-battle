@@ -219,8 +219,9 @@ pub fn generate_starter_stats(element: ElementType) -> Stats {
 
 /// Génère un monstre adverse pour l'entraînement.
 ///
-/// - **Docile** (`wild = false`) : le bot est toujours de niveau strictement inférieur
-///   au joueur (1 à 3 niveaux en dessous, minimum 1).
+/// - **Docile** (`wild = false`) : le bot est de niveau strictement inférieur
+///   au joueur (1 à 3 niveaux en dessous, minimum 1). Cas spécial : si le joueur
+///   est niveau 1, le bot est aussi niveau 1 (impossible de descendre plus bas).
 /// - **Sauvage** (`wild = true`) : le bot est dans une fourchette de ±5 niveaux
 ///   autour du joueur (minimum 1, maximum 100).
 pub fn generate_training_opponent(
@@ -301,5 +302,68 @@ mod tests {
 
         let result = breed(&parent_a, &parent_b, "Impossible".to_string());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_training_docile_level_below_player() {
+        // En mode docile, le bot doit être <= au joueur (strictement inférieur sauf niveau 1)
+        for _ in 0..50 {
+            let bot = generate_training_opponent(10, ElementType::Fire, false);
+            assert!(bot.level < 10, "docile bot level {} should be < 10", bot.level);
+            assert!(bot.level >= 1, "bot level should be >= 1");
+        }
+    }
+
+    #[test]
+    fn test_training_docile_level_1_edge_case() {
+        // Cas spécial : joueur niveau 1, le bot ne peut pas descendre en dessous de 1
+        for _ in 0..20 {
+            let bot = generate_training_opponent(1, ElementType::Water, false);
+            assert_eq!(bot.level, 1, "docile bot at player_level=1 should be 1");
+        }
+    }
+
+    #[test]
+    fn test_training_wild_level_range() {
+        // En mode sauvage, le bot doit être dans ±5 niveaux du joueur
+        for _ in 0..50 {
+            let bot = generate_training_opponent(50, ElementType::Plant, true);
+            assert!(
+                bot.level >= 45 && bot.level <= 55,
+                "wild bot level {} should be in 45..=55",
+                bot.level
+            );
+        }
+    }
+
+    #[test]
+    fn test_training_wild_level_clamp_low() {
+        // Joueur niveau 1 en sauvage : bot entre 1 et 6
+        for _ in 0..50 {
+            let bot = generate_training_opponent(1, ElementType::Electric, true);
+            assert!(bot.level >= 1 && bot.level <= 6, "bot level {} should be in 1..=6", bot.level);
+        }
+    }
+
+    #[test]
+    fn test_training_wild_level_clamp_high() {
+        // Joueur niveau 100 en sauvage : bot entre 95 et 100
+        for _ in 0..50 {
+            let bot = generate_training_opponent(100, ElementType::Earth, true);
+            assert!(
+                bot.level >= 95 && bot.level <= 100,
+                "bot level {} should be in 95..=100",
+                bot.level
+            );
+        }
+    }
+
+    #[test]
+    fn test_training_docile_level_2() {
+        // Joueur niveau 2 : bot doit être 1
+        for _ in 0..20 {
+            let bot = generate_training_opponent(2, ElementType::Shadow, false);
+            assert_eq!(bot.level, 1, "docile bot at player_level=2 should be 1");
+        }
     }
 }

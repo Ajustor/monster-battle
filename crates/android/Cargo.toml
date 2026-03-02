@@ -30,10 +30,6 @@ bevy = { version = "0.15", default-features = false, features = [
   "png",
 ] }
 
-[target.'cfg(not(target_os = "android"))'.dependencies]
-# x11 uniquement pour le build desktop (dev/test)
-bevy = { version = "0.15", default-features = false, features = ["x11"] }
-
 # ── Sérialisation ────────────────────────────────────────────────
 serde.workspace = true
 serde_json.workspace = true
@@ -49,6 +45,10 @@ tokio.workspace = true
 
 # ── Erreurs ──────────────────────────────────────────────────────
 anyhow.workspace = true
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+# x11 uniquement pour le build desktop (dev/test)
+bevy = { version = "0.15", default-features = false, features = ["x11"] }
 
 # ── Logging Android ──────────────────────────────────────────────
 log = "0.4"

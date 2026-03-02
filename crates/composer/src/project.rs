@@ -15,6 +15,16 @@ use monster_battle_audio::tracks::{Track, Voice};
 thread_local! {
     /// Cache du dernier nom leaké pour éviter les fuites mémoire répétées
     /// lors des appels successifs à `to_track()`.
+    ///
+    /// **Fuite bornée** : un seul `Box::leak` est maintenu à la fois (le dernier
+    /// nom utilisé). Si le nom change, l'ancien `&'static str` est abandonné
+    /// (fuite irrécouvrable) et un nouveau est leaké. En pratique, seul un très
+    /// petit nombre de noms différents seront leakés au cours d'une session
+    /// (un par renommage explicite de l'utilisateur).
+    ///
+    /// La vraie solution serait de changer `Track.name` en `Cow<'static, str>`
+    /// ou `String` dans le crate audio, mais ce changement impacte toute l'API
+    /// audio et les tracks intégrées.
     static LEAKED_NAME: RefCell<Option<(&'static str, String)>> = RefCell::new(None);
 }
 
