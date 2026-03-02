@@ -13,6 +13,7 @@
 pub mod audio;
 pub mod connection;
 pub mod game;
+pub mod net_task;
 pub mod screens;
 pub mod sprites;
 pub mod ui;

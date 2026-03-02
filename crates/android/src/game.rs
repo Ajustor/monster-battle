@@ -237,13 +237,49 @@ fn on_enter_training(mut data: ResMut<GameData>) {
     data.menu_index = 0;
 }
 
-fn on_enter_pvp_searching(mut data: ResMut<GameData>) {
+fn on_enter_pvp_searching(
+    mut commands: Commands,
+    mut data: ResMut<GameData>,
+) {
     data.message = None;
+
+    // Lancer la tâche réseau PvP
+    let monsters = match data.storage.list_alive() {
+        Ok(m) if !m.is_empty() => m,
+        _ => {
+            data.message = Some("Pas de monstre vivant !".to_string());
+            return;
+        }
+    };
+
+    let idx = data.monster_select_index.min(monsters.len() - 1);
+    let monster = monsters[idx].clone();
+    let fighter_id = monster.id;
+
+    crate::net_task::start_pvp_task(&mut commands, monster, fighter_id);
 }
 
-fn on_enter_breeding_searching(mut data: ResMut<GameData>) {
+fn on_enter_breeding_searching(
+    mut commands: Commands,
+    mut data: ResMut<GameData>,
+) {
     data.message = None;
     data.remote_monster = None;
+
+    // Lancer la tâche réseau de reproduction
+    let monsters = match data.storage.list_alive() {
+        Ok(m) if !m.is_empty() => m,
+        _ => {
+            data.message = Some("Pas de monstre vivant !".to_string());
+            return;
+        }
+    };
+
+    let idx = data.monster_select_index.min(monsters.len() - 1);
+    let monster = monsters[idx].clone();
+    let fighter_id = monster.id;
+
+    crate::net_task::start_breeding_task(&mut commands, monster, fighter_id);
 }
 
 fn on_enter_breeding_naming(mut data: ResMut<GameData>) {

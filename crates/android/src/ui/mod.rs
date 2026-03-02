@@ -131,6 +131,8 @@ impl Plugin for UiPlugin {
                 Update,
                 help::handle_help_input.run_if(in_state(GameScreen::Help)),
             )
+            // ── Réseau (polling global) ─────────────────────────
+            .add_systems(Update, crate::net_task::poll_network_events)
             // ── Scroll tactile (global) ─────────────────────────
             .init_resource::<common::TouchScrollState>()
             .add_systems(Update, common::handle_touch_scroll)
