@@ -58,7 +58,10 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
         .border_style(border_style(focused));
 
     let play_indicator = if app.playing {
-        Span::styled(" ▶ ", Style::default().fg(PLAYING).add_modifier(Modifier::BOLD))
+        Span::styled(
+            " ▶ ",
+            Style::default().fg(PLAYING).add_modifier(Modifier::BOLD),
+        )
     } else {
         Span::styled(" ■ ", Style::default().fg(DIM))
     };
@@ -148,11 +151,11 @@ fn draw_voice_list(frame: &mut Frame, app: &App, area: Rect) {
             };
             ListItem::new(Line::from(vec![
                 Span::raw(marker),
+                Span::styled(format!("V{} ", i + 1), selected_style),
                 Span::styled(
-                    format!("V{} ", i + 1),
-                    selected_style,
+                    &v.waveform,
+                    Style::default().fg(waveform_color(&v.waveform)),
                 ),
-                Span::styled(&v.waveform, Style::default().fg(waveform_color(&v.waveform))),
                 Span::styled(drum_tag, Style::default().fg(DRUM_COLOR)),
             ]))
         })
@@ -201,7 +204,7 @@ fn draw_editor(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(1), // amplitude
             Constraint::Length(1), // is_drum
             Constraint::Length(1), // spacer
-            Constraint::Min(3),   // pattern visualiser
+            Constraint::Min(3),    // pattern visualiser
         ])
         .split(inner);
 
@@ -220,7 +223,9 @@ fn draw_editor(frame: &mut Frame, app: &App, area: Rect) {
     let pat_block = Block::default()
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(DIM));
-    let pat = Paragraph::new(pat_label).block(pat_block).wrap(Wrap { trim: false });
+    let pat = Paragraph::new(pat_label)
+        .block(pat_block)
+        .wrap(Wrap { trim: false });
     frame.render_widget(pat, rows[0]);
 
     // Waveform field
@@ -290,8 +295,7 @@ fn draw_pattern_vis(frame: &mut Frame, voice: &crate::project::VoiceDef, area: R
     let events = pat.query(0);
 
     if events.is_empty() {
-        let msg = Paragraph::new("  (silence)")
-            .style(Style::default().fg(DIM));
+        let msg = Paragraph::new("  (silence)").style(Style::default().fg(DIM));
         frame.render_widget(msg, inner);
         return;
     }

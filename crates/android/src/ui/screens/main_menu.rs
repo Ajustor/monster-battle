@@ -118,7 +118,13 @@ pub(crate) fn handle_menu_input(
     for (interaction, button) in &interaction_query {
         if *interaction == Interaction::Pressed {
             data.menu_index = button.index;
-            activate_menu_entry(&mut commands, &mut data, &mut next_state, has_monster, &mut exit_events);
+            activate_menu_entry(
+                &mut commands,
+                &mut data,
+                &mut next_state,
+                has_monster,
+                &mut exit_events,
+            );
             return;
         }
     }
@@ -135,7 +141,13 @@ pub(crate) fn handle_menu_input(
         }
     }
     if keyboard.just_pressed(KeyCode::Enter) {
-        activate_menu_entry(&mut commands, &mut data, &mut next_state, has_monster, &mut exit_events);
+        activate_menu_entry(
+            &mut commands,
+            &mut data,
+            &mut next_state,
+            has_monster,
+            &mut exit_events,
+        );
     }
     if keyboard.just_pressed(KeyCode::KeyQ) {
         exit_events.send(AppExit::Success);

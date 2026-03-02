@@ -309,7 +309,11 @@ mod tests {
         // En mode docile, le bot doit être <= au joueur (strictement inférieur sauf niveau 1)
         for _ in 0..50 {
             let bot = generate_training_opponent(10, ElementType::Fire, false);
-            assert!(bot.level < 10, "docile bot level {} should be < 10", bot.level);
+            assert!(
+                bot.level < 10,
+                "docile bot level {} should be < 10",
+                bot.level
+            );
             assert!(bot.level >= 1, "bot level should be >= 1");
         }
     }
@@ -341,7 +345,11 @@ mod tests {
         // Joueur niveau 1 en sauvage : bot entre 1 et 6
         for _ in 0..50 {
             let bot = generate_training_opponent(1, ElementType::Electric, true);
-            assert!(bot.level >= 1 && bot.level <= 6, "bot level {} should be in 1..=6", bot.level);
+            assert!(
+                bot.level >= 1 && bot.level <= 6,
+                "bot level {} should be in 1..=6",
+                bot.level
+            );
         }
     }
 

@@ -701,12 +701,18 @@ async fn run_combat_loop(
         match (res_a, res_b) {
             (Ok(()), Ok(())) => {} // Les deux prêts
             (Err(_), Ok(_)) => {
-                println!("⚠️  {} déconnecté (ready) — {} gagne par forfait !", name_a, name_b);
+                println!(
+                    "⚠️  {} déconnecté (ready) — {} gagne par forfait !",
+                    name_a, name_b
+                );
                 send_disconnect_victory(&mut ws_b, &battle, false, name_a).await;
                 break;
             }
             (Ok(()), Err(_)) => {
-                println!("⚠️  {} déconnecté (ready) — {} gagne par forfait !", name_b, name_a);
+                println!(
+                    "⚠️  {} déconnecté (ready) — {} gagne par forfait !",
+                    name_b, name_a
+                );
                 send_disconnect_victory(&mut ws_a, &battle, true, name_b).await;
                 break;
             }
