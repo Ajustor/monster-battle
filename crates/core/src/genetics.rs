@@ -217,6 +217,43 @@ pub fn generate_starter_stats(element: ElementType) -> Stats {
     )
 }
 
+/// Génère un monstre adverse pour l'entraînement.
+///
+/// - **Docile** (`wild = false`) : le bot est toujours de niveau strictement inférieur
+///   au joueur (1 à 3 niveaux en dessous, minimum 1).
+/// - **Sauvage** (`wild = true`) : le bot est dans une fourchette de ±5 niveaux
+///   autour du joueur (minimum 1, maximum 100).
+pub fn generate_training_opponent(
+    player_level: u32,
+    opponent_type: ElementType,
+    wild: bool,
+) -> Monster {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+
+    let bot_level = if wild {
+        // Sauvage : ±5 niveaux
+        let min_level = player_level.saturating_sub(5).max(1);
+        let max_level = (player_level + 5).min(100);
+        rng.gen_range(min_level..=max_level)
+    } else {
+        // Docile : toujours strictement inférieur (1-3 niveaux en dessous)
+        let sub = rng.gen_range(1..=3u32);
+        player_level.saturating_sub(sub).max(1)
+    };
+
+    let bot_stats = generate_starter_stats(opponent_type);
+    let mut bot = Monster::new_starter(format!("Bot {}", opponent_type), opponent_type, bot_stats);
+
+    // Monter au niveau cible avec la bonne quantité d'XP
+    if bot_level > 1 {
+        let total_xp: u32 = (1..bot_level).map(|l| l * l * 10).sum();
+        bot.gain_xp(total_xp);
+    }
+
+    bot
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

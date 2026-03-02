@@ -29,7 +29,26 @@ pub(crate) fn spawn_monster_list(
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
 ) {
+    spawn_monster_list_inner(&mut commands, &data, &mut images, &mut atlas);
+}
+
+/// Logique interne de création de l'UI (réutilisable pour les rebuilds).
+fn spawn_monster_list_inner(
+    commands: &mut Commands,
+    data: &GameData,
+    images: &mut Assets<Image>,
+    atlas: &mut sprites::MonsterSpriteAtlas,
+) {
     let monsters = data.storage.list_alive().unwrap_or_default();
+
+    // Pre-compute sprite handles to avoid mutable borrow issues in closures
+    let sprite_handles: Vec<Handle<Image>> = monsters
+        .iter()
+        .map(|m| {
+            let grid = sprites::get_pixel_sprite(m.primary_type, m.secondary_type);
+            atlas.get_or_create_front(m.primary_type, m.secondary_type, grid, images)
+        })
+        .collect();
 
     commands
         .spawn((
@@ -128,6 +147,8 @@ pub(crate) fn spawn_monster_list(
                                 colors::BORDER
                             };
 
+                            let handle = sprite_handles[i].clone();
+
                             list.spawn((
                                 Node {
                                     width: Val::Percent(100.0),
@@ -146,18 +167,6 @@ pub(crate) fn spawn_monster_list(
                                 Interaction::default(),
                             ))
                             .with_children(|card| {
-                                // Sprite du monstre
-                                let grid = sprites::get_pixel_sprite(
-                                    monster.primary_type,
-                                    monster.secondary_type,
-                                );
-                                let handle = atlas.get_or_create_front(
-                                    monster.primary_type,
-                                    monster.secondary_type,
-                                    grid,
-                                    &mut images,
-                                );
-
                                 card.spawn((
                                     ImageNode::new(handle),
                                     Node {
@@ -296,14 +305,19 @@ pub(crate) fn spawn_monster_list(
 
 /// Gestion des entrées de la liste des monstres.
 pub(crate) fn handle_monster_list_input(
+    mut commands: Commands,
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
+    mut images: ResMut<Assets<Image>>,
+    mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
+    screen_entities: Query<Entity, With<ScreenEntity>>,
     card_query: Query<(&Interaction, &MonsterCardButton), Changed<Interaction>>,
     back_query: Query<&Interaction, (Changed<Interaction>, With<BackButton>)>,
     feed_query: Query<&Interaction, (Changed<Interaction>, With<FeedButton>)>,
 ) {
     let monster_count = data.storage.list_alive().map(|v| v.len()).unwrap_or(0);
+    let mut needs_rebuild = false;
 
     // Toucher retour
     for interaction in &back_query {
@@ -319,34 +333,50 @@ pub(crate) fn handle_monster_list_input(
     for interaction in &feed_query {
         if *interaction == Interaction::Pressed {
             feed_selected_monster(&mut data);
-            return;
+            needs_rebuild = true;
+            break;
         }
     }
 
     // Toucher carte monstre (sélection visuelle)
-    for (interaction, card) in &card_query {
-        if *interaction == Interaction::Pressed {
-            data.monster_select_index = card.index;
-            return;
+    if !needs_rebuild {
+        for (interaction, card) in &card_query {
+            if *interaction == Interaction::Pressed {
+                data.monster_select_index = card.index;
+                needs_rebuild = true;
+                break;
+            }
         }
     }
 
     if keyboard.just_pressed(KeyCode::ArrowUp) && data.monster_select_index > 0 {
         data.monster_select_index -= 1;
+        needs_rebuild = true;
     }
     if keyboard.just_pressed(KeyCode::ArrowDown)
         && monster_count > 0
         && data.monster_select_index < monster_count - 1
     {
         data.monster_select_index += 1;
+        needs_rebuild = true;
     }
     if keyboard.just_pressed(KeyCode::KeyF) {
         feed_selected_monster(&mut data);
+        needs_rebuild = true;
     }
     if keyboard.just_pressed(KeyCode::KeyQ) || keyboard.just_pressed(KeyCode::Escape) {
         next_state.set(GameScreen::MainMenu);
         data.menu_index = 0;
         data.message = None;
+        return;
+    }
+
+    // Reconstruire l'UI si les données ont changé
+    if needs_rebuild {
+        for entity in &screen_entities {
+            commands.entity(entity).despawn_recursive();
+        }
+        spawn_monster_list_inner(&mut commands, &data, &mut images, &mut atlas);
     }
 }
 

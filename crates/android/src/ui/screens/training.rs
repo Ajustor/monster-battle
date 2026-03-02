@@ -3,9 +3,8 @@
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
-use monster_battle_core::Monster;
 use monster_battle_core::battle::BattleState;
-use monster_battle_core::genetics::generate_starter_stats;
+use monster_battle_core::genetics::generate_training_opponent;
 use monster_battle_core::types::ElementType;
 use monster_battle_storage::MonsterStorage;
 
@@ -373,16 +372,7 @@ fn start_training_fight(
     let types = ElementType::all();
     let bot_type = types[data.menu_index % types.len()];
 
-    // Créer un bot du même niveau que le joueur (±2)
-    let player_level = player_monster.level;
-    let bot_level = player_level.saturating_sub(2).max(1);
-    let mut bot_stats = generate_starter_stats(bot_type);
-    bot_stats.hp += bot_level * 2;
-
-    let mut bot = Monster::new_starter(format!("Bot {}", bot_type), bot_type, bot_stats);
-    if bot_level > 1 {
-        bot.gain_xp(bot_level * bot_level * 10);
-    }
+    let bot = generate_training_opponent(player_monster.level, bot_type, wild);
 
     // is_training = true signifie docile (pas de mort) — wild = !is_training
     let battle = BattleState::new(player_monster, &bot, !wild);
