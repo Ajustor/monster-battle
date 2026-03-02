@@ -56,4 +56,5 @@ jobs:
       build_tools_version: '36.0.0'
       manifest_path: crates/android/AndroidManifest.xml
       res_dir: crates/android/res
+      deploy_pages: true
       inject_resources_script: scripts/inject_resources.py
