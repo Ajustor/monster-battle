@@ -1,0 +1,17 @@
+[package]
+name = "monster-battle-composer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "monster-battle-composer"
+path = "src/main.rs"
+
+[dependencies]
+monster-battle-audio.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+anyhow.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true

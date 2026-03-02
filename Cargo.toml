@@ -8,6 +8,7 @@ members = [
   "crates/server",
   "crates/audio",
   "crates/android",
+  "crates/composer",
 ]
 
 [workspace.package]
@@ -67,3 +68,4 @@ monster-battle-network = { path = "crates/network" }
 monster-battle-server = { path = "crates/server" }
 monster-battle-audio = { path = "crates/audio" }
 monster-battle-android = { path = "crates/android" }
+monster-battle-composer = { path = "crates/composer" }

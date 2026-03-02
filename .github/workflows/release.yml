@@ -38,3 +38,22 @@ jobs:
       package_path: crates/tui
       deploy_pages: true
       linux_apt_packages: libasound2-dev
+
+  # ── Release Android APK ────────────────────────────────────────
+  release-android:
+    needs: version-check
+    if: needs.version-check.outputs.version_changed == 'true'
+    uses: Ajustor/workflows/.github/workflows/bevy-android-release.yml@master
+    with:
+      package_name: monster-battle-android
+      package_path: crates/android
+      app_name: Monster Battle
+      version: ${{ needs.version-check.outputs.new_version }}
+      build_system: xbuild
+      target_sdk: '36'
+      min_sdk: '24'
+      ndk_version: '27.2.12479018'
+      build_tools_version: '36.0.0'
+      manifest_path: crates/android/AndroidManifest.xml
+      res_dir: crates/android/res
+      inject_resources_script: scripts/inject_resources.py
