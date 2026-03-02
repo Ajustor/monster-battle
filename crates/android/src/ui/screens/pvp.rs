@@ -106,6 +106,7 @@ pub(crate) struct CancelButton;
 
 /// Gestion des entrées en recherche PvP.
 pub(crate) fn handle_pvp_searching_input(
+    mut commands: Commands,
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
@@ -113,6 +114,7 @@ pub(crate) fn handle_pvp_searching_input(
 ) {
     for (interaction, _) in &interaction_query {
         if *interaction == Interaction::Pressed {
+            commands.remove_resource::<crate::net_task::NetTask>();
             data.message = None;
             next_state.set(GameScreen::MainMenu);
             data.menu_index = 0;
@@ -121,6 +123,7 @@ pub(crate) fn handle_pvp_searching_input(
     }
 
     if keyboard.just_pressed(KeyCode::Escape) {
+        commands.remove_resource::<crate::net_task::NetTask>();
         data.message = None;
         next_state.set(GameScreen::MainMenu);
         data.menu_index = 0;

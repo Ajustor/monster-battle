@@ -2,6 +2,7 @@
 
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{Key, KeyboardInput};
+use monster_battle_storage::MonsterStorage;
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 use bevy::window::Ime;
@@ -112,6 +113,7 @@ pub(crate) fn spawn_breeding_searching(mut commands: Commands) {
 
 /// Gestion des entrées en recherche de partenaire.
 pub(crate) fn handle_breeding_searching_input(
+    mut commands: Commands,
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
@@ -119,6 +121,7 @@ pub(crate) fn handle_breeding_searching_input(
 ) {
     for (interaction, _) in &interaction_query {
         if *interaction == Interaction::Pressed {
+            commands.remove_resource::<crate::net_task::NetTask>();
             data.message = None;
             data.remote_monster = None;
             next_state.set(GameScreen::MainMenu);
@@ -128,6 +131,7 @@ pub(crate) fn handle_breeding_searching_input(
     }
 
     if keyboard.just_pressed(KeyCode::Escape) {
+        commands.remove_resource::<crate::net_task::NetTask>();
         data.message = None;
         data.remote_monster = None;
         next_state.set(GameScreen::MainMenu);
@@ -399,8 +403,55 @@ fn try_confirm_breeding_name(
         return;
     }
 
-    // Le résultat de la reproduction sera traité par game.rs (finalize_breeding)
-    // Pour l'instant, on transite vers BreedingResult
+    // Effectuer la reproduction
+    let remote = match data.remote_monster.take() {
+        Some(m) => m,
+        None => {
+            data.message = Some("Données du partenaire manquantes.".to_string());
+            next_state.set(GameScreen::MainMenu);
+            return;
+        }
+    };
+
+    let monsters: Vec<monster_battle_core::Monster> = match data.storage.list_alive() {
+        Ok(m) if !m.is_empty() => m,
+        _ => {
+            data.message = Some("Pas de monstre vivant !".to_string());
+            next_state.set(GameScreen::MainMenu);
+            return;
+        }
+    };
+
+    let idx = data.monster_select_index.min(monsters.len() - 1);
+    let parent = &monsters[idx];
+    let child_name = data.name_input.trim().to_string();
+
+    use monster_battle_core::genetics::breed;
+    match breed(parent, &remote, child_name) {
+        Ok(result) => {
+            // Sauvegarder l'enfant
+            match data.storage.save(&result.child) {
+                Ok(()) => {
+                    let mut msg = result.description.clone();
+                    if result.mutation_occurred {
+                        msg.push_str("\nUne mutation génétique s'est produite !");
+                    }
+                    data.message = Some(msg);
+                    data.breed_result = Some(result.child);
+                }
+                Err(e) => {
+                    data.message = Some(format!("Erreur de sauvegarde : {}", e));
+                    data.breed_result = None;
+                }
+            }
+        }
+        Err(e) => {
+            data.message = Some(format!("Erreur : {}", e));
+            data.breed_result = None;
+        }
+    }
+
+    data.name_input.clear();
     data.scroll_offset = 0;
     next_state.set(GameScreen::BreedingResult);
 }

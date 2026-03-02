@@ -4,9 +4,10 @@ use bevy::prelude::*;
 use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
+use crate::net_task::{NetTask, NetTaskAction};
 use crate::sprites;
 use crate::ui::common::{self, SAFE_BOTTOM, SAFE_TOP, colors, fonts};
-use monster_battle_core::battle::{BattlePhase, BattleState};
+use monster_battle_core::battle::{BattlePhase, BattleState, MessageStyle};
 use monster_battle_storage::MonsterStorage;
 
 /// Marqueur pour les boutons d'attaque.
@@ -381,17 +382,26 @@ pub(crate) fn handle_battle_input(
     mut next_state: ResMut<NextState<GameScreen>>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
+    net_task: Option<ResMut<NetTask>>,
     attack_query: Query<(&Interaction, &AttackButton), Changed<Interaction>>,
     flee_query: Query<&Interaction, (Changed<Interaction>, With<FleeButton>)>,
     continue_query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
     screen_entities: Query<Entity, With<ScreenEntity>>,
 ) {
+    let is_pvp = net_task
+        .as_ref()
+        .map(|t| t.action == NetTaskAction::Pvp)
+        .unwrap_or(false);
+
     // ── Résultat des interactions ──────────────────────────────────
     enum Action {
         None,
         Rebuild,
         EndBattle,
         Flee,
+        PvpSendAttack(usize),
+        PvpSendReady,
+        PvpForfeit,
     }
 
     let action = {
@@ -426,8 +436,12 @@ pub(crate) fn handle_battle_input(
                     // Toucher bouton attaque (mobile)
                     for (interaction, btn) in &attack_query {
                         if *interaction == Interaction::Pressed {
-                            battle.player_attack(btn.index);
-                            act = Action::Rebuild;
+                            if is_pvp {
+                                act = Action::PvpSendAttack(btn.index);
+                            } else {
+                                battle.player_attack(btn.index);
+                                act = Action::Rebuild;
+                            }
                             break;
                         }
                     }
@@ -436,7 +450,11 @@ pub(crate) fn handle_battle_input(
                     if matches!(act, Action::None) {
                         for interaction in &flee_query {
                             if *interaction == Interaction::Pressed {
-                                act = Action::Flee;
+                                act = if is_pvp {
+                                    Action::PvpForfeit
+                                } else {
+                                    Action::Flee
+                                };
                                 break;
                             }
                         }
@@ -456,11 +474,51 @@ pub(crate) fn handle_battle_input(
                         }
                         if keyboard.just_pressed(KeyCode::Enter) {
                             let idx = battle.attack_menu_index;
-                            battle.player_attack(idx);
-                            act = Action::Rebuild;
+                            if is_pvp {
+                                act = Action::PvpSendAttack(idx);
+                            } else {
+                                battle.player_attack(idx);
+                                act = Action::Rebuild;
+                            }
                         }
                         if keyboard.just_pressed(KeyCode::Escape) {
-                            act = Action::Flee;
+                            act = if is_pvp {
+                                Action::PvpForfeit
+                            } else {
+                                Action::Flee
+                            };
+                        }
+                    }
+
+                    act
+                }
+                BattlePhase::WaitingForOpponent => {
+                    // PvP : le joueur a fini de lire les messages du tour
+                    let mut act = Action::None;
+
+                    for interaction in &continue_query {
+                        if *interaction == Interaction::Pressed {
+                            if !battle.advance_message() && battle.message_queue.is_empty() {
+                                act = Action::PvpSendReady;
+                            } else {
+                                act = Action::Rebuild;
+                            }
+                            break;
+                        }
+                    }
+
+                    if matches!(act, Action::None) {
+                        if keyboard.just_pressed(KeyCode::Enter)
+                            || keyboard.just_pressed(KeyCode::Space)
+                        {
+                            if !battle.advance_message() && battle.message_queue.is_empty() {
+                                act = Action::PvpSendReady;
+                            } else {
+                                act = Action::Rebuild;
+                            }
+                        }
+                        if keyboard.just_pressed(KeyCode::Escape) && is_pvp {
+                            act = Action::PvpForfeit;
                         }
                     }
 
@@ -469,6 +527,18 @@ pub(crate) fn handle_battle_input(
                 _ => {
                     // Intro, Executing, Victory/Defeat avec messages restants
                     let mut act = Action::None;
+
+                    // En PvP, ne pas avancer si on attend la réponse du serveur
+                    // (phase Executing + plus de messages = on attend)
+                    let is_waiting_server = is_pvp
+                        && battle.phase == BattlePhase::Executing
+                        && battle.message_queue.is_empty()
+                        && battle.current_message.is_none();
+
+                    if is_waiting_server {
+                        // Ne rien faire — la réponse viendra via poll_network_events
+                        return;
+                    }
 
                     // Toucher « Continuer » (mobile)
                     for interaction in &continue_query {
@@ -488,7 +558,11 @@ pub(crate) fn handle_battle_input(
                             act = Action::Rebuild;
                         }
                         if keyboard.just_pressed(KeyCode::Escape) {
-                            act = Action::Flee;
+                            act = if is_pvp {
+                                Action::PvpForfeit
+                            } else {
+                                Action::Flee
+                            };
                         }
                     }
 
@@ -512,12 +586,79 @@ pub(crate) fn handle_battle_input(
             }
         }
         Action::EndBattle => {
+            commands.remove_resource::<NetTask>();
             apply_battle_results(&mut data);
             next_state.set(GameScreen::MainMenu);
         }
         Action::Flee => {
             data.battle_state = None;
             data.message = Some("Vous avez fui le combat.".to_string());
+            next_state.set(GameScreen::MainMenu);
+        }
+        Action::PvpSendAttack(idx) => {
+            // Envoyer le choix au serveur via le canal
+            if let Some(ref net) = net_task {
+                if let Some(ref tx) = net.attack_tx {
+                    let _ = tx.try_send(idx);
+                }
+            }
+            // Passer en mode "attente du serveur"
+            if let Some(ref mut battle) = data.battle_state {
+                battle.phase = BattlePhase::Executing;
+                battle.current_message =
+                    Some(monster_battle_core::battle::BattleMessage {
+                        text: "En attente de l'adversaire...".to_string(),
+                        style: MessageStyle::Info,
+                        player_hp: None,
+                        opponent_hp: None,
+                        anim_type: None,
+                    });
+                battle.message_counter += 1;
+            }
+            // Rebuild l'UI
+            for entity in &screen_entities {
+                commands.entity(entity).despawn_recursive();
+            }
+            if let Some(ref battle) = data.battle_state {
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas);
+            }
+        }
+        Action::PvpSendReady => {
+            // Envoyer PvpReady au serveur (sentinel usize::MAX - 1)
+            if let Some(ref net) = net_task {
+                if let Some(ref tx) = net.attack_tx {
+                    let _ = tx.try_send(usize::MAX - 1);
+                }
+            }
+            // Afficher un message d'attente
+            if let Some(ref mut battle) = data.battle_state {
+                battle.current_message =
+                    Some(monster_battle_core::battle::BattleMessage {
+                        text: "En attente de l'adversaire...".to_string(),
+                        style: MessageStyle::Info,
+                        player_hp: None,
+                        opponent_hp: None,
+                        anim_type: None,
+                    });
+                battle.message_counter += 1;
+            }
+            for entity in &screen_entities {
+                commands.entity(entity).despawn_recursive();
+            }
+            if let Some(ref battle) = data.battle_state {
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas);
+            }
+        }
+        Action::PvpForfeit => {
+            // Envoyer le forfait au serveur (sentinel usize::MAX)
+            if let Some(ref net) = net_task {
+                if let Some(ref tx) = net.attack_tx {
+                    let _ = tx.try_send(usize::MAX);
+                }
+            }
+            commands.remove_resource::<NetTask>();
+            data.battle_state = None;
+            data.message = Some("Vous avez abandonné le combat PvP.".to_string());
             next_state.set(GameScreen::MainMenu);
         }
     }
