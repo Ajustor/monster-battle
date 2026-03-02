@@ -94,8 +94,8 @@ def render_sprite(size: int) -> Image.Image:
             color = PALETTE.get(ch, PALETTE["."])
             x0 = int(margin + col_idx * pixel_w)
             y0 = int(margin + row_idx * pixel_w)
-            x1 = int(margin + (col_idx + 1) * pixel_w)
-            y1 = int(margin + (row_idx + 1) * pixel_w)
+            x1 = int(margin + (col_idx + 1) * pixel_w) - 1
+            y1 = int(margin + (row_idx + 1) * pixel_w) - 1
             draw.rectangle([x0, y0, x1, y1], fill=color)
 
     return img

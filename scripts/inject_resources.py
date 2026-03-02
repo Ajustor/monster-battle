@@ -8,6 +8,10 @@ import shutil
 
 
 def main():
+    if len(sys.argv) != 3:
+        print(f"Usage: {sys.argv[0]} <apk_path> <overlay_dir>", file=sys.stderr)
+        sys.exit(1)
+
     apk_src = sys.argv[1]
     tmp = sys.argv[2]
 
@@ -35,17 +39,27 @@ def main():
 
     # Write the overlay's AndroidManifest.xml (has android:icon reference)
     manifest_path = os.path.join(tmp, "AndroidManifest.xml")
-    if os.path.exists(manifest_path):
-        dst.write(manifest_path, "AndroidManifest.xml")
+    if not os.path.exists(manifest_path):
+        print(f"❌ Erreur : {manifest_path} introuvable dans l'overlay", file=sys.stderr)
+        src.close()
+        dst.close()
+        os.remove(apk_new)
+        sys.exit(1)
+    dst.write(manifest_path, "AndroidManifest.xml")
 
     # Write the overlay's resources.arsc — MUST be stored uncompressed
     # and 4-byte aligned (required by Android R+ / API 30+)
     arsc_path = os.path.join(tmp, "resources.arsc")
-    if os.path.exists(arsc_path):
-        info = zipfile.ZipInfo("resources.arsc")
-        info.compress_type = zipfile.ZIP_STORED  # uncompressed
-        with open(arsc_path, "rb") as f:
-            dst.writestr(info, f.read())
+    if not os.path.exists(arsc_path):
+        print(f"❌ Erreur : {arsc_path} introuvable dans l'overlay", file=sys.stderr)
+        src.close()
+        dst.close()
+        os.remove(apk_new)
+        sys.exit(1)
+    info = zipfile.ZipInfo("resources.arsc")
+    info.compress_type = zipfile.ZIP_STORED  # uncompressed
+    with open(arsc_path, "rb") as f:
+        dst.writestr(info, f.read())
 
     # Write all resource files (mipmap icons, etc.)
     for rf in res_files:

@@ -3,12 +3,20 @@
 //! A project is a JSON file describing a track (name, BPM, voices) using
 //! the same mini‑notation understood by `monster_battle_audio::pattern::parse`.
 
-use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
 
 use monster_battle_audio::pattern;
 use monster_battle_audio::synth::Waveform;
 use monster_battle_audio::tracks::{Track, Voice};
+
+thread_local! {
+    /// Cache du dernier nom leaké pour éviter les fuites mémoire répétées
+    /// lors des appels successifs à `to_track()`.
+    static LEAKED_NAME: RefCell<Option<(&'static str, String)>> = RefCell::new(None);
+}
 
 // ── Serialisable mirror types ───────────────────────────────────
 
@@ -78,11 +86,21 @@ impl Project {
 
     /// Convert to a playable `Track`.
     ///
-    /// The track name is leaked to a `&'static str` so the audio engine can
-    /// hold it.  This is fine for a composer tool with a bounded number of
-    /// previews.
+    /// Le nom est leaké en `&'static str` une seule fois et réutilisé tant
+    /// qu'il ne change pas, évitant les fuites mémoire lors des previews
+    /// successifs.
     pub fn to_track(&self) -> Track {
-        let name: &'static str = Box::leak(self.name.clone().into_boxed_str());
+        let name: &'static str = LEAKED_NAME.with(|cell| {
+            let mut cached = cell.borrow_mut();
+            if let Some((leaked, ref original)) = *cached {
+                if *original == self.name {
+                    return leaked;
+                }
+            }
+            let leaked: &'static str = Box::leak(self.name.clone().into_boxed_str());
+            *cached = Some((leaked, self.name.clone()));
+            leaked
+        });
         Track {
             name,
             bpm: self.bpm,

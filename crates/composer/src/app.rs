@@ -131,6 +131,21 @@ impl App {
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
 
+        // Guard RAII : restaure toujours le terminal, même en cas de panic
+        // ou d'erreur dans la boucle principale.
+        let result = self.main_loop(&mut terminal);
+
+        // Restauration inconditionnelle du terminal
+        let _ = disable_raw_mode();
+        let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
+        let _ = terminal.show_cursor();
+
+        result
+    }
+
+    /// Boucle principale isolée pour garantir la restauration du terminal
+    /// via le guard RAII dans `run()`.
+    fn main_loop(&mut self, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
         let tick_rate = Duration::from_millis(80);
 
         loop {
@@ -156,9 +171,6 @@ impl App {
             }
         }
 
-        disable_raw_mode()?;
-        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-        terminal.show_cursor()?;
         Ok(())
     }
 
