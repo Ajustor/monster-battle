@@ -7,6 +7,8 @@ members = [
   "crates/tui",
   "crates/server",
   "crates/audio",
+  "crates/android",
+  "crates/composer",
 ]
 
 [workspace.package]
@@ -32,6 +34,9 @@ rand = "0.8"
 ratatui = "0.29"
 crossterm = "0.28"
 tachyonfx = "0.9"
+
+# Game engine (Android)
+bevy = "0.15"
 
 # Encryption
 aes-gcm = "0.10"
@@ -62,3 +67,5 @@ monster-battle-storage = { path = "crates/storage" }
 monster-battle-network = { path = "crates/network" }
 monster-battle-server = { path = "crates/server" }
 monster-battle-audio = { path = "crates/audio" }
+monster-battle-android = { path = "crates/android" }
+monster-battle-composer = { path = "crates/composer" }

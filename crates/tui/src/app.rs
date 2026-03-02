@@ -959,7 +959,7 @@ impl App {
     }
 
     fn run_training_fight(&mut self, wild: bool) {
-        use monster_battle_core::genetics::generate_starter_stats;
+        use monster_battle_core::genetics::generate_training_opponent;
         use monster_battle_core::types::ElementType;
 
         let monsters = match self.storage.list_alive() {
@@ -976,16 +976,7 @@ impl App {
         let types = ElementType::all();
         let bot_type = types[self.menu_index % types.len()];
 
-        // Créer un bot du même niveau que le joueur (±2)
-        let player_level = fighter.level;
-        let bot_level = player_level.saturating_sub(2).max(1);
-        let mut bot_stats = generate_starter_stats(bot_type);
-        bot_stats.hp += bot_level * 2;
-
-        let mut bot = Monster::new_starter(format!("Bot {}", bot_type), bot_type, bot_stats);
-        if bot_level > 1 {
-            bot.gain_xp(bot_level * bot_level * 10);
-        }
+        let bot = generate_training_opponent(fighter.level, bot_type, wild);
 
         // Lancer le combat interactif
         // is_training = true (docile, 50% XP) / false (sauvage, 100% XP)

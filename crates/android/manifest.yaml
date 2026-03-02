@@ -1,0 +1,5 @@
+android:
+  manifest:
+    package: "com.ajustor.monsterbattle"
+    application:
+      label: "Monster Battle"
