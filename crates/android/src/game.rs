@@ -84,6 +84,8 @@ pub struct GameData {
     pub breed_result: Option<Monster>,
     /// Décalage de scroll pour les écrans longs.
     pub scroll_offset: usize,
+    /// Drapeau signalant que l'UI de combat doit être reconstruite (polling réseau).
+    pub battle_ui_dirty: bool,
 }
 
 impl GameData {
@@ -106,6 +108,7 @@ impl GameData {
             remote_monster: None,
             breed_result: None,
             scroll_offset: 0,
+            battle_ui_dirty: false,
         }
     }
 
@@ -237,10 +240,7 @@ fn on_enter_training(mut data: ResMut<GameData>) {
     data.menu_index = 0;
 }
 
-fn on_enter_pvp_searching(
-    mut commands: Commands,
-    mut data: ResMut<GameData>,
-) {
+fn on_enter_pvp_searching(mut commands: Commands, mut data: ResMut<GameData>) {
     data.message = None;
 
     // Lancer la tâche réseau PvP
@@ -259,10 +259,7 @@ fn on_enter_pvp_searching(
     crate::net_task::start_pvp_task(&mut commands, monster, fighter_id);
 }
 
-fn on_enter_breeding_searching(
-    mut commands: Commands,
-    mut data: ResMut<GameData>,
-) {
+fn on_enter_breeding_searching(mut commands: Commands, mut data: ResMut<GameData>) {
     data.message = None;
     data.remote_monster = None;
 

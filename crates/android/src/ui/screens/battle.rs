@@ -7,7 +7,7 @@ use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::net_task::{NetTask, NetTaskAction};
 use crate::sprites;
 use crate::ui::common::{self, SAFE_BOTTOM, SAFE_TOP, colors, fonts};
-use monster_battle_core::battle::{BattlePhase, BattleState, MessageStyle};
+use monster_battle_core::battle::{AnimationType, BattlePhase, BattleState, MessageStyle};
 use monster_battle_storage::MonsterStorage;
 
 /// Marqueur pour les boutons d'attaque.
@@ -23,6 +23,46 @@ pub(crate) struct FleeButton;
 /// Marqueur pour le bouton « Continuer » / « Retour au menu ».
 #[derive(Component)]
 pub(crate) struct ContinueButton;
+
+/// Marqueur pour le sprite du joueur.
+#[derive(Component)]
+pub(crate) struct PlayerSprite;
+
+/// Marqueur pour le sprite de l'adversaire.
+#[derive(Component)]
+pub(crate) struct OpponentSprite;
+
+/// Marqueur pour la barre de PV du joueur.
+#[derive(Component)]
+pub(crate) struct PlayerHpBar;
+
+/// Marqueur pour la barre de PV de l'adversaire.
+#[derive(Component)]
+pub(crate) struct OpponentHpBar;
+
+/// Marqueur pour le texte de PV du joueur.
+#[derive(Component)]
+pub(crate) struct PlayerHpText;
+
+/// Marqueur pour le texte de PV de l'adversaire.
+#[derive(Component)]
+pub(crate) struct OpponentHpText;
+
+/// Marqueur pour le texte « En attente... » avec animation de points.
+#[derive(Component)]
+pub(crate) struct WaitingDots {
+    timer: Timer,
+    dots: u8,
+}
+
+/// Ressource qui gère l'état global de l'animation de combat.
+#[derive(Resource)]
+pub(crate) struct BattleAnimTimer {
+    /// Timer de l'animation en cours.
+    pub timer: Timer,
+    /// Type d'animation.
+    pub anim: AnimationType,
+}
 
 /// Construit l'UI de combat.
 pub(crate) fn spawn_battle_ui(
@@ -45,6 +85,12 @@ fn spawn_battle_ui_inner(
     mut images: &mut Assets<Image>,
     atlas: &mut sprites::MonsterSpriteAtlas,
 ) {
+    let is_waiting = matches!(
+        battle.phase,
+        BattlePhase::Executing | BattlePhase::WaitingForOpponent
+    ) && battle.current_message.is_none()
+        && battle.message_queue.is_empty();
+
     commands
         .spawn((
             Node {
@@ -93,11 +139,13 @@ fn spawn_battle_ui_inner(
                         height: Val::Px(96.0),
                         ..default()
                     },
+                    OpponentSprite,
                 ));
 
-                // Stats adversaire
+                // Stats adversaire + barre PV
                 top.spawn(Node {
                     flex_direction: FlexDirection::Column,
+                    flex_grow: 1.0,
                     ..default()
                 })
                 .with_children(|info| {
@@ -113,18 +161,59 @@ fn spawn_battle_ui_inner(
                         TextColor(colors::TEXT_PRIMARY),
                     ));
 
+                    // Barre de PV graphique
+                    let hp_pct = if battle.opponent.max_hp > 0 {
+                        (battle.opponent.display_hp as f32 / battle.opponent.max_hp as f32)
+                            .clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
                     let hp_color =
-                        common::hp_color(battle.opponent.current_hp, battle.opponent.max_hp);
+                        common::hp_color(battle.opponent.display_hp, battle.opponent.max_hp);
+
+                    info.spawn(Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(10.0),
+                        margin: UiRect::vertical(Val::Px(4.0)),
+                        ..default()
+                    })
+                    .with_children(|bar_bg| {
+                        // Fond gris
+                        bar_bg.spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Percent(100.0),
+                                position_type: PositionType::Absolute,
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.3, 0.3, 0.3, 0.5)),
+                            BorderRadius::all(Val::Px(5.0)),
+                        ));
+                        // Barre colorée
+                        bar_bg.spawn((
+                            Node {
+                                width: Val::Percent(hp_pct * 100.0),
+                                height: Val::Percent(100.0),
+                                position_type: PositionType::Absolute,
+                                ..default()
+                            },
+                            BackgroundColor(hp_color),
+                            BorderRadius::all(Val::Px(5.0)),
+                            OpponentHpBar,
+                        ));
+                    });
+
                     info.spawn((
                         Text::new(format!(
                             "PV {}/{}",
-                            battle.opponent.current_hp, battle.opponent.max_hp,
+                            battle.opponent.display_hp, battle.opponent.max_hp,
                         )),
                         TextFont {
                             font_size: fonts::SMALL,
                             ..default()
                         },
                         TextColor(hp_color),
+                        OpponentHpText,
                     ));
                 });
             });
@@ -138,11 +227,12 @@ fn spawn_battle_ui_inner(
                 ..default()
             })
             .with_children(|bottom| {
-                // Stats joueur
+                // Stats joueur + barre PV
                 bottom
                     .spawn(Node {
                         flex_direction: FlexDirection::Column,
                         align_items: AlignItems::FlexEnd,
+                        flex_grow: 1.0,
                         ..default()
                     })
                     .with_children(|info| {
@@ -157,18 +247,57 @@ fn spawn_battle_ui_inner(
                             TextColor(colors::TEXT_PRIMARY),
                         ));
 
+                        // Barre de PV graphique
+                        let hp_pct = if battle.player.max_hp > 0 {
+                            (battle.player.display_hp as f32 / battle.player.max_hp as f32)
+                                .clamp(0.0, 1.0)
+                        } else {
+                            0.0
+                        };
                         let hp_color =
-                            common::hp_color(battle.player.current_hp, battle.player.max_hp);
+                            common::hp_color(battle.player.display_hp, battle.player.max_hp);
+
+                        info.spawn(Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Px(10.0),
+                            margin: UiRect::vertical(Val::Px(4.0)),
+                            ..default()
+                        })
+                        .with_children(|bar_bg| {
+                            bar_bg.spawn((
+                                Node {
+                                    width: Val::Percent(100.0),
+                                    height: Val::Percent(100.0),
+                                    position_type: PositionType::Absolute,
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgba(0.3, 0.3, 0.3, 0.5)),
+                                BorderRadius::all(Val::Px(5.0)),
+                            ));
+                            bar_bg.spawn((
+                                Node {
+                                    width: Val::Percent(hp_pct * 100.0),
+                                    height: Val::Percent(100.0),
+                                    position_type: PositionType::Absolute,
+                                    ..default()
+                                },
+                                BackgroundColor(hp_color),
+                                BorderRadius::all(Val::Px(5.0)),
+                                PlayerHpBar,
+                            ));
+                        });
+
                         info.spawn((
                             Text::new(format!(
                                 "PV {}/{}",
-                                battle.player.current_hp, battle.player.max_hp,
+                                battle.player.display_hp, battle.player.max_hp,
                             )),
                             TextFont {
                                 font_size: fonts::SMALL,
                                 ..default()
                             },
                             TextColor(hp_color),
+                            PlayerHpText,
                         ));
                     });
 
@@ -191,6 +320,7 @@ fn spawn_battle_ui_inner(
                         height: Val::Px(96.0),
                         ..default()
                     },
+                    PlayerSprite,
                 ));
             });
 
@@ -204,16 +334,41 @@ fn spawn_battle_ui_inner(
             .with_children(|actions| {
                 // Message courant
                 if let Some(ref msg) = battle.current_message {
+                    let msg_color = match msg.style {
+                        MessageStyle::PlayerAttack => colors::ACCENT_BLUE,
+                        MessageStyle::OpponentAttack => colors::ACCENT_RED,
+                        MessageStyle::Victory => colors::ACCENT_GREEN,
+                        MessageStyle::Defeat => colors::ACCENT_RED,
+                        _ => colors::TEXT_PRIMARY,
+                    };
                     actions.spawn((
                         Text::new(msg.text.clone()),
                         TextFont {
                             font_size: fonts::BODY,
                             ..default()
                         },
-                        TextColor(colors::TEXT_PRIMARY),
+                        TextColor(msg_color),
                         Node {
                             margin: UiRect::bottom(Val::Px(8.0)),
                             ..default()
+                        },
+                    ));
+                } else if is_waiting {
+                    // Texte animé « En attente de l'adversaire... »
+                    actions.spawn((
+                        Text::new("En attente de l'adversaire".to_string()),
+                        TextFont {
+                            font_size: fonts::BODY,
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.7, 0.7, 0.7, 0.8)),
+                        Node {
+                            margin: UiRect::bottom(Val::Px(8.0)),
+                            ..default()
+                        },
+                        WaitingDots {
+                            timer: Timer::from_seconds(0.5, TimerMode::Repeating),
+                            dots: 0,
                         },
                     ));
                 }
@@ -576,6 +731,17 @@ pub(crate) fn handle_battle_input(
     match action {
         Action::None => {}
         Action::Rebuild => {
+            // Déclencher une animation si le message courant en contient une
+            if let Some(ref battle) = data.battle_state {
+                if let Some(ref msg) = battle.current_message {
+                    if let Some(ref anim) = msg.anim_type {
+                        commands.insert_resource(BattleAnimTimer {
+                            timer: Timer::from_seconds(0.35, TimerMode::Once),
+                            anim: anim.clone(),
+                        });
+                    }
+                }
+            }
             // Supprimer l'ancienne UI
             for entity in &screen_entities {
                 commands.entity(entity).despawn_recursive();
@@ -605,15 +771,8 @@ pub(crate) fn handle_battle_input(
             // Passer en mode "attente du serveur"
             if let Some(ref mut battle) = data.battle_state {
                 battle.phase = BattlePhase::Executing;
-                battle.current_message =
-                    Some(monster_battle_core::battle::BattleMessage {
-                        text: "En attente de l'adversaire...".to_string(),
-                        style: MessageStyle::Info,
-                        player_hp: None,
-                        opponent_hp: None,
-                        anim_type: None,
-                    });
-                battle.message_counter += 1;
+                battle.current_message = None;
+                battle.message_queue.clear();
             }
             // Rebuild l'UI
             for entity in &screen_entities {
@@ -630,17 +789,10 @@ pub(crate) fn handle_battle_input(
                     let _ = tx.try_send(usize::MAX - 1);
                 }
             }
-            // Afficher un message d'attente
+            // Nettoyer le message et attendre PvpNextTurn
             if let Some(ref mut battle) = data.battle_state {
-                battle.current_message =
-                    Some(monster_battle_core::battle::BattleMessage {
-                        text: "En attente de l'adversaire...".to_string(),
-                        style: MessageStyle::Info,
-                        player_hp: None,
-                        opponent_hp: None,
-                        anim_type: None,
-                    });
-                battle.message_counter += 1;
+                battle.current_message = None;
+                battle.message_queue.clear();
             }
             for entity in &screen_entities {
                 commands.entity(entity).despawn_recursive();
@@ -719,5 +871,230 @@ fn apply_battle_results(data: &mut GameData) {
         }
     } else {
         data.message = Some("💀 Défaite... Votre monstre est mort.".to_string());
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Systèmes d'animation de combat
+// ═══════════════════════════════════════════════════════════════════
+
+/// Système qui reconstruit l'UI de combat quand `battle_ui_dirty` est posé
+/// (par polling réseau, animations, etc.).
+pub(crate) fn refresh_battle_ui(
+    mut commands: Commands,
+    mut data: ResMut<GameData>,
+    mut images: ResMut<Assets<Image>>,
+    mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
+    screen_entities: Query<Entity, With<ScreenEntity>>,
+) {
+    if !data.battle_ui_dirty {
+        return;
+    }
+    data.battle_ui_dirty = false;
+
+    // Supprimer l'ancienne UI
+    for entity in &screen_entities {
+        commands.entity(entity).despawn_recursive();
+    }
+
+    // Reconstruire
+    if let Some(ref battle) = data.battle_state {
+        spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas);
+    }
+}
+
+/// Anime les barres de PV et le texte associé (transition fluide vers la valeur cible).
+pub(crate) fn animate_hp_bars(
+    mut data: ResMut<GameData>,
+    time: Res<Time>,
+    mut player_bar: Query<
+        (&mut Node, &mut BackgroundColor),
+        (With<PlayerHpBar>, Without<OpponentHpBar>),
+    >,
+    mut opponent_bar: Query<
+        (&mut Node, &mut BackgroundColor),
+        (With<OpponentHpBar>, Without<PlayerHpBar>),
+    >,
+    mut player_text: Query<
+        (&mut Text, &mut TextColor),
+        (With<PlayerHpText>, Without<OpponentHpText>),
+    >,
+    mut opponent_text: Query<
+        (&mut Text, &mut TextColor),
+        (With<OpponentHpText>, Without<PlayerHpText>),
+    >,
+) {
+    let battle = match data.battle_state.as_mut() {
+        Some(b) => b,
+        None => return,
+    };
+
+    let dt = time.delta_secs();
+    let speed = 60.0; // PV par seconde
+
+    let mut changed = false;
+
+    // Animer display_hp du joueur vers player_target_hp
+    if battle.player.display_hp != battle.player_target_hp {
+        let target = battle.player_target_hp as f32;
+        let current = battle.player.display_hp as f32;
+        let new_hp = if current > target {
+            (current - speed * dt).max(target)
+        } else {
+            (current + speed * dt).min(target)
+        };
+        battle.player.display_hp = new_hp.round() as u32;
+        changed = true;
+    }
+
+    // Animer display_hp de l'adversaire vers opponent_target_hp
+    if battle.opponent.display_hp != battle.opponent_target_hp {
+        let target = battle.opponent_target_hp as f32;
+        let current = battle.opponent.display_hp as f32;
+        let new_hp = if current > target {
+            (current - speed * dt).max(target)
+        } else {
+            (current + speed * dt).min(target)
+        };
+        battle.opponent.display_hp = new_hp.round() as u32;
+        changed = true;
+    }
+
+    if !changed {
+        return;
+    }
+
+    // Mettre à jour la barre du joueur
+    if let Ok((mut node, mut bg)) = player_bar.get_single_mut() {
+        let pct = if battle.player.max_hp > 0 {
+            (battle.player.display_hp as f32 / battle.player.max_hp as f32).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        node.width = Val::Percent(pct * 100.0);
+        *bg = BackgroundColor(common::hp_color(
+            battle.player.display_hp,
+            battle.player.max_hp,
+        ));
+    }
+    if let Ok((mut text, mut color)) = player_text.get_single_mut() {
+        *text = Text::new(format!(
+            "PV {}/{}",
+            battle.player.display_hp, battle.player.max_hp
+        ));
+        *color = TextColor(common::hp_color(
+            battle.player.display_hp,
+            battle.player.max_hp,
+        ));
+    }
+
+    // Mettre à jour la barre de l'adversaire
+    if let Ok((mut node, mut bg)) = opponent_bar.get_single_mut() {
+        let pct = if battle.opponent.max_hp > 0 {
+            (battle.opponent.display_hp as f32 / battle.opponent.max_hp as f32).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        node.width = Val::Percent(pct * 100.0);
+        *bg = BackgroundColor(common::hp_color(
+            battle.opponent.display_hp,
+            battle.opponent.max_hp,
+        ));
+    }
+    if let Ok((mut text, mut color)) = opponent_text.get_single_mut() {
+        *text = Text::new(format!(
+            "PV {}/{}",
+            battle.opponent.display_hp, battle.opponent.max_hp
+        ));
+        *color = TextColor(common::hp_color(
+            battle.opponent.display_hp,
+            battle.opponent.max_hp,
+        ));
+    }
+}
+
+/// Anime le texte « En attente de l'adversaire... » avec des points qui pulsent.
+pub(crate) fn animate_waiting_dots(
+    time: Res<Time>,
+    mut query: Query<(&mut Text, &mut WaitingDots)>,
+) {
+    for (mut text, mut dots) in &mut query {
+        dots.timer.tick(time.delta());
+        if dots.timer.just_finished() {
+            dots.dots = (dots.dots + 1) % 4;
+            let suffix = ".".repeat(dots.dots as usize);
+            *text = Text::new(format!("En attente de l'adversaire{}", suffix));
+        }
+    }
+}
+
+/// Anime les sprites en cas d'attaque ou de hit (secoue / déplace le sprite).
+pub(crate) fn animate_battle_sprites(
+    mut commands: Commands,
+    time: Res<Time>,
+    anim: Option<ResMut<BattleAnimTimer>>,
+    mut player_sprite: Query<&mut Node, (With<PlayerSprite>, Without<OpponentSprite>)>,
+    mut opponent_sprite: Query<&mut Node, (With<OpponentSprite>, Without<PlayerSprite>)>,
+) {
+    let mut anim = match anim {
+        Some(a) => a,
+        None => return,
+    };
+
+    anim.timer.tick(time.delta());
+    let progress = anim.timer.fraction();
+
+    match anim.anim {
+        AnimationType::PlayerAttack => {
+            // Le sprite joueur se déplace vers le haut (vers l'adversaire)
+            if let Ok(mut node) = player_sprite.get_single_mut() {
+                let offset = if progress < 0.5 {
+                    // Phase aller : monter
+                    -20.0 * (progress * 2.0)
+                } else {
+                    // Phase retour : redescendre
+                    -20.0 * (1.0 - (progress - 0.5) * 2.0)
+                };
+                node.top = Val::Px(offset);
+            }
+        }
+        AnimationType::OpponentAttack => {
+            // Le sprite adversaire se déplace vers le bas (vers le joueur)
+            if let Ok(mut node) = opponent_sprite.get_single_mut() {
+                let offset = if progress < 0.5 {
+                    20.0 * (progress * 2.0)
+                } else {
+                    20.0 * (1.0 - (progress - 0.5) * 2.0)
+                };
+                node.top = Val::Px(offset);
+            }
+        }
+        AnimationType::PlayerHit => {
+            // Le sprite joueur tremble horizontalement
+            if let Ok(mut node) = player_sprite.get_single_mut() {
+                let shake = (progress * 24.0 * std::f32::consts::PI).sin() * 6.0 * (1.0 - progress);
+                node.left = Val::Px(shake);
+            }
+        }
+        AnimationType::OpponentHit => {
+            // Le sprite adversaire tremble horizontalement
+            if let Ok(mut node) = opponent_sprite.get_single_mut() {
+                let shake = (progress * 24.0 * std::f32::consts::PI).sin() * 6.0 * (1.0 - progress);
+                node.left = Val::Px(shake);
+            }
+        }
+    }
+
+    if anim.timer.just_finished() {
+        // Remettre les sprites en place
+        if let Ok(mut node) = player_sprite.get_single_mut() {
+            node.top = Val::Auto;
+            node.left = Val::Auto;
+        }
+        if let Ok(mut node) = opponent_sprite.get_single_mut() {
+            node.top = Val::Auto;
+            node.left = Val::Auto;
+        }
+        commands.remove_resource::<BattleAnimTimer>();
     }
 }

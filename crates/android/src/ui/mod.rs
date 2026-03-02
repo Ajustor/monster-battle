@@ -76,7 +76,14 @@ impl Plugin for UiPlugin {
             .add_systems(OnEnter(GameScreen::Battle), battle::spawn_battle_ui)
             .add_systems(
                 Update,
-                battle::handle_battle_input.run_if(in_state(GameScreen::Battle)),
+                (
+                    battle::handle_battle_input,
+                    battle::refresh_battle_ui,
+                    battle::animate_hp_bars,
+                    battle::animate_waiting_dots,
+                    battle::animate_battle_sprites,
+                )
+                    .run_if(in_state(GameScreen::Battle)),
             )
             // ── PvP Searching ───────────────────────────────────
             .add_systems(OnEnter(GameScreen::PvpSearching), pvp::spawn_pvp_searching)

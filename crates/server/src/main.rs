@@ -488,10 +488,33 @@ async fn run_combat_loop(
             }
         }
 
-        let (choice_a, choice_b) = tokio::try_join!(
+        // Utiliser join! au lieu de try_join! pour détecter quelle partie a déconnecté
+        let (res_a, res_b) = tokio::join!(
             wait_for_player_choice(&mut ws_a),
             wait_for_player_choice(&mut ws_b),
-        )?;
+        );
+
+        // Gérer les déconnexions — victoire par forfait pour le joueur restant
+        let (choice_a, choice_b) = match (res_a, res_b) {
+            (Ok(a), Ok(b)) => (a, b),
+            (Err(_), Ok(_)) => {
+                // Joueur A déconnecté → victoire de B
+                println!("⚠️  {} déconnecté — {} gagne par forfait !", name_a, name_b);
+                send_disconnect_victory(&mut ws_b, &battle, false, name_a).await;
+                break;
+            }
+            (Ok(_), Err(_)) => {
+                // Joueur B déconnecté → victoire de A
+                println!("⚠️  {} déconnecté — {} gagne par forfait !", name_b, name_a);
+                send_disconnect_victory(&mut ws_a, &battle, true, name_b).await;
+                break;
+            }
+            (Err(_), Err(_)) => {
+                // Les deux déconnectés — rien à faire
+                println!("⚠️  Les deux joueurs se sont déconnectés !");
+                break;
+            }
+        };
 
         // Gérer les forfeits
         let a_forfeited = matches!(choice_a, PlayerChoice::Forfeit);
@@ -670,10 +693,28 @@ async fn run_combat_loop(
             }
         }
 
-        tokio::try_join!(
+        let (res_a, res_b) = tokio::join!(
             wait_for_player_ready(&mut ws_a),
             wait_for_player_ready(&mut ws_b),
-        )?;
+        );
+
+        match (res_a, res_b) {
+            (Ok(()), Ok(())) => {} // Les deux prêts
+            (Err(_), Ok(_)) => {
+                println!("⚠️  {} déconnecté (ready) — {} gagne par forfait !", name_a, name_b);
+                send_disconnect_victory(&mut ws_b, &battle, false, name_a).await;
+                break;
+            }
+            (Ok(()), Err(_)) => {
+                println!("⚠️  {} déconnecté (ready) — {} gagne par forfait !", name_b, name_a);
+                send_disconnect_victory(&mut ws_a, &battle, true, name_b).await;
+                break;
+            }
+            (Err(_), Err(_)) => {
+                println!("⚠️  Les deux joueurs se sont déconnectés (ready) !");
+                break;
+            }
+        }
 
         // Les deux joueurs sont prêts → envoyer le signal de nouveau tour
         write_message(&mut ws_a, &NetMessage::PvpNextTurn).await?;
@@ -681,4 +722,54 @@ async fn run_combat_loop(
     }
 
     Ok(())
+}
+
+/// Envoie un message de victoire par déconnexion au joueur restant.
+/// `is_winner_a` indique si le gagnant est player_a (true) ou player_b (false).
+async fn send_disconnect_victory(
+    winner_ws: &mut WebSocketStream<TcpStream>,
+    battle: &BattleState,
+    is_winner_a: bool,
+    disconnected_name: &str,
+) {
+    let xp = if is_winner_a {
+        50 + (battle.opponent.level * 5)
+    } else {
+        50 + (battle.player.level * 5)
+    };
+
+    let (winner_hp, opponent_hp) = if is_winner_a {
+        (battle.player.current_hp, battle.opponent.current_hp)
+    } else {
+        (battle.opponent.current_hp, battle.player.current_hp)
+    };
+
+    let disconnect_msg = BattleMessage {
+        text: format!("⚠️ {} s'est déconnecté !", disconnected_name),
+        style: MessageStyle::Info,
+        player_hp: None,
+        opponent_hp: None,
+        anim_type: None,
+    };
+
+    let victory_msg = BattleMessage {
+        text: "🏆 Victoire par forfait !".to_string(),
+        style: MessageStyle::Victory,
+        player_hp: None,
+        opponent_hp: None,
+        anim_type: None,
+    };
+
+    let result = NetMessage::PvpTurnResult {
+        messages: vec![disconnect_msg, victory_msg],
+        player_hp: winner_hp,
+        opponent_hp,
+        battle_over: true,
+        victory: true,
+        xp_gained: xp,
+        loser_died: false,
+        loser_fled: true,
+    };
+
+    let _ = write_message(winner_ws, &result).await;
 }

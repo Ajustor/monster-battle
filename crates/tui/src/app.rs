@@ -48,6 +48,8 @@ enum NetworkEvent {
     },
     /// Les deux joueurs sont prêts — début du prochain tour (PvP).
     PvpNextTurn,
+    /// L'adversaire s'est déconnecté pendant le combat → victoire.
+    OpponentDisconnected,
     /// Monstre du partenaire reçu (reproduction).
     BreedingPartnerReceived(Monster),
     /// Erreur réseau.
@@ -784,7 +786,8 @@ impl App {
                                     return Err(anyhow::anyhow!("{}", e));
                                 }
                                 NetMessage::Disconnect => {
-                                    return Err(anyhow::anyhow!("Adversaire déconnecté."));
+                                    let _ = tx.send(NetworkEvent::OpponentDisconnected);
+                                    return Ok(());
                                 }
                                 _ => {}
                             }
@@ -798,7 +801,13 @@ impl App {
                     }
 
                     // Attendre le résultat du tour du serveur
-                    let msg = client.recv().await?;
+                    let msg = match client.recv().await {
+                        Ok(msg) => msg,
+                        Err(_) => {
+                            let _ = tx.send(NetworkEvent::OpponentDisconnected);
+                            return Ok(());
+                        }
+                    };
                     match msg {
                         NetMessage::PvpTurnResult {
                             messages,
@@ -824,6 +833,10 @@ impl App {
                             if battle_over {
                                 break;
                             }
+                        }
+                        NetMessage::Disconnect => {
+                            let _ = tx.send(NetworkEvent::OpponentDisconnected);
+                            return Ok(());
                         }
                         NetMessage::Error(e) => return Err(anyhow::anyhow!("{}", e)),
                         _ => return Err(anyhow::anyhow!("Réponse inattendue du serveur.")),
@@ -1541,6 +1554,30 @@ impl App {
                     battle.turn += 1;
                     battle.phase = BattlePhase::PlayerChooseAttack;
                     battle.attack_menu_index = 0;
+                }
+            }
+            NetworkEvent::OpponentDisconnected => {
+                // L'adversaire s'est déconnecté — victoire par forfait
+                if let Some(ref mut battle) = self.battle_state {
+                    battle.phase = BattlePhase::Victory;
+                    battle.xp_gained = 50 + (battle.opponent.level * 5);
+                    battle.push_messages(vec![
+                        BattleMessage {
+                            text: "L'adversaire s'est déconnecté !".to_string(),
+                            style: MessageStyle::Info,
+                            player_hp: None,
+                            opponent_hp: None,
+                            anim_type: None,
+                        },
+                        BattleMessage {
+                            text: "🏆 Victoire par forfait !".to_string(),
+                            style: MessageStyle::Victory,
+                            player_hp: None,
+                            opponent_hp: None,
+                            anim_type: None,
+                        },
+                    ]);
+                    battle.advance_message();
                 }
             }
             NetworkEvent::BreedingPartnerReceived(monster) => {

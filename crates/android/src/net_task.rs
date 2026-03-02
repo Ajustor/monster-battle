@@ -44,6 +44,8 @@ pub enum NetworkEvent {
     PvpNextTurn,
     /// Monstre du partenaire reçu (reproduction).
     BreedingPartnerReceived(Monster),
+    /// L'adversaire s'est déconnecté pendant le combat → victoire.
+    OpponentDisconnected,
     /// Erreur réseau.
     NetError(String),
 }
@@ -165,7 +167,8 @@ pub fn start_pvp_task(commands: &mut Commands, monster: Monster, fighter_id: uui
                                     return Err(anyhow::anyhow!("{}", e));
                                 }
                                 NetMessage::Disconnect => {
-                                    return Err(anyhow::anyhow!("Adversaire déconnecté."));
+                                    let _ = tx.send(NetworkEvent::OpponentDisconnected);
+                                    return Ok(());
                                 }
                                 _ => {}
                             }
@@ -179,7 +182,14 @@ pub fn start_pvp_task(commands: &mut Commands, monster: Monster, fighter_id: uui
                     }
 
                     // Attendre le résultat du tour
-                    let msg = client.recv().await?;
+                    let msg = match client.recv().await {
+                        Ok(msg) => msg,
+                        Err(_) => {
+                            // Connexion perdue → adversaire déconnecté
+                            let _ = tx.send(NetworkEvent::OpponentDisconnected);
+                            return Ok(());
+                        }
+                    };
                     match msg {
                         NetMessage::PvpTurnResult {
                             messages,
@@ -205,6 +215,10 @@ pub fn start_pvp_task(commands: &mut Commands, monster: Monster, fighter_id: uui
                             if is_over {
                                 break;
                             }
+                        }
+                        NetMessage::Disconnect => {
+                            let _ = tx.send(NetworkEvent::OpponentDisconnected);
+                            return Ok(());
                         }
                         NetMessage::Error(e) => return Err(anyhow::anyhow!("{}", e)),
                         _ => return Err(anyhow::anyhow!("Réponse inattendue du serveur.")),
@@ -341,6 +355,7 @@ pub fn poll_network_events(
         }
         NetworkEvent::CombatOpponentReceived(opponent_monster) => {
             log::info!("⚔️ Monstre adversaire reçu, lancement du combat PvP");
+            data.battle_ui_dirty = true;
 
             let monsters: Vec<Monster> = match data.storage.list_alive() {
                 Ok(m) if !m.is_empty() => m,
@@ -392,8 +407,6 @@ pub fn poll_network_events(
                         battle.phase = BattlePhase::Defeat;
                         battle.loser_died = loser_died;
                     }
-                    // Nettoyer la tâche réseau (le combat est fini)
-                    // On ne remove pas encore pour laisser le battle_state en place
                 } else {
                     battle.phase = BattlePhase::WaitingForOpponent;
                     battle.attack_menu_index = 0;
@@ -401,6 +414,7 @@ pub fn poll_network_events(
 
                 battle.push_messages(messages);
                 battle.advance_message();
+                data.battle_ui_dirty = true;
             }
         }
         NetworkEvent::PvpNextTurn => {
@@ -411,6 +425,34 @@ pub fn poll_network_events(
                 battle.phase = BattlePhase::PlayerChooseAttack;
                 battle.attack_menu_index = 0;
             }
+            data.battle_ui_dirty = true;
+        }
+        NetworkEvent::OpponentDisconnected => {
+            use monster_battle_core::battle::{BattleMessage, BattlePhase, MessageStyle};
+            log::info!("Adversaire déconnecté → victoire !");
+
+            if let Some(ref mut battle) = data.battle_state {
+                battle.phase = BattlePhase::Victory;
+                battle.xp_gained = 50 + (battle.opponent.level * 5);
+                battle.push_messages(vec![
+                    BattleMessage {
+                        text: "L'adversaire s'est déconnecté !".to_string(),
+                        style: MessageStyle::Info,
+                        player_hp: None,
+                        opponent_hp: None,
+                        anim_type: None,
+                    },
+                    BattleMessage {
+                        text: "🏆 Victoire par forfait !".to_string(),
+                        style: MessageStyle::Victory,
+                        player_hp: None,
+                        opponent_hp: None,
+                        anim_type: None,
+                    },
+                ]);
+                battle.advance_message();
+            }
+            data.battle_ui_dirty = true;
         }
         NetworkEvent::BreedingPartnerReceived(partner) => {
             log::info!("🧬 Partenaire de reproduction reçu");
