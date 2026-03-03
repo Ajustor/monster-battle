@@ -135,6 +135,7 @@ fn select_monster_style(target: &SelectMonsterTarget) -> (&'static str, Color) {
         SelectMonsterTarget::Training => (" ⚔️  Choisir un monstre — Entraînement ", Color::Yellow),
         SelectMonsterTarget::CombatPvP => (" 🗡️  Choisir un monstre — Combat PvP ", Color::Red),
         SelectMonsterTarget::Breeding => (" 🧬 Choisir un monstre — Reproduction ", Color::Magenta),
+        SelectMonsterTarget::Minigame => (" 🎮 Choisir un monstre — Mini-jeux ", Color::Cyan),
     }
 }
 

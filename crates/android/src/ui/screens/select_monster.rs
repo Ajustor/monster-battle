@@ -33,6 +33,7 @@ pub(crate) fn spawn_select_monster(
         Some(SelectMonsterTarget::Training) => "Choisir un monstre -- Entrainement",
         Some(SelectMonsterTarget::CombatPvP) => "Choisir un monstre -- Combat PvP",
         Some(SelectMonsterTarget::Breeding) => "Choisir un monstre -- Reproduction",
+        Some(SelectMonsterTarget::Minigame) => "Choisir un monstre -- Mini-jeux",
         None => "Choisir un monstre",
     };
 
@@ -286,6 +287,19 @@ fn dispatch_selection(
         }
         Some(SelectMonsterTarget::Breeding) => {
             next_state.set(GameScreen::BreedingSearching);
+        }
+        Some(SelectMonsterTarget::Minigame) => {
+            // Stocker le monstre sélectionné et aller à la sélection de difficulté
+            let monsters = data.storage.list_alive().unwrap_or_default();
+            let idx = data
+                .monster_select_index
+                .min(monsters.len().saturating_sub(1));
+            if let Some(m) = monsters.get(idx) {
+                data.minigame_monster_id = Some(m.id);
+                data.minigame_monster_name = Some(m.name.clone());
+            }
+            data.menu_index = 0;
+            next_state.set(GameScreen::MinigameSelect);
         }
         None => {
             // Fallback → entraînement

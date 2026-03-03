@@ -4,6 +4,7 @@ pub mod cemetery;
 pub mod common;
 pub mod help;
 pub mod main_menu;
+pub mod minigame;
 pub mod monster_list;
 pub mod naming;
 pub mod new_monster;
@@ -23,6 +24,8 @@ pub enum SelectMonsterTarget {
     CombatPvP,
     /// Reproduction.
     Breeding,
+    /// Mini-jeu.
+    Minigame,
 }
 
 /// Les différents écrans de l'application.
@@ -54,6 +57,10 @@ pub enum Screen {
     Cemetery,
     /// Écran d'aide / tutoriel.
     Help,
+    /// Sélection de la difficulté du mini-jeu.
+    MinigameSelect,
+    /// Partie de morpion en cours.
+    MinigamePlay,
 }
 
 /// Point d'entrée du rendu : dispatche vers l'écran courant.
@@ -78,6 +85,13 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Screen::NamingMonster { type_index } => naming::draw(frame, chunks[1], app, *type_index),
         Screen::Cemetery => cemetery::draw(frame, chunks[1], app),
         Screen::Help => help::draw(frame, chunks[1], app),
+        Screen::MinigameSelect => minigame::draw_select_difficulty(frame, chunks[1], app),
+        Screen::MinigamePlay => {
+            if let Some(ref game) = app.tictactoe {
+                let name = app.minigame_monster_name.as_deref().unwrap_or("?");
+                minigame::draw_game(frame, chunks[1], game, name);
+            }
+        }
         Screen::Battle => battle::draw(frame, chunks[1], app),
         Screen::SelectMonster(target) => common::draw_select_monster(frame, chunks[1], app, target),
         Screen::Training { wild } => training::draw_select(frame, chunks[1], app, *wild),

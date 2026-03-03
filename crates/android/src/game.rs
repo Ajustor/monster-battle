@@ -7,6 +7,7 @@ use bevy::state::state::{OnEnter, OnExit, States};
 
 use monster_battle_core::Monster;
 use monster_battle_core::battle::BattleState;
+use monster_battle_core::minigame::tictactoe::TicTacToe;
 use monster_battle_storage::{LocalStorage, MonsterStorage};
 
 // ═══════════════════════════════════════════════════════════════════
@@ -43,6 +44,10 @@ pub enum GameScreen {
     Cemetery,
     /// Écran d'aide.
     Help,
+    /// Sélection de la difficulté du mini-jeu.
+    MinigameSelect,
+    /// Partie de morpion en cours.
+    MinigamePlay,
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -55,6 +60,7 @@ pub enum SelectMonsterTarget {
     Training,
     CombatPvP,
     Breeding,
+    Minigame,
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -86,6 +92,12 @@ pub struct GameData {
     pub scroll_offset: usize,
     /// Drapeau signalant que l'UI de combat doit être reconstruite (polling réseau).
     pub battle_ui_dirty: bool,
+    /// État de la partie de morpion en cours.
+    pub tictactoe: Option<TicTacToe>,
+    /// UUID du monstre participant au mini-jeu.
+    pub minigame_monster_id: Option<uuid::Uuid>,
+    /// Nom du monstre participant au mini-jeu.
+    pub minigame_monster_name: Option<String>,
 }
 
 impl GameData {
@@ -109,6 +121,9 @@ impl GameData {
             breed_result: None,
             scroll_offset: 0,
             battle_ui_dirty: false,
+            tictactoe: None,
+            minigame_monster_id: None,
+            minigame_monster_name: None,
         }
     }
 
@@ -164,6 +179,14 @@ impl Plugin for GamePlugin {
             .add_systems(
                 OnEnter(GameScreen::BreedingResult),
                 on_enter_breeding_result,
+            )
+            .add_systems(
+                OnEnter(GameScreen::MinigameSelect),
+                on_enter_minigame_select,
+            )
+            .add_systems(
+                OnEnter(GameScreen::MinigamePlay),
+                on_enter_minigame_play,
             );
     }
 }
@@ -286,6 +309,14 @@ fn on_enter_breeding_naming(mut data: ResMut<GameData>) {
 
 fn on_enter_breeding_result(mut data: ResMut<GameData>) {
     data.scroll_offset = 0;
+}
+
+fn on_enter_minigame_select(mut data: ResMut<GameData>) {
+    data.menu_index = 0;
+}
+
+fn on_enter_minigame_play(_data: ResMut<GameData>) {
+    // Le tictactoe est déjà configuré avant la transition.
 }
 
 /// Active le clavier système pour les écrans de saisie de texte.

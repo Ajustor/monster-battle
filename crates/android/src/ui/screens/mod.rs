@@ -5,6 +5,7 @@ pub mod breeding;
 pub mod cemetery;
 pub mod help;
 pub mod main_menu;
+pub mod minigame;
 pub mod monster_list;
 pub mod naming;
 pub mod new_monster;
