@@ -3,8 +3,8 @@
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
-use monster_battle_core::minigame::tictactoe::{Cell, Difficulty, TicTacToe};
 use monster_battle_core::minigame::apply_reward;
+use monster_battle_core::minigame::tictactoe::{Cell, Difficulty, TicTacToe};
 use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
@@ -254,7 +254,10 @@ pub(crate) fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>) {
         .with_children(|parent| {
             // Titre
             parent.spawn((
-                Text::new(format!("Morpion ({}) -- {}", difficulty_label, monster_name)),
+                Text::new(format!(
+                    "Morpion ({}) -- {}",
+                    difficulty_label, monster_name
+                )),
                 TextFont {
                     font_size: fonts::HEADING,
                     ..default()

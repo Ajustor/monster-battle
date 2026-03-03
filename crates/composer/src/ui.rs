@@ -46,10 +46,10 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),              // header
-            Constraint::Min(8),                 // body (editor + voice list)
+            Constraint::Length(3),               // header
+            Constraint::Min(8),                  // body (editor + voice list)
             Constraint::Length(timeline_height), // timeline
-            Constraint::Length(3),              // status bar
+            Constraint::Length(3),               // status bar
         ])
         .split(size);
 
@@ -222,7 +222,7 @@ fn draw_editor(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(1), // amplitude
             Constraint::Length(1), // is_drum
             Constraint::Length(1), // spacer
-            Constraint::Min(3),   // pattern preview (single voice)
+            Constraint::Min(3),    // pattern preview (single voice)
         ])
         .split(inner);
 
@@ -339,12 +339,7 @@ fn field_style(focused: bool) -> Style {
 
 // ── Pattern preview (single voice) ──────────────────────────────
 
-fn draw_pattern_vis(
-    frame: &mut Frame,
-    voice: &VoiceDef,
-    playback_pos: Option<f64>,
-    area: Rect,
-) {
+fn draw_pattern_vis(frame: &mut Frame, voice: &VoiceDef, playback_pos: Option<f64>, area: Rect) {
     let block = Block::default()
         .title(" Aperçu (cycle 0) ")
         .borders(Borders::TOP)

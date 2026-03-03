@@ -544,8 +544,7 @@ impl App {
                             }
                             SelectMonsterTarget::Minigame => {
                                 // Stocker le monstre sélectionné et aller à la sélection de difficulté
-                                let monsters =
-                                    self.storage.list_alive().unwrap_or_default();
+                                let monsters = self.storage.list_alive().unwrap_or_default();
                                 let idx = self
                                     .monster_select_index
                                     .min(monsters.len().saturating_sub(1));
@@ -1104,7 +1103,11 @@ impl App {
                 let levels = m.gain_xp(reward.xp);
                 let mut msg = format!("{} — {}", game.result_label(), reward.summary());
                 if levels > 0 {
-                    msg.push_str(&format!(" +{} niveau{} !", levels, if levels > 1 { "x" } else { "" }));
+                    msg.push_str(&format!(
+                        " +{} niveau{} !",
+                        levels,
+                        if levels > 1 { "x" } else { "" }
+                    ));
                 }
                 self.message = Some(msg);
                 let _ = self.storage.save(m);

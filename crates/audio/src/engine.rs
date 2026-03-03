@@ -63,7 +63,8 @@ impl AudioEngine {
     pub fn play_track(&self, track: &Track) {
         let mut inner = self.inner.lock().unwrap();
 
-        if inner.current_track.as_deref() == Some(track.name.as_str()) && !inner.music_sink.empty() {
+        if inner.current_track.as_deref() == Some(track.name.as_str()) && !inner.music_sink.empty()
+        {
             return; // already playing (or paused with the same track)
         }
 

@@ -184,10 +184,7 @@ impl Plugin for GamePlugin {
                 OnEnter(GameScreen::MinigameSelect),
                 on_enter_minigame_select,
             )
-            .add_systems(
-                OnEnter(GameScreen::MinigamePlay),
-                on_enter_minigame_play,
-            );
+            .add_systems(OnEnter(GameScreen::MinigamePlay), on_enter_minigame_play);
     }
 }
 

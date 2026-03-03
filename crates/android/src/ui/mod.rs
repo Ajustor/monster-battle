@@ -145,8 +145,7 @@ impl Plugin for UiPlugin {
             )
             .add_systems(
                 Update,
-                minigame::handle_minigame_select_input
-                    .run_if(in_state(GameScreen::MinigameSelect)),
+                minigame::handle_minigame_select_input.run_if(in_state(GameScreen::MinigameSelect)),
             )
             // ── Mini-jeu : partie ──────────────────────────────
             .add_systems(
@@ -155,8 +154,7 @@ impl Plugin for UiPlugin {
             )
             .add_systems(
                 Update,
-                minigame::handle_minigame_play_input
-                    .run_if(in_state(GameScreen::MinigamePlay)),
+                minigame::handle_minigame_play_input.run_if(in_state(GameScreen::MinigamePlay)),
             )
             // ── Réseau (polling global) ─────────────────────────
             .add_systems(Update, crate::net_task::poll_network_events)
