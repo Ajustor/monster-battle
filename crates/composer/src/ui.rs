@@ -1,4 +1,10 @@
 //! UI rendering for the composer TUI.
+//!
+//! Features:
+//! - Header: track name, BPM, voice count, play indicator
+//! - Body: voice list (left) + editor panel (right)
+//! - Timeline: multi‑lane overview of all voices with playback cursor
+//! - Status bar: editing hints + messages
 
 use ratatui::{
     Frame,
@@ -9,6 +15,7 @@ use ratatui::{
 };
 
 use monster_battle_audio::pattern;
+use monster_battle_audio::track_def::VoiceDef;
 
 use crate::app::{App, EditorField, Focus, HeaderField};
 
@@ -19,6 +26,7 @@ const FOCUSED_BORDER: Color = Color::Yellow;
 const DIM: Color = Color::DarkGray;
 const PLAYING: Color = Color::Green;
 const DRUM_COLOR: Color = Color::Magenta;
+const CURSOR_COLOR: Color = Color::White;
 
 fn border_style(focused: bool) -> Style {
     if focused {
@@ -33,19 +41,29 @@ fn border_style(focused: bool) -> Style {
 pub fn draw(frame: &mut Frame, app: &App) {
     let size = frame.area();
 
-    // Top‑level layout: header (3) / body / status bar (3)
+    // Top‑level layout: header (3) / body / timeline / status bar (3)
+    let timeline_height = timeline_lanes_height(app);
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
-            Constraint::Min(10),
-            Constraint::Length(3),
+            Constraint::Length(3),              // header
+            Constraint::Min(8),                 // body (editor + voice list)
+            Constraint::Length(timeline_height), // timeline
+            Constraint::Length(3),              // status bar
         ])
         .split(size);
 
     draw_header(frame, app, outer[0]);
     draw_body(frame, app, outer[1]);
-    draw_status_bar(frame, app, outer[2]);
+    draw_timeline(frame, app, outer[2]);
+    draw_status_bar(frame, app, outer[3]);
+}
+
+/// Compute the height needed for the timeline panel.
+fn timeline_lanes_height(app: &App) -> u16 {
+    let lanes = app.project.voices.len() as u16;
+    // 2 for borders + 1 header line + 1 per voice, min 4
+    (lanes + 3).max(4).min(14)
 }
 
 // ── Header: track name + BPM ────────────────────────────────────
@@ -192,7 +210,7 @@ fn draw_editor(frame: &mut Frame, app: &App, area: Rect) {
         return;
     };
 
-    // Split editor area: fields + pattern visualiser
+    // Split editor area: fields + pattern preview (for selected voice)
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -204,29 +222,51 @@ fn draw_editor(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(1), // amplitude
             Constraint::Length(1), // is_drum
             Constraint::Length(1), // spacer
-            Constraint::Min(3),    // pattern visualiser
+            Constraint::Min(3),   // pattern preview (single voice)
         ])
         .split(inner);
 
-    // Pattern field
+    // Pattern field (with text cursor when editing)
     let pat_focused = focused && app.editor_field == EditorField::Pattern;
-    let pat_text = if app.editing && pat_focused {
-        format!(" {}", app.input_buf)
-    } else {
-        format!(" {}", voice.pattern)
-    };
     let pat_style = field_style(pat_focused);
-    let pat_label = Line::from(vec![
-        Span::styled(" Pattern: ", Style::default().fg(DIM)),
-        Span::styled(pat_text, pat_style),
-    ]);
-    let pat_block = Block::default()
-        .borders(Borders::BOTTOM)
-        .border_style(Style::default().fg(DIM));
-    let pat = Paragraph::new(pat_label)
-        .block(pat_block)
-        .wrap(Wrap { trim: false });
-    frame.render_widget(pat, rows[0]);
+
+    if app.editing && pat_focused {
+        // Show text cursor inside the pattern field
+        let before: String = app.input_buf[..app.cursor].to_string();
+        let cursor_char = if app.blink_on { "│" } else { " " };
+        let after: String = app.input_buf[app.cursor..].to_string();
+
+        let pat_label = Line::from(vec![
+            Span::styled(" Pattern: ", Style::default().fg(DIM)),
+            Span::styled(format!(" {}", before), pat_style),
+            Span::styled(
+                cursor_char,
+                Style::default()
+                    .fg(CURSOR_COLOR)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(after, pat_style),
+        ]);
+        let pat_block = Block::default()
+            .borders(Borders::BOTTOM)
+            .border_style(Style::default().fg(DIM));
+        let pat = Paragraph::new(pat_label)
+            .block(pat_block)
+            .wrap(Wrap { trim: false });
+        frame.render_widget(pat, rows[0]);
+    } else {
+        let pat_label = Line::from(vec![
+            Span::styled(" Pattern: ", Style::default().fg(DIM)),
+            Span::styled(format!(" {}", voice.pattern), pat_style),
+        ]);
+        let pat_block = Block::default()
+            .borders(Borders::BOTTOM)
+            .border_style(Style::default().fg(DIM));
+        let pat = Paragraph::new(pat_label)
+            .block(pat_block)
+            .wrap(Wrap { trim: false });
+        frame.render_widget(pat, rows[0]);
+    }
 
     // Waveform field
     let wf_focused = focused && app.editor_field == EditorField::Waveform;
@@ -239,23 +279,40 @@ fn draw_editor(frame: &mut Frame, app: &App, area: Rect) {
     ]);
     frame.render_widget(Paragraph::new(wf_line), rows[1]);
 
-    // Amplitude field
+    // Amplitude field (with text cursor when editing)
     let amp_focused = focused && app.editor_field == EditorField::Amplitude;
-    let amp_text = if app.editing && amp_focused {
-        app.input_buf.clone()
-    } else {
-        format!("{:.2}", voice.amplitude)
-    };
     let bar_width = (rows[2].width as f32 * 0.4) as usize;
     let filled = (voice.amplitude * bar_width as f32) as usize;
     let bar: String = "█".repeat(filled) + &"░".repeat(bar_width.saturating_sub(filled));
-    let amp_line = Line::from(vec![
-        Span::styled(" Amplitude: ", Style::default().fg(DIM)),
-        Span::styled(amp_text, field_style(amp_focused)),
-        Span::raw("  "),
-        Span::styled(bar, Style::default().fg(ACCENT)),
-    ]);
-    frame.render_widget(Paragraph::new(amp_line), rows[2]);
+
+    if app.editing && amp_focused {
+        let before: String = app.input_buf[..app.cursor].to_string();
+        let cursor_char = if app.blink_on { "│" } else { " " };
+        let after: String = app.input_buf[app.cursor..].to_string();
+        let amp_line = Line::from(vec![
+            Span::styled(" Amplitude: ", Style::default().fg(DIM)),
+            Span::styled(before, field_style(true)),
+            Span::styled(
+                cursor_char,
+                Style::default()
+                    .fg(CURSOR_COLOR)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(after, field_style(true)),
+            Span::raw("  "),
+            Span::styled(bar, Style::default().fg(ACCENT)),
+        ]);
+        frame.render_widget(Paragraph::new(amp_line), rows[2]);
+    } else {
+        let amp_text = format!("{:.2}", voice.amplitude);
+        let amp_line = Line::from(vec![
+            Span::styled(" Amplitude: ", Style::default().fg(DIM)),
+            Span::styled(amp_text, field_style(amp_focused)),
+            Span::raw("  "),
+            Span::styled(bar, Style::default().fg(ACCENT)),
+        ]);
+        frame.render_widget(Paragraph::new(amp_line), rows[2]);
+    }
 
     // IsDrum field
     let drum_focused = focused && app.editor_field == EditorField::IsDrum;
@@ -266,8 +323,8 @@ fn draw_editor(frame: &mut Frame, app: &App, area: Rect) {
     ]);
     frame.render_widget(Paragraph::new(drum_line), rows[3]);
 
-    // Pattern visualiser
-    draw_pattern_vis(frame, voice, rows[5]);
+    // Single‑voice pattern preview
+    draw_pattern_vis(frame, voice, app.playback_position(), rows[5]);
 }
 
 fn field_style(focused: bool) -> Style {
@@ -280,9 +337,14 @@ fn field_style(focused: bool) -> Style {
     }
 }
 
-// ── Pattern visualiser ──────────────────────────────────────────
+// ── Pattern preview (single voice) ──────────────────────────────
 
-fn draw_pattern_vis(frame: &mut Frame, voice: &crate::project::VoiceDef, area: Rect) {
+fn draw_pattern_vis(
+    frame: &mut Frame,
+    voice: &VoiceDef,
+    playback_pos: Option<f64>,
+    area: Rect,
+) {
     let block = Block::default()
         .title(" Aperçu (cycle 0) ")
         .borders(Borders::TOP)
@@ -293,6 +355,10 @@ fn draw_pattern_vis(frame: &mut Frame, voice: &crate::project::VoiceDef, area: R
 
     let pat = pattern::parse(&voice.pattern);
     let events = pat.query(0);
+    let width = inner.width as usize;
+    if width == 0 {
+        return;
+    }
 
     if events.is_empty() {
         let msg = Paragraph::new("  (silence)").style(Style::default().fg(DIM));
@@ -300,31 +366,140 @@ fn draw_pattern_vis(frame: &mut Frame, voice: &crate::project::VoiceDef, area: R
         return;
     }
 
-    let width = inner.width as usize;
-    if width == 0 {
-        return;
-    }
-
-    // Build a text‑based step sequencer visualisation.
-    let mut grid = vec![' '; width];
     let color = waveform_color(&voice.waveform);
 
+    // Build grid with events
+    let mut grid: Vec<(char, Color)> = vec![('░', DIM); width];
     for ev in &events {
         let start_col = (ev.start * width as f64) as usize;
         let end_col = ((ev.start + ev.duration) * width as f64).ceil() as usize;
         let end_col = end_col.min(width);
-
         for col in start_col..end_col {
-            grid[col] = '█';
+            grid[col] = ('█', color);
         }
     }
 
-    let grid_str: String = grid.into_iter().collect();
-    let vis = Paragraph::new(Line::from(Span::styled(
-        grid_str,
-        Style::default().fg(color),
-    )));
+    // Overlay playback cursor
+    if let Some(pos) = playback_pos {
+        let cursor_col = (pos * width as f64) as usize;
+        if cursor_col < width {
+            grid[cursor_col] = ('▎', CURSOR_COLOR);
+        }
+    }
+
+    let spans: Vec<Span> = grid
+        .into_iter()
+        .map(|(ch, c)| Span::styled(ch.to_string(), Style::default().fg(c)))
+        .collect();
+    let vis = Paragraph::new(Line::from(spans));
     frame.render_widget(vis, inner);
+}
+
+// ── Timeline: multi‑lane overview ───────────────────────────────
+
+fn draw_timeline(frame: &mut Frame, app: &App, area: Rect) {
+    let block = Block::default()
+        .title(" 🎼 Timeline ")
+        .borders(Borders::ALL)
+        .border_style(border_style(false));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if app.project.voices.is_empty() || inner.width < 6 || inner.height < 1 {
+        return;
+    }
+
+    let width = inner.width as usize;
+    let playback_pos = app.playback_position();
+
+    // Draw one lane per voice (up to available height)
+    let max_lanes = inner.height as usize;
+    let label_width: usize = 4; // "V1 " + separator
+    let lane_width = width.saturating_sub(label_width + 1);
+
+    if lane_width == 0 {
+        return;
+    }
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Ruler line (beat markers)
+    let mut ruler_spans = vec![Span::styled(
+        format!("{:<width$}", "", width = label_width + 1),
+        Style::default().fg(DIM),
+    )];
+    for col in 0..lane_width {
+        let frac = col as f64 / lane_width as f64;
+        let beat = (frac * 4.0) as usize;
+        let is_beat_boundary = col == (beat as f64 * lane_width as f64 / 4.0) as usize;
+        if is_beat_boundary && beat < 4 {
+            ruler_spans.push(Span::styled(
+                format!("{}", beat + 1),
+                Style::default().fg(DIM),
+            ));
+        } else {
+            ruler_spans.push(Span::styled("·", Style::default().fg(Color::Black)));
+        }
+    }
+    lines.push(Line::from(ruler_spans));
+
+    // Voice lanes
+    for (i, voice) in app.project.voices.iter().enumerate() {
+        if lines.len() >= max_lanes {
+            break;
+        }
+
+        let is_selected = i == app.voice_index;
+        let color = waveform_color(&voice.waveform);
+        let pat = pattern::parse(&voice.pattern);
+        let events = pat.query(0);
+
+        // Build the lane grid
+        let mut grid: Vec<(char, Color)> = vec![('·', Color::Black); lane_width];
+        for ev in &events {
+            let start_col = (ev.start * lane_width as f64) as usize;
+            let end_col = ((ev.start + ev.duration) * lane_width as f64).ceil() as usize;
+            let end_col = end_col.min(lane_width);
+            for col in start_col..end_col {
+                if voice.is_drum {
+                    grid[col] = ('▮', DRUM_COLOR);
+                } else {
+                    grid[col] = ('█', color);
+                }
+            }
+        }
+
+        // Overlay playback cursor on this lane
+        if let Some(pos) = playback_pos {
+            let cursor_col = (pos * lane_width as f64) as usize;
+            if cursor_col < lane_width {
+                grid[cursor_col] = ('▎', CURSOR_COLOR);
+            }
+        }
+
+        // Voice label
+        let label_style = if is_selected {
+            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(DIM)
+        };
+
+        let mut spans = vec![
+            Span::styled(format!("V{:<2}", i + 1), label_style),
+            Span::styled("│", Style::default().fg(DIM)),
+        ];
+
+        // Lane cells
+        for (ch, c) in &grid {
+            spans.push(Span::styled(ch.to_string(), Style::default().fg(*c)));
+        }
+
+        lines.push(Line::from(spans));
+    }
+
+    let para = Paragraph::new(lines);
+    frame.render_widget(para, inner);
 }
 
 // ── Status bar ──────────────────────────────────────────────────

@@ -39,7 +39,9 @@
 pub mod engine;
 pub mod pattern;
 pub mod synth;
+pub mod track_def;
 pub mod tracks;
 
 pub use engine::AudioEngine;
+pub use track_def::TrackDef;
 pub use tracks::Sfx;

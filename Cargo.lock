@@ -2903,6 +2903,8 @@ version = "0.6.2"
 dependencies = [
  "rand 0.8.5",
  "rodio",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

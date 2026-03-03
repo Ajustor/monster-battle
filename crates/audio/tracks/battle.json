@@ -1,0 +1,30 @@
+{
+  "name": "battle",
+  "bpm": 155.0,
+  "voices": [
+    {
+      "pattern": "<[a4 a4 [c5 d5] a4] [g4 g4 [bb4 c5] g4] [f4 f4 [a4 bb4] f4] [g4 ~ [bb4 c5] d5]>",
+      "waveform": "sawtooth",
+      "amplitude": 0.18,
+      "is_drum": false
+    },
+    {
+      "pattern": "<[a2 ~ a2 ~] [g2 ~ g2 ~] [f2 ~ f2 ~] [g2 ~ g2 a2]>",
+      "waveform": "square",
+      "amplitude": 0.16,
+      "is_drum": false
+    },
+    {
+      "pattern": "<[a3,e4] ~ [a3,e4] ~ [g3,d4] ~ [g3,d4] ~ [f3,c4] ~ [f3,c4] ~ [g3,d4] ~ [g3,d4] ~>",
+      "waveform": "square",
+      "amplitude": 0.10,
+      "is_drum": false
+    },
+    {
+      "pattern": "[x ~ x ~]*2",
+      "waveform": "sine",
+      "amplitude": 0.18,
+      "is_drum": true
+    }
+  ]
+}

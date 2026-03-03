@@ -1,0 +1,30 @@
+{
+  "name": "cemetery",
+  "bpm": 68.0,
+  "voices": [
+    {
+      "pattern": "<[b4 ~ a4 ~] [g4 ~ f#4 ~] [e4 ~ d4 ~] [c4 ~ b3 ~]>",
+      "waveform": "sine",
+      "amplitude": 0.14,
+      "is_drum": false
+    },
+    {
+      "pattern": "<[~ e5 ~ d5] [~ c5 ~ b4] [~ a4 ~ g4] [~ f#4 ~ e4]>",
+      "waveform": "triangle",
+      "amplitude": 0.07,
+      "is_drum": false
+    },
+    {
+      "pattern": "<[e2 ~ ~ ~] [c2 ~ ~ ~] [a1 ~ ~ ~] [b1 ~ ~ ~]>",
+      "waveform": "triangle",
+      "amplitude": 0.10,
+      "is_drum": false
+    },
+    {
+      "pattern": "<[e3,g3,b3] [c3,e3,g3] [a2,c3,e3] [b2,d3,f#3]>",
+      "waveform": "square",
+      "amplitude": 0.04,
+      "is_drum": false
+    }
+  ]
+}
