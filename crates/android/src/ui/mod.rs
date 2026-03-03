@@ -138,6 +138,26 @@ impl Plugin for UiPlugin {
                 Update,
                 help::handle_help_input.run_if(in_state(GameScreen::Help)),
             )
+            // ── Mini-jeu : sélection difficulté ────────────────
+            .add_systems(
+                OnEnter(GameScreen::MinigameSelect),
+                minigame::spawn_minigame_select,
+            )
+            .add_systems(
+                Update,
+                minigame::handle_minigame_select_input
+                    .run_if(in_state(GameScreen::MinigameSelect)),
+            )
+            // ── Mini-jeu : partie ──────────────────────────────
+            .add_systems(
+                OnEnter(GameScreen::MinigamePlay),
+                minigame::spawn_minigame_play,
+            )
+            .add_systems(
+                Update,
+                minigame::handle_minigame_play_input
+                    .run_if(in_state(GameScreen::MinigamePlay)),
+            )
             // ── Réseau (polling global) ─────────────────────────
             .add_systems(Update, crate::net_task::poll_network_events)
             // ── Scroll tactile (global) ─────────────────────────

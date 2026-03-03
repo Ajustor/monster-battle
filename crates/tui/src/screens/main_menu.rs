@@ -20,6 +20,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         items.push("⚔️  Entraînement");
         items.push("🗡️  Combat PvP");
         items.push("🧬 Reproduction");
+        items.push("🎮 Mini-jeux");
     }
     items.push("💀 Cimetière");
     items.push("❓ Aide");

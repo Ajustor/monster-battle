@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 use monster_battle_core::Monster;
 use monster_battle_core::battle::{BattleMessage, BattlePhase, BattleState, MessageStyle};
+use monster_battle_core::minigame::tictactoe::TicTacToe;
 use monster_battle_network::{
     GameClient, NetAction, NetMessage, check_server_health, check_server_version,
 };
@@ -123,6 +124,14 @@ pub struct App {
 
     /// Index de sélection du monstre (écran SelectMonster).
     pub monster_select_index: usize,
+
+    // --- Mini-jeu ---
+    /// État de la partie de morpion en cours.
+    pub tictactoe: Option<TicTacToe>,
+    /// UUID du monstre participant au mini-jeu.
+    pub minigame_monster_id: Option<Uuid>,
+    /// Nom du monstre (pour affichage).
+    pub minigame_monster_name: Option<String>,
 }
 
 impl App {
@@ -160,6 +169,9 @@ impl App {
             net_task: None,
             pvp_attack_tx: None,
             monster_select_index: 0,
+            tictactoe: None,
+            minigame_monster_id: None,
+            minigame_monster_name: None,
         })
     }
 
@@ -421,6 +433,82 @@ impl App {
             return;
         }
 
+        // ── Mini-jeu : sélection de la difficulté ──
+        if self.current_screen == Screen::MinigameSelect {
+            match code {
+                KeyCode::Up => {
+                    if self.menu_index > 0 {
+                        self.menu_index -= 1;
+                        crate::audio::sfx_menu_move();
+                    }
+                }
+                KeyCode::Down => {
+                    self.menu_index += 1;
+                    crate::audio::sfx_menu_move();
+                }
+                KeyCode::Enter => {
+                    use monster_battle_core::minigame::tictactoe::Difficulty;
+                    let diffs = Difficulty::all();
+                    let d = diffs[self.menu_index % diffs.len()];
+                    self.tictactoe = Some(TicTacToe::new(d));
+                    self.current_screen = Screen::MinigamePlay;
+                    self.menu_index = 0;
+                    crate::audio::sfx_menu_select();
+                }
+                KeyCode::Esc => {
+                    self.current_screen = Screen::MainMenu;
+                    self.menu_index = 0;
+                    self.tictactoe = None;
+                    self.minigame_monster_id = None;
+                    self.minigame_monster_name = None;
+                    self.message = None;
+                    crate::audio::play_title_music();
+                }
+                _ => {}
+            }
+            return;
+        }
+
+        // ── Mini-jeu : partie de morpion ──
+        if self.current_screen == Screen::MinigamePlay {
+            if let Some(ref mut game) = self.tictactoe {
+                if game.is_over() {
+                    // Partie terminée → Enter pour récolter et revenir
+                    if code == KeyCode::Enter || code == KeyCode::Esc {
+                        self.apply_minigame_reward();
+                        self.tictactoe = None;
+                        self.minigame_monster_id = None;
+                        self.minigame_monster_name = None;
+                        self.current_screen = Screen::MainMenu;
+                        self.menu_index = 0;
+                        crate::audio::play_title_music();
+                    }
+                } else {
+                    match code {
+                        KeyCode::Up => game.move_cursor_up(),
+                        KeyCode::Down => game.move_cursor_down(),
+                        KeyCode::Left => game.move_cursor_left(),
+                        KeyCode::Right => game.move_cursor_right(),
+                        KeyCode::Enter => {
+                            game.play();
+                        }
+                        KeyCode::Esc => {
+                            // Abandon = défaite
+                            self.tictactoe = None;
+                            self.minigame_monster_id = None;
+                            self.minigame_monster_name = None;
+                            self.current_screen = Screen::MainMenu;
+                            self.menu_index = 0;
+                            self.message = None;
+                            crate::audio::play_title_music();
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            return;
+        }
+
         // Sélection du monstre (Entraînement, Combat PvP, Reproduction)
         if let Screen::SelectMonster(ref target) = self.current_screen {
             let target = target.clone();
@@ -453,6 +541,20 @@ impl App {
                             SelectMonsterTarget::Breeding => {
                                 crate::audio::play_breeding_music();
                                 self.run_breeding();
+                            }
+                            SelectMonsterTarget::Minigame => {
+                                // Stocker le monstre sélectionné et aller à la sélection de difficulté
+                                let monsters =
+                                    self.storage.list_alive().unwrap_or_default();
+                                let idx = self
+                                    .monster_select_index
+                                    .min(monsters.len().saturating_sub(1));
+                                if let Some(m) = monsters.get(idx) {
+                                    self.minigame_monster_id = Some(m.id);
+                                    self.minigame_monster_name = Some(m.name.clone());
+                                }
+                                self.current_screen = Screen::MinigameSelect;
+                                self.menu_index = 0;
                             }
                         }
                     }
@@ -649,6 +751,15 @@ impl App {
             if self.menu_index == idx {
                 self.monster_select_index = 0;
                 self.current_screen = Screen::SelectMonster(SelectMonsterTarget::Breeding);
+                self.menu_index = 0;
+                return;
+            }
+            idx += 1;
+
+            // Mini-jeux — sélection du monstre d'abord
+            if self.menu_index == idx {
+                self.monster_select_index = 0;
+                self.current_screen = Screen::SelectMonster(SelectMonsterTarget::Minigame);
                 self.menu_index = 0;
                 return;
             }
@@ -969,6 +1080,36 @@ impl App {
         self.name_input.clear();
         self.current_screen = Screen::MonsterList;
         self.menu_index = 0;
+    }
+
+    /// Applique la récompense du mini-jeu au monstre sélectionné.
+    fn apply_minigame_reward(&mut self) {
+        let Some(ref game) = self.tictactoe else {
+            return;
+        };
+        let reward = game.reward();
+        if reward.is_empty() {
+            self.message = Some(format!("{} — Pas de récompense.", game.result_label()));
+            return;
+        }
+
+        let Some(monster_id) = self.minigame_monster_id else {
+            return;
+        };
+
+        if let Ok(mut monsters) = self.storage.list_alive() {
+            if let Some(m) = monsters.iter_mut().find(|m| m.id == monster_id) {
+                use monster_battle_core::minigame::apply_reward;
+                apply_reward(&mut m.base_stats, &reward);
+                let levels = m.gain_xp(reward.xp);
+                let mut msg = format!("{} — {}", game.result_label(), reward.summary());
+                if levels > 0 {
+                    msg.push_str(&format!(" +{} niveau{} !", levels, if levels > 1 { "x" } else { "" }));
+                }
+                self.message = Some(msg);
+                let _ = self.storage.save(m);
+            }
+        }
     }
 
     fn run_training_fight(&mut self, wild: bool) {

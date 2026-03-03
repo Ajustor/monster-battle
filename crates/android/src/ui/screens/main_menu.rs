@@ -51,6 +51,7 @@ pub(crate) fn spawn_menu(mut commands: Commands, data: Res<GameData>) {
                 entries.push(("Entrainement", true));
                 entries.push(("Combat PvP", true));
                 entries.push(("Reproduction", true));
+                entries.push(("Mini-jeux", true));
             }
             entries.push(("Cimetiere", true));
             entries.push(("Aide", true));
@@ -160,7 +161,7 @@ fn menu_entry_count(has_monster: bool) -> usize {
         count += 1; // Nouveau Monstre
     }
     if has_monster {
-        count += 3; // Entraînement, Combat PvP, Reproduction
+        count += 4; // Entraînement, Combat PvP, Reproduction, Mini-jeux
     }
     count += 3; // Cimetière, Aide, Quitter
     count
@@ -215,6 +216,15 @@ fn activate_menu_entry(
 
         if data.menu_index == idx {
             commands.insert_resource(SelectMonsterTarget::Breeding);
+            data.monster_select_index = 0;
+            next_state.set(GameScreen::SelectMonster);
+            data.menu_index = 0;
+            return;
+        }
+        idx += 1;
+
+        if data.menu_index == idx {
+            commands.insert_resource(SelectMonsterTarget::Minigame);
             data.monster_select_index = 0;
             next_state.set(GameScreen::SelectMonster);
             data.menu_index = 0;
