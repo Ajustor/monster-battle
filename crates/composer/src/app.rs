@@ -12,8 +12,9 @@ use crossterm::{
 use ratatui::{Terminal, backend::CrosstermBackend};
 
 use monster_battle_audio::AudioEngine;
+use monster_battle_audio::track_def::{VoiceDef, WAVEFORMS};
 
-use crate::project::{self, Project, VoiceDef, WAVEFORMS};
+use crate::project::{self, Project};
 use crate::ui;
 
 // ── Focus / modes ───────────────────────────────────────────────
@@ -92,6 +93,8 @@ pub struct App {
     pub status: String,
     /// Is the track currently being played?
     pub playing: bool,
+    /// Instant when playback started (for playback cursor).
+    pub play_start: Option<Instant>,
     /// Audio engine handle.
     pub engine: Option<AudioEngine>,
     /// Blink timer for cursor.
@@ -105,7 +108,7 @@ impl App {
     pub fn new() -> Result<Self> {
         let engine = AudioEngine::try_new();
         Ok(Self {
-            project: Project::new(),
+            project: project::new_project(),
             focus: Focus::VoiceList,
             voice_index: 0,
             editor_field: EditorField::Pattern,
@@ -115,6 +118,7 @@ impl App {
             input_buf: String::new(),
             status: String::from("Bienvenue ! Appuyez sur ? pour l'aide."),
             playing: false,
+            play_start: None,
             engine,
             blink_on: true,
             blink_timer: Instant::now(),
@@ -550,6 +554,7 @@ impl App {
             let track = self.project.to_track();
             engine.play_track(&track);
             self.playing = true;
+            self.play_start = Some(Instant::now());
             self.status = format!(
                 "▶ Lecture: {} @ {} BPM",
                 self.project.name, self.project.bpm
@@ -564,6 +569,7 @@ impl App {
             engine.stop_music();
         }
         self.playing = false;
+        self.play_start = None;
         self.status = String::from("■ Arrêté.");
     }
 
@@ -624,5 +630,20 @@ impl App {
     /// Currently selected voice (if any).
     pub fn current_voice(&self) -> Option<&VoiceDef> {
         self.project.voices.get(self.voice_index)
+    }
+
+    /// Current playback position as a fraction within a cycle (0.0–1.0).
+    /// Returns `None` when not playing.
+    pub fn playback_position(&self) -> Option<f64> {
+        let start = self.play_start?;
+        if !self.playing {
+            return None;
+        }
+        let elapsed = start.elapsed().as_secs_f64();
+        let cycle_dur = 4.0 * 60.0 / self.project.bpm;
+        if cycle_dur <= 0.0 {
+            return None;
+        }
+        Some((elapsed % cycle_dur) / cycle_dur)
     }
 }

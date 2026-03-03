@@ -1,0 +1,24 @@
+{
+  "name": "victory",
+  "bpm": 140.0,
+  "voices": [
+    {
+      "pattern": "<[c5 e5 g5 [c6 c6]] [c6 ~ ~ ~]>",
+      "waveform": "triangle",
+      "amplitude": 0.24,
+      "is_drum": false
+    },
+    {
+      "pattern": "<[c3 e3 g3 c4] [c4 ~ ~ ~]>",
+      "waveform": "square",
+      "amplitude": 0.14,
+      "is_drum": false
+    },
+    {
+      "pattern": "x ~ x [x x]",
+      "waveform": "sine",
+      "amplitude": 0.14,
+      "is_drum": true
+    }
+  ]
+}

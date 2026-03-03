@@ -1,0 +1,18 @@
+{
+  "name": "defeat",
+  "bpm": 80.0,
+  "voices": [
+    {
+      "pattern": "<[e4 ~ d4 c4] [b3 ~ a3 ~]>",
+      "waveform": "sine",
+      "amplitude": 0.18,
+      "is_drum": false
+    },
+    {
+      "pattern": "<[a2 ~ ~ ~] [e2 ~ ~ ~]>",
+      "waveform": "triangle",
+      "amplitude": 0.12,
+      "is_drum": false
+    }
+  ]
+}

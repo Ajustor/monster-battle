@@ -1,0 +1,18 @@
+{
+  "name": "exploration",
+  "bpm": 100.0,
+  "voices": [
+    {
+      "pattern": "<[c5 e5 g5 e5] [d5 f5 a5 f5] [e5 g5 b5 g5] [f5 a5 c6 a5]>",
+      "waveform": "triangle",
+      "amplitude": 0.16,
+      "is_drum": false
+    },
+    {
+      "pattern": "<[c3 e3 g3 e3] [d3 f3 a3 f3] [e3 g3 b3 g3] [f3 a3 c4 a3]>",
+      "waveform": "sine",
+      "amplitude": 0.10,
+      "is_drum": false
+    }
+  ]
+}

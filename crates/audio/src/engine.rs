@@ -27,7 +27,7 @@ struct Inner {
     stream_handle: OutputStreamHandle,
     music_sink: Sink,
     sfx_sinks: Vec<Sink>,
-    current_track: Option<&'static str>,
+    current_track: Option<String>,
     music_volume: f32,
     sfx_volume: f32,
     muted: bool,
@@ -63,7 +63,7 @@ impl AudioEngine {
     pub fn play_track(&self, track: &Track) {
         let mut inner = self.inner.lock().unwrap();
 
-        if inner.current_track == Some(track.name) && !inner.music_sink.empty() {
+        if inner.current_track.as_deref() == Some(track.name.as_str()) && !inner.music_sink.empty() {
             return; // already playing (or paused with the same track)
         }
 
@@ -81,7 +81,7 @@ impl AudioEngine {
             }
 
             inner.music_sink = sink;
-            inner.current_track = Some(track.name);
+            inner.current_track = Some(track.name.clone());
         }
     }
 
