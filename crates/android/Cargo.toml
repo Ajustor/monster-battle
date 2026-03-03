@@ -93,7 +93,6 @@ package = "com.ajustor.monsterbattle"
 [package.metadata.android.manifest.sdk]
 min_sdk_version = 36
 target_sdk_version = 36
-version_code = 2
 
 [package.metadata.android.manifest.application]
 label = "Monster Battle"
