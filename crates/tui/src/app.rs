@@ -315,10 +315,17 @@ impl App {
     }
 
     fn handle_key(&mut self, code: KeyCode) {
-        // Modale de mise à jour : seule Enter ou Esc ferme
+        // Modale de mise à jour : Enter ouvre le navigateur, Esc/q ferme
         if self.show_update_modal {
-            if matches!(code, KeyCode::Enter | KeyCode::Esc | KeyCode::Char('q')) {
-                self.show_update_modal = false;
+            match code {
+                KeyCode::Enter => {
+                    let _ = open_browser("https://ajustor.github.io/monster-battle");
+                    self.show_update_modal = false;
+                }
+                KeyCode::Esc | KeyCode::Char('q') => {
+                    self.show_update_modal = false;
+                }
+                _ => {}
             }
             return;
         }
@@ -2001,4 +2008,23 @@ fn dirs_data_dir() -> std::path::PathBuf {
     } else {
         std::path::PathBuf::from(".")
     }
+}
+
+/// Ouvre une URL dans le navigateur par défaut de l'utilisateur.
+fn open_browser(url: &str) -> std::io::Result<()> {
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open").arg(url).spawn()?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open").arg(url).spawn()?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/c", "start", url])
+            .spawn()?;
+    }
+    Ok(())
 }
