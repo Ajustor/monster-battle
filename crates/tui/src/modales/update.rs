@@ -64,7 +64,7 @@ pub fn draw(frame: &mut Frame, server_version: Option<&str>) {
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "  Appuyez sur Enter pour continuer…",
+            "  Appuyez sur Enter pour ouvrir le lien…",
             Style::default().fg(Color::DarkGray),
         )),
     ];
