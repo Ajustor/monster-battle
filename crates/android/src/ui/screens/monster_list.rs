@@ -180,6 +180,7 @@ fn spawn_monster_list_inner(
                                 card.spawn(Node {
                                     flex_direction: FlexDirection::Column,
                                     flex_grow: 1.0,
+                                    row_gap: Val::Px(2.0),
                                     ..default()
                                 })
                                 .with_children(|info| {
@@ -203,6 +204,20 @@ fn spawn_monster_list_inner(
                                         TextColor(colors::TEXT_PRIMARY),
                                     ));
 
+                                    // XP
+                                    let xp_to_next = monster.xp_to_next_level();
+                                    info.spawn((
+                                        Text::new(format!(
+                                            "XP {}/{}",
+                                            monster.xp, xp_to_next,
+                                        )),
+                                        TextFont {
+                                            font_size: fonts::SMALL,
+                                            ..default()
+                                        },
+                                        TextColor(colors::TEXT_SECONDARY),
+                                    ));
+
                                     info.spawn((
                                         Text::new(format!(
                                             "PV {}/{}  ATK {} DEF {} SPD {}",
@@ -211,6 +226,50 @@ fn spawn_monster_list_inner(
                                             monster.effective_attack(),
                                             monster.effective_defense(),
                                             monster.effective_speed(),
+                                        )),
+                                        TextFont {
+                                            font_size: fonts::SMALL,
+                                            ..default()
+                                        },
+                                        TextColor(colors::TEXT_SECONDARY),
+                                    ));
+
+                                    // S.ATK et S.DEF
+                                    info.spawn((
+                                        Text::new(format!(
+                                            "S.ATK {} S.DEF {}",
+                                            monster.effective_sp_attack(),
+                                            monster.effective_sp_defense(),
+                                        )),
+                                        TextFont {
+                                            font_size: fonts::SMALL,
+                                            ..default()
+                                        },
+                                        TextColor(colors::TEXT_SECONDARY),
+                                    ));
+
+                                    // Traits
+                                    if !monster.traits.is_empty() {
+                                        let traits_str: Vec<String> =
+                                            monster.traits.iter().map(|t| format!("{}", t)).collect();
+                                        info.spawn((
+                                            Text::new(format!("Traits : {}", traits_str.join(", "))),
+                                            TextFont {
+                                                font_size: fonts::SMALL,
+                                                ..default()
+                                            },
+                                            TextColor(colors::ACCENT_YELLOW),
+                                        ));
+                                    }
+
+                                    // Stade et Âge
+                                    let stage = monster.age_stage();
+                                    info.spawn((
+                                        Text::new(format!(
+                                            "Stade : {}  Age : {}j/{}j",
+                                            stage,
+                                            monster.age_days(),
+                                            monster.max_age_days(),
                                         )),
                                         TextFont {
                                             font_size: fonts::SMALL,
@@ -242,6 +301,21 @@ fn spawn_monster_list_inner(
                                             ..default()
                                         },
                                         TextColor(hunger_color),
+                                    ));
+
+                                    // Generation et V/D
+                                    info.spawn((
+                                        Text::new(format!(
+                                            "Gen. {}  V:{} / D:{}",
+                                            monster.generation,
+                                            monster.wins,
+                                            monster.losses,
+                                        )),
+                                        TextFont {
+                                            font_size: fonts::SMALL,
+                                            ..default()
+                                        },
+                                        TextColor(colors::TEXT_SECONDARY),
                                     ));
                                 });
                             });

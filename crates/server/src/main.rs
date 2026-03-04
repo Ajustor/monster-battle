@@ -677,11 +677,20 @@ async fn run_combat_loop(
         }
 
         // Attendre que les deux joueurs aient fini de lire les messages du tour
-        async fn wait_for_player_ready(ws: &mut WebSocketStream<TcpStream>) -> anyhow::Result<()> {
+        // (gère aussi le forfait pendant la phase de lecture)
+        enum ReadyResult {
+            Ready,
+            Forfeit,
+        }
+
+        async fn wait_for_player_ready(
+            ws: &mut WebSocketStream<TcpStream>,
+        ) -> anyhow::Result<ReadyResult> {
             loop {
                 let msg = read_message(ws).await?;
                 match msg {
-                    NetMessage::PvpReady => return Ok(()),
+                    NetMessage::PvpReady => return Ok(ReadyResult::Ready),
+                    NetMessage::PvpForfeit => return Ok(ReadyResult::Forfeit),
                     NetMessage::Ping => {
                         write_message(ws, &NetMessage::Pong).await?;
                     }
@@ -698,8 +707,8 @@ async fn run_combat_loop(
             wait_for_player_ready(&mut ws_b),
         );
 
-        match (res_a, res_b) {
-            (Ok(()), Ok(())) => {} // Les deux prêts
+        // Vérifier les déconnexions d'abord
+        match (&res_a, &res_b) {
             (Err(_), Ok(_)) => {
                 println!(
                     "⚠️  {} déconnecté (ready) — {} gagne par forfait !",
@@ -708,7 +717,7 @@ async fn run_combat_loop(
                 send_disconnect_victory(&mut ws_b, &battle, false, name_a).await;
                 break;
             }
-            (Ok(()), Err(_)) => {
+            (Ok(_), Err(_)) => {
                 println!(
                     "⚠️  {} déconnecté (ready) — {} gagne par forfait !",
                     name_b, name_a
@@ -720,6 +729,67 @@ async fn run_combat_loop(
                 println!("⚠️  Les deux joueurs se sont déconnectés (ready) !");
                 break;
             }
+            _ => {}
+        }
+
+        let ready_a = res_a.unwrap();
+        let ready_b = res_b.unwrap();
+
+        // Vérifier les forfeits pendant la phase de lecture
+        let a_forfeited_ready = matches!(ready_a, ReadyResult::Forfeit);
+        let b_forfeited_ready = matches!(ready_b, ReadyResult::Forfeit);
+
+        if a_forfeited_ready || b_forfeited_ready {
+            let a_wins = b_forfeited_ready && !a_forfeited_ready;
+            let xp = if a_wins {
+                50 + (battle.opponent.level * 5)
+            } else {
+                50 + (battle.player.level * 5)
+            };
+
+            let forfeit_name = if a_forfeited_ready { name_a } else { name_b };
+            println!(
+                "🏳️  {} a fui le combat PvP (pendant lecture) !",
+                forfeit_name
+            );
+
+            let forfeit_msg = BattleMessage {
+                text: format!("🏳️ {} a fui le combat !", forfeit_name),
+                style: if a_wins {
+                    MessageStyle::Victory
+                } else {
+                    MessageStyle::Defeat
+                },
+                player_hp: None,
+                opponent_hp: None,
+                anim_type: None,
+            };
+            let flipped_forfeit = forfeit_msg.flip_perspective();
+
+            let result_a = NetMessage::PvpTurnResult {
+                messages: vec![forfeit_msg],
+                player_hp: battle.player.current_hp,
+                opponent_hp: battle.opponent.current_hp,
+                battle_over: true,
+                victory: a_wins,
+                xp_gained: if a_wins { xp } else { 0 },
+                loser_died: false,
+                loser_fled: true,
+            };
+            let result_b = NetMessage::PvpTurnResult {
+                messages: vec![flipped_forfeit],
+                player_hp: battle.opponent.current_hp,
+                opponent_hp: battle.player.current_hp,
+                battle_over: true,
+                victory: !a_wins,
+                xp_gained: if !a_wins { xp } else { 0 },
+                loser_died: false,
+                loser_fled: true,
+            };
+
+            let _ = write_message(&mut ws_a, &result_a).await;
+            let _ = write_message(&mut ws_b, &result_b).await;
+            break;
         }
 
         // Les deux joueurs sont prêts → envoyer le signal de nouveau tour

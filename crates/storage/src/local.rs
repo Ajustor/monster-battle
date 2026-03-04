@@ -48,15 +48,13 @@ impl LocalStorage {
     }
 
     /// Cherche un monstre dans les deux répertoires.
+    /// Seuls les fichiers `.enc` sont acceptés dans `alive/` — les fichiers
+    /// `.json` dans `alive/` ne sont plus acceptés (anti-triche : empêche de
+    /// copier un fichier mort dans le dossier des vivants).
     fn find_monster_path(&self, id: Uuid) -> Option<PathBuf> {
         let alive = self.alive_path(id);
         if alive.exists() {
             return Some(alive);
-        }
-        // Ancien format non chiffré (migration)
-        let alive_json = self.base_dir.join("alive").join(format!("{}.json", id));
-        if alive_json.exists() {
-            return Some(alive_json);
         }
         let dead = self.dead_path(id);
         if dead.exists() {
@@ -110,6 +108,8 @@ impl LocalStorage {
     }
 
     /// Charge tous les monstres d'un sous-répertoire.
+    /// Pour le dossier `alive`, seuls les fichiers `.enc` sont acceptés (anti-triche).
+    /// Pour le dossier `dead`, seuls les fichiers `.json` sont acceptés.
     fn load_dir(&self, subdir: &str) -> Result<Vec<Monster>, StorageError> {
         let dir = self.base_dir.join(subdir);
         let mut monsters = Vec::new();
@@ -118,20 +118,63 @@ impl LocalStorage {
             return Ok(monsters);
         }
 
+        let is_alive_dir = subdir == "alive";
+        let expected_ext = if is_alive_dir { "enc" } else { "json" };
+
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
             let path = entry.path();
             let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
-            if ext == "enc" || ext == "json" {
-                match self.load_from_path(&path) {
-                    Ok(monster) => monsters.push(monster),
-                    Err(e) => {
+            // N'accepter que l'extension attendue pour ce répertoire
+            if ext != expected_ext {
+                // Supprimer les fichiers .json dans alive/ (anti-triche / nettoyage)
+                if is_alive_dir && ext == "json" {
+                    eprintln!(
+                        "Anti-triche : fichier JSON ignoré et supprimé dans alive/ : {}",
+                        path.display()
+                    );
+                    let _ = fs::remove_file(&path);
+                }
+                continue;
+            }
+
+            match self.load_from_path(&path) {
+                Ok(monster) => {
+                    // Vérification d'intégrité : un monstre dans alive/ doit être vivant
+                    if is_alive_dir && monster.is_dead() {
                         eprintln!(
-                            "Avertissement : impossible de charger {} : {}",
-                            path.display(),
-                            e
+                            "Anti-triche : monstre mort trouvé dans alive/, déplacement vers dead/ : {}",
+                            monster.name
                         );
+                        // Déplacer vers dead/
+                        let _ = fs::remove_file(&path);
+                        let _ = self.save_dead(&monster);
+                        continue;
+                    }
+                    // Vérification inverse : un monstre dans dead/ doit être mort
+                    if !is_alive_dir && monster.is_alive() {
+                        eprintln!(
+                            "Incohérence : monstre vivant trouvé dans dead/, ignoré : {}",
+                            monster.name
+                        );
+                        continue;
+                    }
+                    monsters.push(monster);
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Avertissement : impossible de charger {} : {}",
+                        path.display(),
+                        e
+                    );
+                    // Si le fichier chiffré est corrompu dans alive/, le supprimer
+                    if is_alive_dir {
+                        eprintln!(
+                            "Anti-triche : fichier corrompu supprimé dans alive/ : {}",
+                            path.display()
+                        );
+                        let _ = fs::remove_file(&path);
                     }
                 }
             }
@@ -139,24 +182,24 @@ impl LocalStorage {
 
         Ok(monsters)
     }
-
-    /// Migre un ancien fichier JSON non chiffré vers le format chiffré.
-    fn migrate_if_needed(&self, id: Uuid) {
-        let old_json = self.base_dir.join("alive").join(format!("{}.json", id));
-        if old_json.exists() {
-            if let Ok(data) = fs::read_to_string(&old_json) {
-                if let Ok(monster) = serde_json::from_str::<Monster>(&data) {
-                    if self.save_alive(&monster).is_ok() {
-                        let _ = fs::remove_file(&old_json);
-                    }
-                }
-            }
-        }
-    }
 }
 
 impl MonsterStorage for LocalStorage {
     fn save(&self, monster: &Monster) -> Result<(), StorageError> {
+        // Anti-triche : empêcher la résurrection d'un monstre mort.
+        // Si le monstre existe déjà dans dead/ et qu'on essaie de le sauvegarder
+        // comme vivant, c'est une tentative de triche.
+        let dead_path = self.dead_path(monster.id);
+        if monster.is_alive() && dead_path.exists() {
+            eprintln!(
+                "Anti-triche : tentative de résurrection bloquée pour {} ({})",
+                monster.name, monster.id
+            );
+            return Err(StorageError::Encryption(
+                "Impossible de ressusciter un monstre mort.".to_string(),
+            ));
+        }
+
         // Supprime l'ancien fichier (peut avoir changé de répertoire/format)
         if let Some(old_path) = self.find_monster_path(monster.id) {
             let _ = fs::remove_file(old_path);
@@ -170,14 +213,20 @@ impl MonsterStorage for LocalStorage {
     }
 
     fn load(&self, id: Uuid) -> Result<Monster, StorageError> {
-        // Tente une migration automatique si nécessaire
-        self.migrate_if_needed(id);
-
         let path = self
             .find_monster_path(id)
             .ok_or(StorageError::NotFound(id))?;
 
-        self.load_from_path(&path)
+        let monster = self.load_from_path(&path)?;
+
+        // Vérification d'intégrité : si un monstre du dossier alive/ est mort,
+        // le déplacer vers dead/
+        if path.starts_with(self.base_dir.join("alive")) && monster.is_dead() {
+            let _ = fs::remove_file(&path);
+            self.save_dead(&monster)?;
+        }
+
+        Ok(monster)
     }
 
     fn delete(&self, id: Uuid) -> Result<(), StorageError> {
@@ -298,6 +347,96 @@ mod tests {
 
         let all = storage.list_all().unwrap();
         assert_eq!(all.len(), 2);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_anticheat_json_in_alive_is_rejected() {
+        // Simuler la triche : copier un fichier JSON dans alive/
+        let dir = std::env::temp_dir().join("monster_test_anticheat_json");
+        let _ = fs::remove_dir_all(&dir);
+        let storage = LocalStorage::new(&dir).unwrap();
+
+        let monster = Monster::new_starter(
+            "TricheMon".to_string(),
+            ElementType::Fire,
+            generate_starter_stats(ElementType::Fire),
+        );
+        let id = monster.id;
+
+        // Écrire un fichier JSON directement dans alive/ (triche)
+        let json = serde_json::to_string(&monster).unwrap();
+        let cheat_path = dir.join("alive").join(format!("{}.json", id));
+        fs::write(&cheat_path, json).unwrap();
+
+        // Le fichier JSON doit être supprimé et le monstre ignoré
+        let alive = storage.list_alive().unwrap();
+        assert!(
+            alive.is_empty(),
+            "Le monstre JSON en alive/ doit être ignoré"
+        );
+        assert!(
+            !cheat_path.exists(),
+            "Le fichier JSON triche doit être supprimé"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_anticheat_resurrection_blocked() {
+        // Simuler la triche : essayer de sauvegarder un monstre mort comme vivant
+        let dir = std::env::temp_dir().join("monster_test_anticheat_resurrect");
+        let _ = fs::remove_dir_all(&dir);
+        let storage = LocalStorage::new(&dir).unwrap();
+
+        let mut monster = Monster::new_starter(
+            "MortMon".to_string(),
+            ElementType::Shadow,
+            generate_starter_stats(ElementType::Shadow),
+        );
+        let id = monster.id;
+
+        // Tuer et sauvegarder le monstre
+        monster.died_at = Some(chrono::Utc::now());
+        storage.save(&monster).unwrap();
+
+        // Vérifier qu'il est dans dead/
+        let dead = storage.list_dead().unwrap();
+        assert_eq!(dead.len(), 1);
+
+        // Tentative de résurrection : remettre died_at à None
+        monster.died_at = None;
+        let result = storage.save(&monster);
+        assert!(result.is_err(), "La résurrection doit être bloquée");
+
+        // Le monstre doit toujours être dans dead/
+        let dead = storage.list_dead().unwrap();
+        assert_eq!(dead.len(), 1);
+        assert_eq!(dead[0].id, id);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_anticheat_corrupted_enc_in_alive_is_removed() {
+        // Simuler la triche : mettre un fichier .enc invalide dans alive/
+        let dir = std::env::temp_dir().join("monster_test_anticheat_corrupted");
+        let _ = fs::remove_dir_all(&dir);
+        let storage = LocalStorage::new(&dir).unwrap();
+
+        let fake_id = Uuid::new_v4();
+        let cheat_path = dir.join("alive").join(format!("{}.enc", fake_id));
+        fs::write(&cheat_path, b"fake-encrypted-data").unwrap();
+
+        // Le fichier corrompu doit être supprimé
+        let alive = storage.list_alive().unwrap();
+        assert!(alive.is_empty(), "Le fichier corrompu doit être ignoré");
+        assert!(
+            !cheat_path.exists(),
+            "Le fichier corrompu doit être supprimé"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
