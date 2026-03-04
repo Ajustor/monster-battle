@@ -152,12 +152,38 @@ pub fn start_pvp_task(commands: &mut Commands, monster: Monster, fighter_id: uui
                         // Signal PvpReady (joueur a fini de lire les messages du tour)
                         client.send(&NetMessage::PvpReady).await?;
 
-                        // Attendre PvpNextTurn du serveur
+                        // Attendre PvpNextTurn du serveur (ou PvpTurnResult si l'adversaire a fui)
                         loop {
                             let msg = client.recv().await?;
                             match msg {
                                 NetMessage::PvpNextTurn => {
                                     let _ = tx.send(NetworkEvent::PvpNextTurn);
+                                    break;
+                                }
+                                NetMessage::PvpTurnResult {
+                                    messages,
+                                    player_hp,
+                                    opponent_hp,
+                                    battle_over,
+                                    victory,
+                                    xp_gained,
+                                    loser_died,
+                                    loser_fled,
+                                } => {
+                                    // L'adversaire a fui pendant la phase de lecture
+                                    let _ = tx.send(NetworkEvent::PvpTurnResult {
+                                        messages,
+                                        player_hp,
+                                        opponent_hp,
+                                        battle_over,
+                                        victory,
+                                        xp_gained,
+                                        loser_died,
+                                        loser_fled,
+                                    });
+                                    if battle_over {
+                                        return Ok(());
+                                    }
                                     break;
                                 }
                                 NetMessage::Ping => {

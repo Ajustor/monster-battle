@@ -880,13 +880,39 @@ impl App {
                         // Signal PvpReady (joueur a fini de lire les messages)
                         client.send(&NetMessage::PvpReady).await?;
 
-                        // Attendre PvpNextTurn du serveur
+                        // Attendre PvpNextTurn du serveur (ou PvpTurnResult si l'adversaire a fui)
                         loop {
                             let msg = client.recv().await?;
                             match msg {
                                 NetMessage::PvpNextTurn => {
                                     // Signaler au client qu'il peut choisir sa prochaine attaque
                                     let _ = tx.send(NetworkEvent::PvpNextTurn);
+                                    break;
+                                }
+                                NetMessage::PvpTurnResult {
+                                    messages,
+                                    player_hp,
+                                    opponent_hp,
+                                    battle_over,
+                                    victory,
+                                    xp_gained,
+                                    loser_died,
+                                    loser_fled,
+                                } => {
+                                    // L'adversaire a fui pendant la phase de lecture
+                                    let _ = tx.send(NetworkEvent::PvpTurnResult {
+                                        messages,
+                                        player_hp,
+                                        opponent_hp,
+                                        battle_over,
+                                        victory,
+                                        xp_gained,
+                                        loser_died,
+                                        loser_fled,
+                                    });
+                                    if battle_over {
+                                        return Ok(());
+                                    }
                                     break;
                                 }
                                 NetMessage::Ping => {
@@ -1528,6 +1554,49 @@ impl App {
         log.push(format!(
             "🧬 Reproduction entre {} et {} !",
             parent.name, remote.name
+        ));
+        log.push(String::new());
+
+        // Infos du parent local
+        let parent_sec = parent
+            .secondary_type
+            .map(|t| format!(" / {} {}", t.icon(), t))
+            .unwrap_or_default();
+        log.push(format!(
+            "👤 {} — {} {}{}  Nv.{}",
+            parent.name,
+            parent.primary_type.icon(),
+            parent.primary_type,
+            parent_sec,
+            parent.level,
+        ));
+        log.push(format!(
+            "   PV {}  ATK {}  DEF {}  SPD {}",
+            parent.base_stats.hp,
+            parent.base_stats.attack,
+            parent.base_stats.defense,
+            parent.base_stats.speed,
+        ));
+
+        // Infos du partenaire distant
+        let remote_sec = remote
+            .secondary_type
+            .map(|t| format!(" / {} {}", t.icon(), t))
+            .unwrap_or_default();
+        log.push(format!(
+            "👤 {} — {} {}{}  Nv.{}",
+            remote.name,
+            remote.primary_type.icon(),
+            remote.primary_type,
+            remote_sec,
+            remote.level,
+        ));
+        log.push(format!(
+            "   PV {}  ATK {}  DEF {}  SPD {}",
+            remote.base_stats.hp,
+            remote.base_stats.attack,
+            remote.base_stats.defense,
+            remote.base_stats.speed,
         ));
         log.push(String::new());
 

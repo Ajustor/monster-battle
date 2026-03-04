@@ -153,6 +153,13 @@ pub(crate) struct BreedingNamingBackButton;
 
 /// Construit l'UI de nommage du bébé.
 pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>) {
+    // Récupérer le monstre local et le partenaire distant pour afficher leurs infos
+    let local_monster = data.storage.list_alive().ok().and_then(|m| {
+        let idx = data.monster_select_index.min(m.len().saturating_sub(1));
+        m.into_iter().nth(idx)
+    });
+    let remote_monster = data.remote_monster.as_ref();
+
     commands
         .spawn((
             Node {
@@ -213,10 +220,87 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
                 },
                 TextColor(colors::ACCENT_MAGENTA),
                 Node {
-                    margin: UiRect::bottom(Val::Px(16.0)),
+                    margin: UiRect::bottom(Val::Px(12.0)),
                     ..default()
                 },
             ));
+
+            // ── Infos des parents ──
+            // Fonction locale pour construire une carte de parent
+            fn spawn_parent_card(
+                parent_ui: &mut ChildBuilder,
+                label: &str,
+                monster: &monster_battle_core::Monster,
+            ) {
+                let secondary = monster
+                    .secondary_type
+                    .map(|t| format!(" / {}", t))
+                    .unwrap_or_default();
+
+                parent_ui
+                    .spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            padding: UiRect::all(Val::Px(8.0)),
+                            margin: UiRect::bottom(Val::Px(6.0)),
+                            border: UiRect::all(Val::Px(1.0)),
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(2.0),
+                            ..default()
+                        },
+                        BackgroundColor(colors::PANEL),
+                        BorderColor(colors::BORDER),
+                        BorderRadius::all(Val::Px(6.0)),
+                    ))
+                    .with_children(|card| {
+                        card.spawn((
+                            Text::new(format!(
+                                "{} [{}{}] {}  Nv.{}",
+                                label, monster.primary_type, secondary, monster.name, monster.level,
+                            )),
+                            TextFont {
+                                font_size: fonts::SMALL,
+                                ..default()
+                            },
+                            TextColor(colors::ACCENT_YELLOW),
+                        ));
+
+                        card.spawn((
+                            Text::new(format!(
+                                "PV {}  ATK {}  DEF {}  SPD {}",
+                                monster.base_stats.hp,
+                                monster.base_stats.attack,
+                                monster.base_stats.defense,
+                                monster.base_stats.speed,
+                            )),
+                            TextFont {
+                                font_size: fonts::SMALL,
+                                ..default()
+                            },
+                            TextColor(colors::TEXT_SECONDARY),
+                        ));
+
+                        if !monster.traits.is_empty() {
+                            let traits_str: Vec<String> =
+                                monster.traits.iter().map(|t| format!("{}", t)).collect();
+                            card.spawn((
+                                Text::new(format!("Traits : {}", traits_str.join(", "))),
+                                TextFont {
+                                    font_size: fonts::SMALL,
+                                    ..default()
+                                },
+                                TextColor(colors::TEXT_SECONDARY),
+                            ));
+                        }
+                    });
+            }
+
+            if let Some(ref local) = local_monster {
+                spawn_parent_card(parent, "Parent 1 :", local);
+            }
+            if let Some(remote) = remote_monster {
+                spawn_parent_card(parent, "Parent 2 :", remote);
+            }
 
             parent.spawn((
                 Text::new("Donnez un nom au nouveau monstre :"),
@@ -587,6 +671,19 @@ pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>)
                             },
                             TextColor(colors::TEXT_SECONDARY),
                         ));
+
+                        if !baby.traits.is_empty() {
+                            let traits_str: Vec<String> =
+                                baby.traits.iter().map(|t| format!("{}", t)).collect();
+                            card.spawn((
+                                Text::new(format!("Traits : {}", traits_str.join(", "))),
+                                TextFont {
+                                    font_size: fonts::SMALL,
+                                    ..default()
+                                },
+                                TextColor(colors::TEXT_SECONDARY),
+                            ));
+                        }
                     });
             } else {
                 parent.spawn((
