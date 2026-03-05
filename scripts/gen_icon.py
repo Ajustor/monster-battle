@@ -67,6 +67,15 @@ SIZES = {
 
 PLAYSTORE_SIZE = 512
 
+# Tailles pour les foreground adaptifs (108dp par densité)
+ADAPTIVE_SIZES = {
+    "mipmap-mdpi":    108,
+    "mipmap-hdpi":    162,
+    "mipmap-xhdpi":   216,
+    "mipmap-xxhdpi":  324,
+    "mipmap-xxxhdpi": 432,
+}
+
 
 def render_sprite(size: int) -> Image.Image:
     """Rend le sprite pixel-art sur un fond avec coins arrondis."""
@@ -81,9 +90,25 @@ def render_sprite(size: int) -> Image.Image:
         fill=BG_COLOR_CENTER,
     )
 
-    # Dessiner le sprite centré avec marge
+    _draw_sprite(draw, size, margin_ratio=8)
+    return img
+
+
+def render_foreground(size: int) -> Image.Image:
+    """Rend le sprite pixel-art centré sur fond transparent (foreground adaptatif)."""
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Le foreground adaptatif utilise une safe zone de 66 % au centre.
+    # On dessine le sprite dans cette zone.
+    _draw_sprite(draw, size, margin_ratio=4)
+    return img
+
+
+def _draw_sprite(draw: ImageDraw.Draw, size: int, margin_ratio: int = 8):
+    """Dessine le sprite pixel-art centré dans le canvas."""
     grid_size = 16
-    margin = max(size // 8, 2)
+    margin = max(size // margin_ratio, 2)
     sprite_area = size - 2 * margin
     pixel_w = sprite_area / grid_size
 
@@ -98,20 +123,27 @@ def render_sprite(size: int) -> Image.Image:
             y1 = int(margin + (row_idx + 1) * pixel_w) - 1
             draw.rectangle([x0, y0, x1, y1], fill=color)
 
-    return img
-
 
 def main():
     project_root = Path(__file__).resolve().parent.parent
     res_dir = project_root / "crates" / "android" / "res"
 
-    # Icônes Android par densité
+    # Icônes Android par densité (legacy)
     for folder, size in SIZES.items():
         out_dir = res_dir / folder
         out_dir.mkdir(parents=True, exist_ok=True)
         icon = render_sprite(size)
         out_path = out_dir / "ic_launcher.png"
         icon.save(out_path, "PNG")
+        print(f"  ✅ {out_path.relative_to(project_root)}  ({size}×{size})")
+
+    # Foreground adaptatif par densité (API 26+)
+    for folder, size in ADAPTIVE_SIZES.items():
+        out_dir = res_dir / folder
+        out_dir.mkdir(parents=True, exist_ok=True)
+        fg = render_foreground(size)
+        out_path = out_dir / "ic_launcher_foreground.png"
+        fg.save(out_path, "PNG")
         print(f"  ✅ {out_path.relative_to(project_root)}  ({size}×{size})")
 
     # Icône Play Store
