@@ -52,7 +52,7 @@ jobs:
       build_system: xbuild
       target_sdk: '36'
       min_sdk: '24'
-      ndk_version: '27.2.12479018'
+      ndk_version: '29.0.14206865'
       build_tools_version: '36.0.0'
       manifest_path: crates/android/AndroidManifest.xml
       res_dir: crates/android/res
