@@ -4,6 +4,7 @@ members = [
   "crates/core",
   "crates/storage",
   "crates/network",
+  "crates/sprites",
   "crates/tui",
   "crates/server",
   "crates/audio",
@@ -12,7 +13,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.8.3"
+version = "0.9.0"
 edition = "2024"
 license = "MIT"
 
@@ -63,6 +64,7 @@ thiserror = "2"
 
 # Internal crates
 monster-battle-core = { path = "crates/core" }
+monster-battle-sprites = { path = "crates/sprites" }
 monster-battle-storage = { path = "crates/storage" }
 monster-battle-network = { path = "crates/network" }
 monster-battle-server = { path = "crates/server" }

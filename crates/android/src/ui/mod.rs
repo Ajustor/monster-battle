@@ -82,6 +82,7 @@ impl Plugin for UiPlugin {
                     battle::animate_hp_bars,
                     battle::animate_waiting_dots,
                     battle::animate_battle_sprites,
+                    battle::animate_attack_flash,
                 )
                     .run_if(in_state(GameScreen::Battle)),
             )

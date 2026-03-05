@@ -155,14 +155,17 @@ pub(crate) fn spawn_select_monster(
                             ))
                             .with_children(|card| {
                                 // Sprite
-                                let grid = sprites::get_pixel_sprite(
+                                let age = monster.age_stage();
+                                let grid = sprites::get_blended_sprite(
                                     monster.primary_type,
                                     monster.secondary_type,
+                                    age,
                                 );
                                 let handle = atlas.get_or_create_front(
                                     monster.primary_type,
                                     monster.secondary_type,
-                                    grid,
+                                    age,
+                                    &grid,
                                     &mut images,
                                 );
 

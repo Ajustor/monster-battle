@@ -45,8 +45,9 @@ fn spawn_monster_list_inner(
     let sprite_handles: Vec<Handle<Image>> = monsters
         .iter()
         .map(|m| {
-            let grid = sprites::get_pixel_sprite(m.primary_type, m.secondary_type);
-            atlas.get_or_create_front(m.primary_type, m.secondary_type, grid, images)
+            let age = m.age_stage();
+            let grid = sprites::get_blended_sprite(m.primary_type, m.secondary_type, age);
+            atlas.get_or_create_front(m.primary_type, m.secondary_type, age, &grid, images)
         })
         .collect();
 
@@ -207,10 +208,7 @@ fn spawn_monster_list_inner(
                                     // XP
                                     let xp_to_next = monster.xp_to_next_level();
                                     info.spawn((
-                                        Text::new(format!(
-                                            "XP {}/{}",
-                                            monster.xp, xp_to_next,
-                                        )),
+                                        Text::new(format!("XP {}/{}", monster.xp, xp_to_next,)),
                                         TextFont {
                                             font_size: fonts::SMALL,
                                             ..default()
@@ -250,10 +248,16 @@ fn spawn_monster_list_inner(
 
                                     // Traits
                                     if !monster.traits.is_empty() {
-                                        let traits_str: Vec<String> =
-                                            monster.traits.iter().map(|t| format!("{}", t)).collect();
+                                        let traits_str: Vec<String> = monster
+                                            .traits
+                                            .iter()
+                                            .map(|t| format!("{}", t))
+                                            .collect();
                                         info.spawn((
-                                            Text::new(format!("Traits : {}", traits_str.join(", "))),
+                                            Text::new(format!(
+                                                "Traits : {}",
+                                                traits_str.join(", ")
+                                            )),
                                             TextFont {
                                                 font_size: fonts::SMALL,
                                                 ..default()
@@ -307,9 +311,7 @@ fn spawn_monster_list_inner(
                                     info.spawn((
                                         Text::new(format!(
                                             "Gen. {}  V:{} / D:{}",
-                                            monster.generation,
-                                            monster.wins,
-                                            monster.losses,
+                                            monster.generation, monster.wins, monster.losses,
                                         )),
                                         TextFont {
                                             font_size: fonts::SMALL,

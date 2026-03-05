@@ -10,6 +10,7 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 # ── Crates internes ──────────────────────────────────────────────
 monster-battle-core.workspace = true
+monster-battle-sprites.workspace = true
 monster-battle-storage.workspace = true
 monster-battle-network.workspace = true
 monster-battle-audio.workspace = true

@@ -4,7 +4,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::attack::Attack;
-use crate::monster::Monster;
+use crate::monster::{AgeStage, Monster};
 use crate::types::{ElementType, Trait};
 
 // ── Structures publiques ────────────────────────────────────────────
@@ -27,6 +27,8 @@ pub struct BattleMonster {
     pub speed_stat: u32,
     pub sp_attack: u32,
     pub sp_defense: u32,
+    /// Stade de vie du monstre (pour le rendu visuel).
+    pub age_stage: AgeStage,
 }
 
 impl BattleMonster {
@@ -49,6 +51,7 @@ impl BattleMonster {
             speed_stat: monster.effective_speed(),
             sp_attack: monster.effective_sp_attack(),
             sp_defense: monster.effective_sp_defense(),
+            age_stage: monster.age_stage(),
         }
     }
 
@@ -116,6 +119,8 @@ pub enum AnimationType {
     OpponentAttack,
     PlayerHit,
     OpponentHit,
+    PlayerFaint,
+    OpponentFaint,
 }
 
 // ── BattleState ─────────────────────────────────────────────────────
@@ -672,7 +677,15 @@ impl BattleState {
             self.player.current_hp
         };
         if def_hp == 0 {
+            let faint_anim = Some(if is_player {
+                AnimationType::OpponentFaint
+            } else {
+                AnimationType::PlayerFaint
+            });
             self.queue_msg(&format!("💀 {} est K.O. !", def_name), MessageStyle::Defeat);
+            if let Some(msg) = self.message_queue.back_mut() {
+                msg.anim_type = faint_anim;
+            }
         }
     }
 
@@ -832,6 +845,17 @@ impl AnimationType {
             Self::OpponentAttack => Self::PlayerAttack,
             Self::PlayerHit => Self::OpponentHit,
             Self::OpponentHit => Self::PlayerHit,
+            Self::PlayerFaint => Self::OpponentFaint,
+            Self::OpponentFaint => Self::PlayerFaint,
+        }
+    }
+
+    /// Durée de cette animation en secondes.
+    pub fn duration(&self) -> f32 {
+        match self {
+            Self::PlayerAttack | Self::OpponentAttack => 0.45,
+            Self::PlayerHit | Self::OpponentHit => 0.5,
+            Self::PlayerFaint | Self::OpponentFaint => 0.8,
         }
     }
 }

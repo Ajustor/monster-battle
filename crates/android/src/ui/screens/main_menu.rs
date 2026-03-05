@@ -15,11 +15,7 @@ pub struct MenuButton {
 }
 
 /// Construit l'UI du menu principal.
-pub(crate) fn spawn_menu(
-    mut commands: Commands,
-    data: Res<GameData>,
-    version: Res<VersionState>,
-) {
+pub(crate) fn spawn_menu(mut commands: Commands, data: Res<GameData>, version: Res<VersionState>) {
     let has_monster = data.has_living_monster();
     log::info!("🖥️ spawn_menu — has_monster={}", has_monster);
 
@@ -299,8 +295,7 @@ fn activate_menu_entry(
         // Combat PvP — bloqué si la version ne correspond pas
         if data.menu_index == idx {
             if !version_ok {
-                data.message =
-                    Some("Mise a jour requise pour le PvP !".to_string());
+                data.message = Some("Mise a jour requise pour le PvP !".to_string());
                 return;
             }
             commands.insert_resource(SelectMonsterTarget::CombatPvP);
@@ -314,8 +309,7 @@ fn activate_menu_entry(
         // Reproduction — bloquée si la version ne correspond pas
         if data.menu_index == idx {
             if !version_ok {
-                data.message =
-                    Some("Mise a jour requise pour la reproduction !".to_string());
+                data.message = Some("Mise a jour requise pour la reproduction !".to_string());
                 return;
             }
             commands.insert_resource(SelectMonsterTarget::Breeding);
