@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 monster-battle-core.workspace = true
+monster-battle-sprites.workspace = true
 monster-battle-storage.workspace = true
 monster-battle-network.workspace = true
 monster-battle-audio = { workspace = true, optional = true }

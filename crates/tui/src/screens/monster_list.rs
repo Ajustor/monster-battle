@@ -178,12 +178,14 @@ fn draw_monster_detail(frame: &mut Frame, area: Rect, m: &monster_battle_core::M
         .split(inner);
 
     // ── Sprite ──────────────────────────────────────────────────
-    let grid = sprites::pixel::get_pixel_sprite(m.primary_type, m.secondary_type);
+    let age = m.age_stage();
+    let grid = sprites::pixel::get_blended_sprite(m.primary_type, m.secondary_type, age);
     let mut sprite_lines: Vec<Line> = vec![Line::from("")];
     sprite_lines.extend(sprites::pixel::render_pixel_sprite(
-        grid,
+        &grid,
         m.primary_type,
         m.secondary_type,
+        age,
     ));
     sprite_lines.push(Line::from(""));
     sprite_lines.push(Line::from(Span::styled(

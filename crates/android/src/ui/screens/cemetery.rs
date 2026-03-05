@@ -131,14 +131,17 @@ pub(crate) fn spawn_cemetery(
                             ))
                             .with_children(|card| {
                                 // Sprite (grisé — le monstre est mort)
-                                let grid = sprites::get_pixel_sprite(
+                                let age = monster.age_stage();
+                                let grid = sprites::get_blended_sprite(
                                     monster.primary_type,
                                     monster.secondary_type,
+                                    age,
                                 );
                                 let handle = atlas.get_or_create_front(
                                     monster.primary_type,
                                     monster.secondary_type,
-                                    grid,
+                                    age,
+                                    &grid,
                                     &mut images,
                                 );
 

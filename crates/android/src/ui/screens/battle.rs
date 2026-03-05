@@ -64,6 +64,12 @@ pub(crate) struct BattleAnimTimer {
     pub anim: AnimationType,
 }
 
+/// Marqueur pour le flash d'impact (overlay plein écran temporaire).
+#[derive(Component)]
+pub(crate) struct AttackFlashOverlay {
+    pub timer: Timer,
+}
+
 /// Construit l'UI de combat.
 pub(crate) fn spawn_battle_ui(
     mut commands: Commands,
@@ -111,7 +117,8 @@ fn spawn_battle_ui_inner(
             bevy::state::state_scoped::StateScoped(GameScreen::Battle),
         ))
         .with_children(|root| {
-            // ── Zone adversaire (haut) ───────────────────────────
+            // ── Zone adversaire (haut-droite, style Pokémon) ─────
+            // Info (nom + barre PV) à gauche, sprite à droite
             root.spawn(Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
@@ -120,29 +127,7 @@ fn spawn_battle_ui_inner(
                 ..default()
             })
             .with_children(|top| {
-                // Sprite adversaire (de face)
-                let grid = sprites::get_pixel_sprite(
-                    battle.opponent.element,
-                    battle.opponent.secondary_element,
-                );
-                let handle = atlas.get_or_create_front(
-                    battle.opponent.element,
-                    battle.opponent.secondary_element,
-                    grid,
-                    &mut images,
-                );
-
-                top.spawn((
-                    ImageNode::new(handle),
-                    Node {
-                        width: Val::Px(96.0),
-                        height: Val::Px(96.0),
-                        ..default()
-                    },
-                    OpponentSprite,
-                ));
-
-                // Stats adversaire + barre PV
+                // Stats adversaire + barre PV (à gauche)
                 top.spawn(Node {
                     flex_direction: FlexDirection::Column,
                     flex_grow: 1.0,
@@ -216,18 +201,66 @@ fn spawn_battle_ui_inner(
                         OpponentHpText,
                     ));
                 });
+
+                // Sprite adversaire (de face, à droite — style Pokémon)
+                let grid = sprites::get_blended_sprite(
+                    battle.opponent.element,
+                    battle.opponent.secondary_element,
+                    battle.opponent.age_stage,
+                );
+                let handle = atlas.get_or_create_front(
+                    battle.opponent.element,
+                    battle.opponent.secondary_element,
+                    battle.opponent.age_stage,
+                    &grid,
+                    &mut images,
+                );
+
+                top.spawn((
+                    ImageNode::new(handle),
+                    Node {
+                        width: Val::Px(80.0),
+                        height: Val::Px(80.0),
+                        ..default()
+                    },
+                    OpponentSprite,
+                ));
             });
 
-            // ── Zone joueur (bas) ────────────────────────────────
+            // ── Zone joueur (bas-gauche, style Pokémon) ──────────
+            // Sprite à gauche (plus grand, de dos), info à droite
             root.spawn(Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(12.0),
-                justify_content: JustifyContent::FlexEnd,
                 ..default()
             })
             .with_children(|bottom| {
-                // Stats joueur + barre PV
+                // Sprite joueur (de dos, à gauche — style Pokémon, plus grand)
+                let grid = sprites::get_blended_back_sprite(
+                    battle.player.element,
+                    battle.player.secondary_element,
+                    battle.player.age_stage,
+                );
+                let handle = atlas.get_or_create_back(
+                    battle.player.element,
+                    battle.player.secondary_element,
+                    battle.player.age_stage,
+                    &grid,
+                    &mut images,
+                );
+
+                bottom.spawn((
+                    ImageNode::new(handle),
+                    Node {
+                        width: Val::Px(112.0),
+                        height: Val::Px(112.0),
+                        ..default()
+                    },
+                    PlayerSprite,
+                ));
+
+                // Stats joueur + barre PV (à droite)
                 bottom
                     .spawn(Node {
                         flex_direction: FlexDirection::Column,
@@ -300,28 +333,6 @@ fn spawn_battle_ui_inner(
                             PlayerHpText,
                         ));
                     });
-
-                // Sprite joueur (de dos)
-                let grid = sprites::get_pixel_back_sprite(
-                    battle.player.element,
-                    battle.player.secondary_element,
-                );
-                let handle = atlas.get_or_create_back(
-                    battle.player.element,
-                    battle.player.secondary_element,
-                    grid,
-                    &mut images,
-                );
-
-                bottom.spawn((
-                    ImageNode::new(handle),
-                    Node {
-                        width: Val::Px(96.0),
-                        height: Val::Px(96.0),
-                        ..default()
-                    },
-                    PlayerSprite,
-                ));
             });
 
             // ── Zone actions / messages (bas) ────────────────────
@@ -735,10 +746,30 @@ pub(crate) fn handle_battle_input(
             if let Some(ref battle) = data.battle_state {
                 if let Some(ref msg) = battle.current_message {
                     if let Some(ref anim) = msg.anim_type {
+                        let duration = anim.duration();
                         commands.insert_resource(BattleAnimTimer {
-                            timer: Timer::from_seconds(0.35, TimerMode::Once),
+                            timer: Timer::from_seconds(duration, TimerMode::Once),
                             anim: anim.clone(),
                         });
+                        // Flash d'impact pour les attaques (style Pokémon)
+                        match anim {
+                            AnimationType::PlayerHit | AnimationType::OpponentHit => {
+                                commands.spawn((
+                                    Node {
+                                        width: Val::Percent(100.0),
+                                        height: Val::Percent(100.0),
+                                        position_type: PositionType::Absolute,
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.6)),
+                                    GlobalZIndex(100),
+                                    AttackFlashOverlay {
+                                        timer: Timer::from_seconds(0.12, TimerMode::Once),
+                                    },
+                                ));
+                            }
+                            _ => {}
+                        }
                     }
                 }
             }
@@ -1028,13 +1059,19 @@ pub(crate) fn animate_waiting_dots(
     }
 }
 
-/// Anime les sprites en cas d'attaque ou de hit (secoue / déplace le sprite).
+/// Anime les sprites en cas d'attaque ou de hit (style Pokémon).
 pub(crate) fn animate_battle_sprites(
     mut commands: Commands,
     time: Res<Time>,
     anim: Option<ResMut<BattleAnimTimer>>,
-    mut player_sprite: Query<&mut Node, (With<PlayerSprite>, Without<OpponentSprite>)>,
-    mut opponent_sprite: Query<&mut Node, (With<OpponentSprite>, Without<PlayerSprite>)>,
+    mut player_sprite: Query<
+        (&mut Node, &mut Visibility),
+        (With<PlayerSprite>, Without<OpponentSprite>),
+    >,
+    mut opponent_sprite: Query<
+        (&mut Node, &mut Visibility),
+        (With<OpponentSprite>, Without<PlayerSprite>),
+    >,
 ) {
     let mut anim = match anim {
         Some(a) => a,
@@ -1046,55 +1083,158 @@ pub(crate) fn animate_battle_sprites(
 
     match anim.anim {
         AnimationType::PlayerAttack => {
-            // Le sprite joueur se déplace vers le haut (vers l'adversaire)
-            if let Ok(mut node) = player_sprite.get_single_mut() {
-                let offset = if progress < 0.5 {
-                    // Phase aller : monter
-                    -20.0 * (progress * 2.0)
+            // Lunge style Pokémon : dash rapide vers l'adversaire puis retour
+            if let Ok((mut node, _)) = player_sprite.get_single_mut() {
+                let (offset_y, offset_x) = if progress < 0.3 {
+                    // Phase d'élan : recul léger
+                    let t = progress / 0.3;
+                    (5.0 * t, -3.0 * t)
+                } else if progress < 0.5 {
+                    // Phase d'attaque : dash vers l'adversaire (haut-droite)
+                    let t = (progress - 0.3) / 0.2;
+                    let ease = t * t; // ease-in
+                    (5.0 - 40.0 * ease, -3.0 + 20.0 * ease)
+                } else if progress < 0.55 {
+                    // Pause à l'impact
+                    (-35.0, 17.0)
                 } else {
-                    // Phase retour : redescendre
-                    -20.0 * (1.0 - (progress - 0.5) * 2.0)
+                    // Retour à la position d'origine
+                    let t = (progress - 0.55) / 0.45;
+                    let ease = 1.0 - (1.0 - t) * (1.0 - t); // ease-out
+                    (-35.0 * (1.0 - ease), 17.0 * (1.0 - ease))
                 };
-                node.top = Val::Px(offset);
+                node.top = Val::Px(offset_y);
+                node.left = Val::Px(offset_x);
             }
         }
         AnimationType::OpponentAttack => {
-            // Le sprite adversaire se déplace vers le bas (vers le joueur)
-            if let Ok(mut node) = opponent_sprite.get_single_mut() {
-                let offset = if progress < 0.5 {
-                    20.0 * (progress * 2.0)
+            // Lunge style Pokémon : dash rapide vers le joueur puis retour
+            if let Ok((mut node, _)) = opponent_sprite.get_single_mut() {
+                let (offset_y, offset_x) = if progress < 0.3 {
+                    let t = progress / 0.3;
+                    (-5.0 * t, 3.0 * t)
+                } else if progress < 0.5 {
+                    let t = (progress - 0.3) / 0.2;
+                    let ease = t * t;
+                    (-5.0 + 40.0 * ease, 3.0 - 20.0 * ease)
+                } else if progress < 0.55 {
+                    (35.0, -17.0)
                 } else {
-                    20.0 * (1.0 - (progress - 0.5) * 2.0)
+                    let t = (progress - 0.55) / 0.45;
+                    let ease = 1.0 - (1.0 - t) * (1.0 - t);
+                    (35.0 * (1.0 - ease), -17.0 * (1.0 - ease))
                 };
-                node.top = Val::Px(offset);
+                node.top = Val::Px(offset_y);
+                node.left = Val::Px(offset_x);
             }
         }
         AnimationType::PlayerHit => {
-            // Le sprite joueur tremble horizontalement
-            if let Ok(mut node) = player_sprite.get_single_mut() {
-                let shake = (progress * 24.0 * std::f32::consts::PI).sin() * 6.0 * (1.0 - progress);
+            // Clignotement rapide + tremblement (style Pokémon : blink + shake)
+            if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
+                // Tremblement avec amplitude décroissante
+                let shake_amp = 8.0 * (1.0 - progress);
+                let shake = (progress * 30.0 * std::f32::consts::PI).sin() * shake_amp;
                 node.left = Val::Px(shake);
+
+                // Clignotement rapide (toggle visible/invisible)
+                let blink_cycle = (progress * 20.0) as u32;
+                *vis = if blink_cycle % 2 == 0 {
+                    Visibility::Visible
+                } else {
+                    Visibility::Hidden
+                };
             }
         }
         AnimationType::OpponentHit => {
-            // Le sprite adversaire tremble horizontalement
-            if let Ok(mut node) = opponent_sprite.get_single_mut() {
-                let shake = (progress * 24.0 * std::f32::consts::PI).sin() * 6.0 * (1.0 - progress);
+            // Clignotement rapide + tremblement (style Pokémon)
+            if let Ok((mut node, mut vis)) = opponent_sprite.get_single_mut() {
+                let shake_amp = 8.0 * (1.0 - progress);
+                let shake = (progress * 30.0 * std::f32::consts::PI).sin() * shake_amp;
                 node.left = Val::Px(shake);
+
+                let blink_cycle = (progress * 20.0) as u32;
+                *vis = if blink_cycle % 2 == 0 {
+                    Visibility::Visible
+                } else {
+                    Visibility::Hidden
+                };
+            }
+        }
+        AnimationType::PlayerFaint => {
+            // K.O. style Pokémon : le sprite rétrécit vers le bas et disparaît
+            if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
+                let shrink = 1.0 - progress;
+                node.height = Val::Px(112.0 * shrink);
+                // Glisser vers le bas en rétrécissant
+                node.top = Val::Px(112.0 * progress * 0.5);
+                if progress > 0.95 {
+                    *vis = Visibility::Hidden;
+                }
+            }
+        }
+        AnimationType::OpponentFaint => {
+            // K.O. style Pokémon : le sprite rétrécit vers le bas et disparaît
+            if let Ok((mut node, mut vis)) = opponent_sprite.get_single_mut() {
+                let shrink = 1.0 - progress;
+                node.height = Val::Px(80.0 * shrink);
+                node.top = Val::Px(80.0 * progress * 0.5);
+                if progress > 0.95 {
+                    *vis = Visibility::Hidden;
+                }
             }
         }
     }
 
     if anim.timer.just_finished() {
-        // Remettre les sprites en place
-        if let Ok(mut node) = player_sprite.get_single_mut() {
-            node.top = Val::Auto;
-            node.left = Val::Auto;
-        }
-        if let Ok(mut node) = opponent_sprite.get_single_mut() {
-            node.top = Val::Auto;
-            node.left = Val::Auto;
+        // Remettre les sprites en place (sauf pour les faint où on les laisse cachés)
+        match anim.anim {
+            AnimationType::PlayerFaint => {
+                if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
+                    node.height = Val::Px(0.0);
+                    node.top = Val::Auto;
+                    node.left = Val::Auto;
+                    *vis = Visibility::Hidden;
+                }
+            }
+            AnimationType::OpponentFaint => {
+                if let Ok((mut node, mut vis)) = opponent_sprite.get_single_mut() {
+                    node.height = Val::Px(0.0);
+                    node.top = Val::Auto;
+                    node.left = Val::Auto;
+                    *vis = Visibility::Hidden;
+                }
+            }
+            _ => {
+                if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
+                    node.top = Val::Auto;
+                    node.left = Val::Auto;
+                    *vis = Visibility::Visible;
+                }
+                if let Ok((mut node, mut vis)) = opponent_sprite.get_single_mut() {
+                    node.top = Val::Auto;
+                    node.left = Val::Auto;
+                    *vis = Visibility::Visible;
+                }
+            }
         }
         commands.remove_resource::<BattleAnimTimer>();
+    }
+}
+
+/// Anime le flash d'impact (overlay blanc qui disparaît rapidement, style Pokémon).
+pub(crate) fn animate_attack_flash(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut flash_query: Query<(Entity, &mut AttackFlashOverlay, &mut BackgroundColor)>,
+) {
+    for (entity, mut flash, mut bg) in &mut flash_query {
+        flash.timer.tick(time.delta());
+        let progress = flash.timer.fraction();
+        // Fade out rapide
+        let alpha = 0.6 * (1.0 - progress);
+        *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, alpha));
+        if flash.timer.just_finished() {
+            commands.entity(entity).despawn_recursive();
+        }
     }
 }

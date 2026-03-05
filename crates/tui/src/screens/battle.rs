@@ -140,11 +140,17 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
             Line::from(Span::styled("       💥", Style::default().fg(Color::Red))),
         ]
     } else {
-        let grid = sprites::pixel::get_pixel_sprite(opp.element, opp.secondary_element);
+        let grid =
+            sprites::pixel::get_blended_sprite(opp.element, opp.secondary_element, opp.age_stage);
         if is_hit {
-            sprites::pixel::render_pixel_sprite_hit(grid)
+            sprites::pixel::render_pixel_sprite_hit(&grid)
         } else {
-            sprites::pixel::render_pixel_sprite(grid, opp.element, opp.secondary_element)
+            sprites::pixel::render_pixel_sprite(
+                &grid,
+                opp.element,
+                opp.secondary_element,
+                opp.age_stage,
+            )
         }
     };
     frame.render_widget(Paragraph::new(sprite_lines), cols[1]);
@@ -178,11 +184,12 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
             Line::from(""),
         ]
     } else {
-        let grid = sprites::pixel::get_pixel_back_sprite(p.element, p.secondary_element);
+        let grid =
+            sprites::pixel::get_blended_back_sprite(p.element, p.secondary_element, p.age_stage);
         if is_hit {
-            sprites::pixel::render_pixel_sprite_hit(grid)
+            sprites::pixel::render_pixel_sprite_hit(&grid)
         } else {
-            sprites::pixel::render_pixel_sprite(grid, p.element, p.secondary_element)
+            sprites::pixel::render_pixel_sprite(&grid, p.element, p.secondary_element, p.age_stage)
         }
     };
     frame.render_widget(Paragraph::new(sprite_lines), cols[0]);

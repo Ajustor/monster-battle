@@ -2867,6 +2867,7 @@ dependencies = [
  "monster-battle-audio",
  "monster-battle-core",
  "monster-battle-network",
+ "monster-battle-sprites",
  "monster-battle-storage",
  "ratatui",
  "serde",
@@ -2889,6 +2890,7 @@ dependencies = [
  "monster-battle-audio",
  "monster-battle-core",
  "monster-battle-network",
+ "monster-battle-sprites",
  "monster-battle-storage",
  "rodio",
  "serde",
@@ -2959,6 +2961,13 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-tungstenite",
+]
+
+[[package]]
+name = "monster-battle-sprites"
+version = "0.8.3"
+dependencies = [
+ "monster-battle-core",
 ]
 
 [[package]]
