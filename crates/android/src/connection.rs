@@ -218,15 +218,24 @@ fn trigger_health_check(mut conn: ResMut<ConnectionState>) {
         let shared = conn.shared.clone();
         let addr = SERVER_ADDR.to_string();
 
-        // Lancer la vérification dans un thread natif (pas de tokio runtime ici)
+        // Lancer la vérification dans un thread natif avec runtime tokio
+        // (même mécanisme que la version check et la TUI)
         std::thread::spawn(move || {
-            let result = std::net::TcpStream::connect_timeout(
-                &format!("{}:443", addr)
-                    .to_socket_addrs_simple()
-                    .unwrap_or_else(|| std::net::SocketAddr::from(([0, 0, 0, 0], 443))),
-                std::time::Duration::from_secs(5),
-            )
-            .is_ok();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build();
+
+            let result = match rt {
+                Ok(rt) => rt.block_on(async {
+                    tokio::time::timeout(
+                        std::time::Duration::from_secs(5),
+                        monster_battle_network::check_server_health(&addr),
+                    )
+                    .await
+                    .unwrap_or(false)
+                }),
+                Err(_) => false,
+            };
 
             if let Ok(mut guard) = shared.lock() {
                 *guard = Some(result);
@@ -256,21 +265,6 @@ fn update_status_bar(
     }
     for mut bg in &mut dot_query {
         *bg = BackgroundColor(color);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  Helper pour résolution DNS simple
-// ═══════════════════════════════════════════════════════════════════
-
-trait ToSocketAddrsSimple {
-    fn to_socket_addrs_simple(&self) -> Option<std::net::SocketAddr>;
-}
-
-impl ToSocketAddrsSimple for str {
-    fn to_socket_addrs_simple(&self) -> Option<std::net::SocketAddr> {
-        use std::net::ToSocketAddrs;
-        self.to_socket_addrs().ok()?.next()
     }
 }
 
