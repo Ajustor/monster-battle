@@ -309,6 +309,7 @@ pub fn spawn_rps_play(mut commands: Commands, data: Res<GameData>) {
 // ═══════════════════════════════════════════════════════════════════
 
 pub fn handle_rps_play_input(
+    mut commands: Commands,
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
@@ -316,6 +317,7 @@ pub fn handle_rps_play_input(
     confirm_query: Query<&Interaction, (Changed<Interaction>, With<ConfirmButton>)>,
     back_query: Query<&Interaction, (Changed<Interaction>, With<MinigameBackButton>)>,
     continue_query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
+    screen_entities: Query<Entity, With<ScreenEntity>>,
 ) {
     let is_over = data.rps_game.as_ref().map(|g| g.is_over()).unwrap_or(true);
     let waiting_confirm = data
@@ -343,27 +345,28 @@ pub fn handle_rps_play_input(
         }
     }
 
+    let mut needs_rebuild = false;
+
     // Confirmer après un round
     for interaction in &confirm_query {
         if *interaction == Interaction::Pressed && waiting_confirm {
             if let Some(ref mut game) = data.rps_game {
                 game.confirm();
-                next_state.set(GameScreen::RpsPlay);
+                needs_rebuild = true;
             }
-            return;
+            break;
         }
     }
 
     // Toucher un choix d'élément
-    if !is_over && !waiting_confirm {
+    if !is_over && !waiting_confirm && !needs_rebuild {
         for (interaction, choice) in &choice_query {
             if *interaction == Interaction::Pressed {
                 if let Some(ref mut game) = data.rps_game {
                     game.play(choice.index);
-                    // Rebuild UI to show result
-                    next_state.set(GameScreen::RpsPlay);
+                    needs_rebuild = true;
                 }
-                return;
+                break;
             }
         }
     }
@@ -376,15 +379,14 @@ pub fn handle_rps_play_input(
             next_state.set(GameScreen::MainMenu);
             return;
         }
-    } else if waiting_confirm {
+    } else if waiting_confirm && !needs_rebuild {
         if keyboard.just_pressed(KeyCode::Enter) {
             if let Some(ref mut game) = data.rps_game {
                 game.confirm();
-                next_state.set(GameScreen::RpsPlay);
+                needs_rebuild = true;
             }
-            return;
         }
-    } else {
+    } else if !needs_rebuild {
         // Sélection avec touches numériques
         let choice = if keyboard.just_pressed(KeyCode::Digit1) {
             Some(0)
@@ -399,14 +401,22 @@ pub fn handle_rps_play_input(
         if let Some(idx) = choice {
             if let Some(ref mut game) = data.rps_game {
                 game.play(idx);
-                next_state.set(GameScreen::RpsPlay);
+                needs_rebuild = true;
             }
-            return;
         }
     }
 
     if keyboard.just_pressed(KeyCode::Escape) {
         clear_minigame_state(&mut data);
         next_state.set(GameScreen::MainMenu);
+        return;
+    }
+
+    // Reconstruire l'UI après une action (despawn + respawn)
+    if needs_rebuild {
+        for entity in &screen_entities {
+            commands.entity(entity).despawn_recursive();
+        }
+        spawn_rps_play(commands, data.into());
     }
 }
