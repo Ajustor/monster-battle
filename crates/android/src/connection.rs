@@ -12,6 +12,75 @@ use bevy::prelude::*;
 use crate::ui::common::colors;
 
 // ═══════════════════════════════════════════════════════════════════
+//  Résolution DNS via JNI (contourne le getaddrinfo Android défaillant)
+// ═══════════════════════════════════════════════════════════════════
+
+/// Résout un nom d'hôte en adresse IP via JNI (`InetAddress.getByName`).
+///
+/// Sur Android, `getaddrinfo` depuis du code natif peut échouer alors que
+/// la résolution DNS Java fonctionne normalement. Cette fonction appelle
+/// le résolveur DNS de la JVM pour contourner le problème.
+#[cfg(target_os = "android")]
+pub fn resolve_host_jni(hostname: &str) -> Option<std::net::IpAddr> {
+    use jni::objects::JValue;
+
+    let app = bevy::window::ANDROID_APP.get()?;
+    let vm_ptr = app.vm_as_ptr() as *mut jni::sys::JavaVM;
+    let vm = unsafe { jni::JavaVM::from_raw(vm_ptr) }.ok()?;
+
+    let result = (|| -> Result<std::net::IpAddr, Box<dyn std::error::Error>> {
+        let mut env = vm.attach_current_thread_as_daemon()?;
+
+        let hostname_jstr = env.new_string(hostname)?;
+
+        // InetAddress addr = InetAddress.getByName(hostname);
+        let inet_address = env
+            .call_static_method(
+                "java/net/InetAddress",
+                "getByName",
+                "(Ljava/lang/String;)Ljava/net/InetAddress;",
+                &[JValue::Object(&hostname_jstr.into())],
+            )?
+            .l()?;
+
+        // String ip = addr.getHostAddress();
+        let ip_jstr = env
+            .call_method(&inet_address, "getHostAddress", "()Ljava/lang/String;", &[])?
+            .l()?;
+
+        let ip_string: String = env.get_string((&ip_jstr).into())?.into();
+        let ip: std::net::IpAddr = ip_string.parse()?;
+
+        Ok(ip)
+    })();
+
+    // Ne pas appeler DestroyJavaVM — la JVM appartient à Android
+    std::mem::forget(vm);
+
+    match result {
+        Ok(ip) => {
+            log::info!("🔍 DNS résolu via JNI : {} → {}", hostname, ip);
+            Some(ip)
+        }
+        Err(e) => {
+            log::error!("❌ Résolution DNS JNI échouée pour {} : {}", hostname, e);
+            None
+        }
+    }
+}
+
+/// Fallback pour les builds non-Android (utilise la résolution système standard).
+#[cfg(not(target_os = "android"))]
+pub fn resolve_host_jni(hostname: &str) -> Option<std::net::IpAddr> {
+    use std::net::ToSocketAddrs;
+    let addr = format!("{}:443", hostname);
+    addr.to_socket_addrs()
+        .ok()?
+        .next()
+        .map(|sa| sa.ip())
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  Ressource de connexion
 // ═══════════════════════════════════════════════════════════════════
 
@@ -233,23 +302,26 @@ fn trigger_health_check(mut conn: ResMut<ConnectionState>) {
         let shared = conn.shared.clone();
         let addr = SERVER_ADDR.to_string();
 
-        // Lancer la vérification dans un thread natif avec runtime tokio
-        // (même mécanisme que la version check et la TUI)
+        // Lancer la vérification dans un thread natif avec runtime tokio.
+        // Résolution DNS via JNI pour contourner le getaddrinfo Android.
         std::thread::spawn(move || {
+            // Résoudre le DNS avant de lancer le runtime tokio
+            let resolved_ip = resolve_host_jni(&addr);
+
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build();
 
-            let result = match rt {
-                Ok(rt) => rt.block_on(async {
+            let result = match (rt, resolved_ip) {
+                (Ok(rt), Some(ip)) => rt.block_on(async {
                     tokio::time::timeout(
                         std::time::Duration::from_secs(5),
-                        monster_battle_network::check_server_health(&addr),
+                        monster_battle_network::check_server_health_resolved(&addr, ip),
                     )
                     .await
                     .unwrap_or(false)
                 }),
-                Err(_) => false,
+                _ => false,
             };
 
             if let Ok(mut guard) = shared.lock() {
@@ -337,20 +409,23 @@ fn trigger_version_check(mut version: ResMut<VersionState>) {
         let addr = SERVER_ADDR.to_string();
 
         std::thread::spawn(move || {
+            // Résoudre le DNS avant de lancer le runtime tokio
+            let resolved_ip = resolve_host_jni(&addr);
+
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build();
 
-            let result = match rt {
-                Ok(rt) => rt.block_on(async {
+            let result = match (rt, resolved_ip) {
+                (Ok(rt), Some(ip)) => rt.block_on(async {
                     tokio::time::timeout(
                         std::time::Duration::from_secs(10),
-                        monster_battle_network::check_server_version(&addr),
+                        monster_battle_network::check_server_version_resolved(&addr, ip),
                     )
                     .await
                     .unwrap_or(None)
                 }),
-                Err(_) => None,
+                _ => None,
             };
 
             if let Ok(mut guard) = shared.lock() {

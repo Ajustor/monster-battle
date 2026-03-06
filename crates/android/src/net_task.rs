@@ -13,6 +13,8 @@ use monster_battle_core::battle::BattleMessage;
 use monster_battle_network::{GameClient, NetAction, NetMessage};
 use monster_battle_storage::MonsterStorage;
 
+use crate::connection::resolve_host_jni;
+
 /// Adresse du serveur de jeu.
 const SERVER_ADDR: &str = "monster-battle.darthoit.eu";
 
@@ -86,6 +88,10 @@ pub fn start_pvp_task(commands: &mut Commands, monster: Monster, fighter_id: uui
     let player_name = monster.name.clone();
 
     std::thread::spawn(move || {
+        // Résoudre le DNS via JNI avant de lancer le runtime tokio
+        // (getaddrinfo peut échouer sur Android natif)
+        let resolved_ip = resolve_host_jni(SERVER_ADDR);
+
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -93,8 +99,11 @@ pub fn start_pvp_task(commands: &mut Commands, monster: Monster, fighter_id: uui
 
         rt.block_on(async move {
             let result: Result<(), anyhow::Error> = async {
+                let ip = resolved_ip
+                    .ok_or_else(|| anyhow::anyhow!("Résolution DNS échouée"))?;
+
                 let client = GameClient::new();
-                client.connect(SERVER_ADDR).await?;
+                client.connect_with_resolved_ip(SERVER_ADDR, ip).await?;
 
                 // S'inscrire dans la file de combat
                 client
@@ -276,6 +285,9 @@ pub fn start_breeding_task(commands: &mut Commands, monster: Monster, fighter_id
     let player_name = monster.name.clone();
 
     std::thread::spawn(move || {
+        // Résoudre le DNS via JNI avant de lancer le runtime tokio
+        let resolved_ip = resolve_host_jni(SERVER_ADDR);
+
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -283,8 +295,11 @@ pub fn start_breeding_task(commands: &mut Commands, monster: Monster, fighter_id
 
         rt.block_on(async move {
             let result: Result<Monster, anyhow::Error> = async {
+                let ip = resolved_ip
+                    .ok_or_else(|| anyhow::anyhow!("Résolution DNS échouée"))?;
+
                 let client = GameClient::new();
-                client.connect(SERVER_ADDR).await?;
+                client.connect_with_resolved_ip(SERVER_ADDR, ip).await?;
 
                 // S'inscrire dans la file de reproduction
                 client
