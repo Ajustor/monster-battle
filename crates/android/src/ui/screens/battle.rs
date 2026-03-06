@@ -216,12 +216,22 @@ fn spawn_battle_ui_inner(
                     &mut images,
                 );
 
+                let opponent_dead = battle.opponent.current_hp == 0;
                 top.spawn((
                     ImageNode::new(handle),
                     Node {
                         width: Val::Px(80.0),
-                        height: Val::Px(80.0),
+                        height: if opponent_dead {
+                            Val::Px(0.0)
+                        } else {
+                            Val::Px(80.0)
+                        },
                         ..default()
+                    },
+                    if opponent_dead {
+                        Visibility::Hidden
+                    } else {
+                        Visibility::Inherited
                     },
                     OpponentSprite,
                 ));
@@ -250,12 +260,22 @@ fn spawn_battle_ui_inner(
                     &mut images,
                 );
 
+                let player_dead = battle.player.current_hp == 0;
                 bottom.spawn((
                     ImageNode::new(handle),
                     Node {
                         width: Val::Px(112.0),
-                        height: Val::Px(112.0),
+                        height: if player_dead {
+                            Val::Px(0.0)
+                        } else {
+                            Val::Px(112.0)
+                        },
                         ..default()
+                    },
+                    if player_dead {
+                        Visibility::Hidden
+                    } else {
+                        Visibility::Inherited
                     },
                     PlayerSprite,
                 ));
