@@ -107,9 +107,9 @@ android-deploy: android-install
 	adb shell am start -n $(ANDROID_PKG)/android.app.NativeActivity
 	adb logcat -s MonsterBattle:* bevy:* wgpu:*
 
-## Builder + lancer sur un appareil connecté (via xbuild)
-android-run:
-	x run -p $(PKG) --release --platform $(PLATFORM) --arch $(ARCH)
+## Builder + installer + lancer sur un appareil connecté (avec icône)
+android-run: android-install
+	adb shell am start -n $(ANDROID_PKG)/android.app.NativeActivity
 
 ## Nettoyer les artefacts Android
 android-clean:
@@ -152,7 +152,7 @@ help:
 	@echo "    make android-apk    — Convertir l'AAB en APK universel"
 	@echo "    make android-install — Installer l'APK sur l'appareil"
 	@echo "    make android-deploy — Installer + lancer + logs (adb)"
-	@echo "    make android-run    — Builder + lancer sur l'appareil"
+	@echo "    make android-run    — Builder + installer + lancer sur l'appareil"
 	@echo "    make android-clean  — Nettoyer les artefacts Android"
 	@echo ""
 	@echo "  TUI :"

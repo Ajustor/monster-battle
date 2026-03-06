@@ -364,8 +364,30 @@ pub fn poll_network_events(
         Ok(event) => event,
         Err(mpsc::TryRecvError::Empty) => return,
         Err(mpsc::TryRecvError::Disconnected) => {
-            // La tâche est terminée sans envoyer d'événement
+            // La tâche réseau est terminée (sender droppé).
+            // Si on est encore sur un écran de recherche, c'est une erreur
+            // silencieuse (thread crash / panic) → informer l'utilisateur.
             commands.remove_resource::<NetTask>();
+            let current = **state;
+            match current {
+                crate::game::GameScreen::PvpSearching => {
+                    log::error!("❌ Tâche réseau PvP terminée sans événement (thread crash ?)");
+                    data.battle_state = None;
+                    data.message = Some("Erreur : connexion au serveur impossible.".to_string());
+                    next_state.set(crate::game::GameScreen::MainMenu);
+                }
+                crate::game::GameScreen::BreedingSearching => {
+                    log::error!(
+                        "❌ Tâche réseau reproduction terminée sans événement (thread crash ?)"
+                    );
+                    data.remote_monster = None;
+                    data.message = Some("Erreur : connexion au serveur impossible.".to_string());
+                    next_state.set(crate::game::GameScreen::MainMenu);
+                }
+                _ => {
+                    // Fin normale de la tâche (combat terminé, reproduction finie, etc.)
+                }
+            }
             return;
         }
     };

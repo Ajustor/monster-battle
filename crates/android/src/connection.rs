@@ -99,6 +99,18 @@ pub struct UpdateBanner;
 #[derive(Component)]
 pub struct UpdateButton;
 
+/// Marqueur pour le nœud racine de la modale de mise à jour.
+#[derive(Component)]
+struct UpdateModal;
+
+/// Marqueur pour le bouton "Fermer" de la modale.
+#[derive(Component)]
+struct UpdateModalDismiss;
+
+/// Ressource de suivi : la modale a déjà été affichée.
+#[derive(Resource, Default)]
+struct UpdateModalShown(bool);
+
 // ═══════════════════════════════════════════════════════════════════
 //  Marqueurs UI
 // ═══════════════════════════════════════════════════════════════════
@@ -126,6 +138,7 @@ impl Plugin for ConnectionPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ConnectionState::default())
             .insert_resource(VersionState::default())
+            .insert_resource(UpdateModalShown::default())
             .add_systems(Startup, spawn_status_bar)
             .add_systems(
                 Update,
@@ -134,6 +147,8 @@ impl Plugin for ConnectionPlugin {
                     update_status_bar,
                     trigger_version_check,
                     handle_update_button,
+                    show_update_modal,
+                    handle_modal_dismiss,
                 ),
             );
     }
@@ -254,14 +269,25 @@ fn update_status_bar(
         return;
     }
 
+    let client_version = env!("CARGO_PKG_VERSION");
+
     let (label, color) = match conn.status {
-        ServerStatus::Unknown => ("Serveur: ...", colors::TEXT_SECONDARY),
-        ServerStatus::Online => ("Serveur: connecte", colors::ACCENT_GREEN),
-        ServerStatus::Offline => ("Serveur: hors ligne", colors::ACCENT_RED),
+        ServerStatus::Unknown => (
+            format!("v{} | Serveur: ...", client_version),
+            colors::TEXT_SECONDARY,
+        ),
+        ServerStatus::Online => (
+            format!("v{} | Serveur: connecte", client_version),
+            colors::ACCENT_GREEN,
+        ),
+        ServerStatus::Offline => (
+            format!("v{} | Serveur: hors ligne", client_version),
+            colors::ACCENT_RED,
+        ),
     };
 
     for mut text in &mut text_query {
-        *text = Text::new(label);
+        *text = Text::new(label.clone());
     }
     for mut bg in &mut dot_query {
         *bg = BackgroundColor(color);
@@ -436,4 +462,194 @@ fn android_open_url(url: &str) {
 
     // Empêcher le wrapper JavaVM d'appeler DestroyJavaVM
     std::mem::forget(vm);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Modale de mise à jour — systèmes
+// ═══════════════════════════════════════════════════════════════════
+
+/// Surveille le changement de `VersionState` → `UpdateRequired` et affiche
+/// une modale par-dessus tout le reste.
+fn show_update_modal(
+    mut commands: Commands,
+    version: Res<VersionState>,
+    mut shown: ResMut<UpdateModalShown>,
+    existing: Query<Entity, With<UpdateModal>>,
+) {
+    // Ne rien faire si pas de changement ou déjà affichée
+    if !version.is_changed() || shown.0 {
+        return;
+    }
+
+    let VersionStatus::UpdateRequired { ref server_version } = version.status else {
+        return;
+    };
+
+    // Nettoyer d'éventuels doublons
+    for entity in &existing {
+        commands.entity(entity).despawn();
+    }
+
+    shown.0 = true;
+    let client_version = env!("CARGO_PKG_VERSION");
+    let sv = server_version.clone();
+
+    log::info!(
+        "📢 Affichage de la modale de mise à jour (client={}, serveur={})",
+        client_version,
+        sv
+    );
+
+    // Fond semi-transparent couvrant tout l'écran
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                top: Val::Px(0.0),
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+            GlobalZIndex(200), // Au-dessus de la barre de statut
+            UpdateModal,
+        ))
+        .with_children(|overlay| {
+            // Carte de la modale
+            overlay
+                .spawn((
+                    Node {
+                        width: Val::Percent(85.0),
+                        max_width: Val::Px(400.0),
+                        padding: UiRect::all(Val::Px(20.0)),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        row_gap: Val::Px(12.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.12, 0.12, 0.18)),
+                    BorderRadius::all(Val::Px(12.0)),
+                ))
+                .with_children(|card| {
+                    // Titre
+                    card.spawn((
+                        Text::new("Mise a jour requise !"),
+                        TextFont {
+                            font_size: 22.0,
+                            ..default()
+                        },
+                        TextColor(colors::ACCENT_YELLOW),
+                    ));
+
+                    // Versions
+                    card.spawn((
+                        Text::new(format!("Votre version : {}", client_version)),
+                        TextFont {
+                            font_size: 15.0,
+                            ..default()
+                        },
+                        TextColor(colors::ACCENT_RED),
+                    ));
+                    card.spawn((
+                        Text::new(format!("Version serveur : {}", sv)),
+                        TextFont {
+                            font_size: 15.0,
+                            ..default()
+                        },
+                        TextColor(colors::ACCENT_GREEN),
+                    ));
+
+                    // Séparateur
+                    card.spawn((
+                        Node {
+                            width: Val::Percent(80.0),
+                            height: Val::Px(1.0),
+                            margin: UiRect::axes(Val::Px(0.0), Val::Px(4.0)),
+                            ..default()
+                        },
+                        BackgroundColor(colors::BORDER),
+                    ));
+
+                    // Explication
+                    card.spawn((
+                        Text::new("Veuillez telecharger la derniere version pour continuer a jouer en ligne."),
+                        TextFont {
+                            font_size: 14.0,
+                            ..default()
+                        },
+                        TextColor(colors::TEXT_SECONDARY),
+                        Node {
+                            max_width: Val::Px(320.0),
+                            ..default()
+                        },
+                    ));
+
+                    // Bouton « Télécharger »
+                    card.spawn((
+                        Node {
+                            width: Val::Percent(80.0),
+                            padding: UiRect::axes(Val::Px(20.0), Val::Px(12.0)),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        BackgroundColor(colors::ACCENT_YELLOW),
+                        BorderRadius::all(Val::Px(8.0)),
+                        UpdateButton,
+                        Interaction::default(),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn((
+                            Text::new("Telecharger la mise a jour"),
+                            TextFont {
+                                font_size: 16.0,
+                                ..default()
+                            },
+                            TextColor(Color::BLACK),
+                        ));
+                    });
+
+                    // Bouton « Fermer »
+                    card.spawn((
+                        Node {
+                            padding: UiRect::axes(Val::Px(20.0), Val::Px(8.0)),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.3, 0.3, 0.4, 0.6)),
+                        BorderRadius::all(Val::Px(6.0)),
+                        UpdateModalDismiss,
+                        Interaction::default(),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn((
+                            Text::new("Fermer"),
+                            TextFont {
+                                font_size: 14.0,
+                                ..default()
+                            },
+                            TextColor(colors::TEXT_SECONDARY),
+                        ));
+                    });
+                });
+        });
+}
+
+/// Détruit la modale lorsque le bouton « Fermer » est pressé.
+fn handle_modal_dismiss(
+    mut commands: Commands,
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<UpdateModalDismiss>)>,
+    modal_query: Query<Entity, With<UpdateModal>>,
+) {
+    for interaction in &interaction_query {
+        if *interaction == Interaction::Pressed {
+            for entity in &modal_query {
+                commands.entity(entity).despawn();
+            }
+        }
+    }
 }
