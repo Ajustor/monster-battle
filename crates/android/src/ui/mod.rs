@@ -139,6 +139,16 @@ impl Plugin for UiPlugin {
                 Update,
                 help::handle_help_input.run_if(in_state(GameScreen::Help)),
             )
+            // ── Mini-jeu : sélection du type ────────────────────
+            .add_systems(
+                OnEnter(GameScreen::MinigameTypeSelect),
+                minigame::spawn_minigame_type_select,
+            )
+            .add_systems(
+                Update,
+                minigame::handle_minigame_type_select_input
+                    .run_if(in_state(GameScreen::MinigameTypeSelect)),
+            )
             // ── Mini-jeu : sélection difficulté ────────────────
             .add_systems(
                 OnEnter(GameScreen::MinigameSelect),
@@ -148,7 +158,7 @@ impl Plugin for UiPlugin {
                 Update,
                 minigame::handle_minigame_select_input.run_if(in_state(GameScreen::MinigameSelect)),
             )
-            // ── Mini-jeu : partie ──────────────────────────────
+            // ── Mini-jeu : morpion ─────────────────────────────
             .add_systems(
                 OnEnter(GameScreen::MinigamePlay),
                 minigame::spawn_minigame_play,
@@ -156,6 +166,24 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 minigame::handle_minigame_play_input.run_if(in_state(GameScreen::MinigamePlay)),
+            )
+            // ── Mini-jeu : Memory ──────────────────────────────
+            .add_systems(OnEnter(GameScreen::MemoryPlay), minigame::spawn_memory_play)
+            .add_systems(
+                Update,
+                minigame::handle_memory_play_input.run_if(in_state(GameScreen::MemoryPlay)),
+            )
+            // ── Mini-jeu : Réflexe ─────────────────────────────
+            .add_systems(OnEnter(GameScreen::ReflexPlay), minigame::spawn_reflex_play)
+            .add_systems(
+                Update,
+                minigame::handle_reflex_play_input.run_if(in_state(GameScreen::ReflexPlay)),
+            )
+            // ── Mini-jeu : PPC ─────────────────────────────────
+            .add_systems(OnEnter(GameScreen::RpsPlay), minigame::spawn_rps_play)
+            .add_systems(
+                Update,
+                minigame::handle_rps_play_input.run_if(in_state(GameScreen::RpsPlay)),
             )
             // ── Réseau (polling global) ─────────────────────────
             .add_systems(Update, crate::net_task::poll_network_events)

@@ -169,6 +169,157 @@ Joueur A                    Serveur                     Joueur B
 | `Esc` | Retour / Annuler |
 | `q` | Quitter |
 
-## 📄 Licence
+## �️ Roadmap & Améliorations
+
+### 🐉 Monstres & Statistiques
+
+- [x] Système complet de monstre (UUID, nom, types, stats, niveau, XP, lignée, wins/losses)
+- [x] 8 types élémentaires + Normal (table d'efficacité ×1.5 / ×0.5)
+- [x] 4 stades de vie (Bébé / Jeune / Adulte / Vieux) avec multiplicateurs de stats
+- [x] Vieillissement en temps réel (~30 jours de durée de vie)
+- [x] Mort de vieillesse automatique
+- [x] 8 traits génétiques héritables (Régénération, Évasion, Coup Critique+, Longévité, etc.)
+- [x] Système de faim (4 niveaux, fenêtre de 12h, mort après 3 jours sans nourriture)
+- [x] 5 types de nourriture (Baie, Viande, Poisson, Herbes, Gâteau) avec effets uniques
+- [x] Buffs temporaires alimentaires (Viande → +15% ATK 1h, Poisson → +15% VIT 1h)
+- [x] Système de bonheur (0–100, 5 niveaux, multiplicateurs stats & XP)
+- [x] Système de lien / affinité (0–100, 5 niveaux, bonus survie & reproduction)
+- [x] Événements aléatoires (6 types, 30% chance, cooldown 1h)
+- [ ] Effets de statut en combat (brûlure, poison, paralysie, sommeil…)
+- [ ] Système d'évolution (formes évoluées selon niveau/conditions)
+- [ ] Objets tenus / équipement (bonus de stats ou effets spéciaux)
+- [ ] Renommage de monstre après création
+- [ ] Plus d'événements aléatoires (maladie, rencontres rares, événements saisonniers)
+- [ ] Système météo / heure du jour affectant le gameplay
+
+### ⚔️ Combat
+
+- [x] Combat interactif style Pokémon (phases Intro → Choix → Exécution → Victoire/Défaite)
+- [x] Files de messages stylisées avec animations
+- [x] Système physique / spécial, coups critiques, précision/évasion, variance de dégâts
+- [x] IA d'entraînement (priorise les attaques super efficaces)
+- [x] Mode Docile (safe) et Sauvage (mort possible)
+- [x] 3 attaques par élément (puissance 50/70/90, précision 100/90/75)
+- [x] 4 attaques par monstre (1 universelle + 2-3 de type)
+- [ ] Apprentissage d'attaques au level-up (remplacer une attaque existante)
+- [ ] Plus de variété d'attaques (multi-coups, self-buffs, effets de terrain)
+- [ ] Objets utilisables en combat (potions, buffs)
+- [ ] Multijoueur local (2 joueurs même appareil)
+
+### 🌐 PvP & Réseau
+
+- [x] Combat PvP en temps réel via serveur relais
+- [x] Matchmaking automatique par file d'attente
+- [x] Arbitrage serveur tour par tour (anti-triche)
+- [x] Gestion forfait / déconnexion (victoire par forfait)
+- [x] Client WebSocket avec support TLS (wss://)
+- [x] Protocole JSON avec préfixe de longueur
+- [x] Health check HTTP (`GET /health`)
+- [x] Vérification de version client/serveur
+- [ ] Système de classement / ELO / ranking saisonnier
+- [ ] Tournois organisés
+- [ ] Rate limiting sur le serveur
+- [ ] Authentification / comptes joueurs
+- [ ] Validation des stats côté serveur (anti-triche renforcé)
+- [ ] Reconnexion en cas de déconnexion mid-combat
+- [ ] Heartbeat automatique serveur (ping/pong périodique)
+- [ ] Logging structuré (tracing) et métriques serveur
+- [ ] Arrêt gracieux du serveur (signal handling)
+
+### 🧬 Reproduction
+
+- [x] Reproduction entre monstres de joueurs différents via serveur
+- [x] Héritage de type (50/50 primaire, 40% type secondaire)
+- [x] Blending de stats (moyenne ± 15% variance)
+- [x] Héritage de traits (50% par trait parent) + 15% mutation
+- [x] Suivi de génération et de parenté
+- [x] Bonus de lien sur les stats de l'enfant
+- [ ] Échange / trade direct de monstres entre joueurs
+- [ ] Visualisation de l'arbre généalogique / lignée
+
+### 🎮 Mini-jeux
+
+- [x] Morpion (Tic-Tac-Toe) avec IA à 3 niveaux de difficulté
+- [x] Memory (paires de cartes, grilles variables selon difficulté)
+- [x] Reflex / QTE (flèches directionnelles, 8/12/16 rounds)
+- [x] RPS Élémentaire (triangles d'éléments, best-of 3/5/7)
+- [x] Récompenses stats + XP selon difficulté et performance
+- [x] Sélection du type de mini-jeu et de la difficulté
+- [ ] Plus de mini-jeux (puzzle, course, rythme…)
+- [ ] Musique dédiée par mini-jeu
+
+### 🖥️ Client TUI
+
+- [x] Interface terminal complète (ratatui + crossterm)
+- [x] Sprites pixel-art en terminal (demi-blocs Unicode)
+- [x] Animations de combat (tachyonfx : coalesce, sweep, glitch, glow, dissolve…)
+- [x] Tous les écrans : menu, liste monstres, création, entraînement, PvP, reproduction, cimetière, aide, mini-jeux
+- [x] Sélection et distribution de nourriture
+- [x] Affichage des événements aléatoires
+- [x] Modal de mise à jour (vérification version serveur)
+- [x] Indicateur de connexion serveur en temps réel (🟢 / 🔴)
+- [ ] Écran dédié détaillé pour un monstre (stats, attaques, arbre familial)
+- [ ] Tableau d'efficacité des types in-game
+- [ ] Revue du log de combat après la fin
+- [ ] Écran de paramètres (volume, serveur, langue)
+- [ ] Thème clair / sombre
+
+### 📱 Client Android
+
+- [x] Interface Bevy complète avec tous les écrans
+- [x] Sprites pixel-art Bevy (RGBA8, scaling ×4, atlas caché)
+- [x] Support tactile (navigation, scroll, tap)
+- [x] Clavier IME pour la saisie de texte (workaround JNI)
+- [x] Indicateur de connexion serveur avec vérification de version
+- [x] Animations de combat (barre HP, flash d'attaque, dots d'attente)
+- [x] Police personnalisée embarquée (emoji/unicode)
+- [x] Réseau asynchrone via threads dédiés (résolution DNS JNI)
+- [ ] Notifications push (monstre affamé, match trouvé en arrière-plan)
+- [ ] Widget écran d'accueil (statut du monstre)
+- [ ] Publication Play Store (métadonnées à compléter)
+- [ ] Gestion mode hors-ligne (dégradation gracieuse)
+- [ ] Nettoyage des écrans stub dans `screens.rs`
+
+### 🎵 Audio
+
+- [x] Moteur audio logiciel (rodio, thread-safe)
+- [x] Synthétiseurs : Oscillateur (Sine/Square/Sawtooth/Triangle) + ADSR, KickDrum, Hihat, Snare
+- [x] Mini-notation Strudel (séquences, groupes, alternances, repos, vitesse, polyphonie)
+- [x] 7 pistes musicales (titre, combat, victoire, défaite, exploration, reproduction, cimetière)
+- [x] 10 effets sonores (hit, crit, menu, level-up, mort, heal, match, fuite)
+- [x] Contrôle volume + mute avec sauvegarde des préférences
+- [x] Outil compositeur interactif (éditeur, preview live, save/load JSON)
+- [ ] Thèmes de combat par élément de l'adversaire
+- [ ] Plus de SFX (nourriture, reproduction, événements, attaques par type)
+- [ ] Sliders de volume dans un écran paramètres
+
+### 💾 Stockage & Sécurité
+
+- [x] Chiffrement AES-256-GCM pour les monstres vivants
+- [x] Clé dérivée de la machine (hostname + username + salt)
+- [x] Monstres morts en clair (archivage consultable)
+- [x] Protections anti-triche (anti-résurrection, validation intégrité)
+- [x] Trait `MonsterStorage` générique (save, load, delete, list, export/import réseau)
+- [ ] Synchronisation cross-device (cloud sync)
+- [ ] Backup / restauration de sauvegarde complète
+- [ ] Système de migration versionné pour le schéma Monster
+
+### 🏗️ Infrastructure & Qualité
+
+- [x] Workspace Cargo organisé (9 crates)
+- [x] Makefile (desktop check/build/run, Android build/APK/install)
+- [x] Pipeline de build Android (xbuild → AAB → APK, aapt2, zipalign, apksigner)
+- [x] Script de génération d'icônes multi-densité
+- [x] Dockerfile multi-stage pour le serveur
+- [x] Viewer de sprites web ([sprites.html](web/sprites.html))
+- [x] Tests unitaires core (génétique, entraînement, mini-jeux — 33 tests)
+- [ ] Tests de combat, faim, bonheur, lien, événements
+- [ ] Tests d'intégration (serveur + client end-to-end)
+- [ ] CI/CD (GitHub Actions)
+- [ ] Localisation / i18n (actuellement français uniquement)
+- [ ] Documentation API en anglais
+- [ ] Réduction des `unwrap()` non critiques
+
+## �📄 Licence
 
 MIT

@@ -74,10 +74,7 @@ pub fn resolve_host_jni(hostname: &str) -> Option<std::net::IpAddr> {
 pub fn resolve_host_jni(hostname: &str) -> Option<std::net::IpAddr> {
     use std::net::ToSocketAddrs;
     let addr = format!("{}:443", hostname);
-    addr.to_socket_addrs()
-        .ok()?
-        .next()
-        .map(|sa| sa.ip())
+    addr.to_socket_addrs().ok()?.next().map(|sa| sa.ip())
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -233,7 +230,7 @@ fn spawn_status_bar(mut commands: Commands) {
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                bottom: Val::Px(8.0),
+                bottom: Val::Px(32.0),
                 left: Val::Px(0.0),
                 width: Val::Percent(100.0),
                 justify_content: JustifyContent::Center,

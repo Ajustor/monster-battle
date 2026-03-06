@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use uuid::Uuid;
 
-use crate::types::{ElementType, Stats, Trait};
+use crate::types::{BondLevel, ElementType, FoodType, HappinessLevel, RandomEvent, Stats, Trait};
 
 /// Durée de vie maximale d'un monstre en jours (sans le trait Longévité).
 const BASE_MAX_AGE_DAYS: i64 = 30;
@@ -173,6 +173,30 @@ pub struct Monster {
     /// Horodatage du premier repas de la fenêtre actuelle (pour reset du compteur).
     #[serde(default)]
     pub meals_window_start: Option<DateTime<Utc>>,
+
+    /// Bonheur du monstre (0–100). Affecte les stats et l'XP.
+    #[serde(default = "default_happiness")]
+    pub happiness: u32,
+
+    /// Lien / affection entre le joueur et le monstre (0–100). Ne descend jamais.
+    #[serde(default)]
+    pub bond: u32,
+
+    /// Buff temporaire de nourriture actif (type + expiration).
+    #[serde(default)]
+    pub food_buff: Option<(FoodType, DateTime<Utc>)>,
+
+    /// Dernière interaction avec le monstre (pour la baisse passive de bonheur).
+    #[serde(default)]
+    pub last_interaction: Option<DateTime<Utc>>,
+
+    /// Dernier événement aléatoire vérifié (pour limiter la fréquence).
+    #[serde(default)]
+    pub last_event_check: Option<DateTime<Utc>>,
+}
+
+fn default_happiness() -> u32 {
+    50
 }
 
 impl Monster {
@@ -199,6 +223,11 @@ impl Monster {
             last_fed: Some(Utc::now()),
             meals_today: 0,
             meals_window_start: None,
+            happiness: 50,
+            bond: 0,
+            food_buff: None,
+            last_interaction: Some(Utc::now()),
+            last_event_check: None,
         }
     }
 
@@ -319,8 +348,8 @@ impl Monster {
         }
     }
 
-    /// Nourrit le monstre. Retourne le nouveau niveau de faim.
-    pub fn feed(&mut self) -> HungerLevel {
+    /// Nourrit le monstre avec un type de nourriture. Retourne le nouveau niveau de faim.
+    pub fn feed_with(&mut self, food: FoodType) -> HungerLevel {
         if self.is_dead() {
             return HungerLevel::Hungry;
         }
@@ -341,9 +370,35 @@ impl Monster {
         }
 
         self.last_fed = Some(now);
-        self.meals_today += 1;
+        self.meals_today += food.meal_weight();
 
-        self.hunger_level()
+        // Appliquer le buff temporaire de nourriture (dure 1h)
+        match food {
+            FoodType::Meat | FoodType::Fish => {
+                self.food_buff = Some((food, now + chrono::Duration::hours(1)));
+            }
+            _ => {}
+        }
+
+        // Bonheur : la nourriture rend heureux !
+        let happiness_bonus = food.happiness_bonus();
+        // Mais si le monstre est suralimenté, le bonheur baisse
+        let hunger = self.hunger_level();
+        if hunger == HungerLevel::Overfed {
+            self.adjust_happiness(-5);
+        } else {
+            self.adjust_happiness(happiness_bonus);
+        }
+
+        // Interaction → lien
+        self.record_interaction();
+
+        hunger
+    }
+
+    /// Nourrit le monstre (compatibilité ancienne — utilise une baie).
+    pub fn feed(&mut self) -> HungerLevel {
+        self.feed_with(FoodType::Berry)
     }
 
     /// Heures depuis le dernier repas.
@@ -355,46 +410,236 @@ impl Monster {
         }
     }
 
+    // ── Système de bonheur ──────────────────────────────────
+
+    /// Retourne le niveau de bonheur actuel.
+    pub fn happiness_level(&self) -> HappinessLevel {
+        HappinessLevel::from_value(self.happiness)
+    }
+
+    /// Ajuste le bonheur (positif ou négatif), borné à 0–100.
+    pub fn adjust_happiness(&mut self, delta: i32) {
+        let new_val = (self.happiness as i32 + delta).clamp(0, 100);
+        self.happiness = new_val as u32;
+    }
+
+    /// Applique la baisse passive de bonheur (appelé périodiquement).
+    /// Le bonheur baisse de 1 pour chaque heure sans interaction.
+    pub fn decay_happiness(&mut self) {
+        if self.is_dead() {
+            return;
+        }
+        let now = Utc::now();
+        let hours_since = match self.last_interaction {
+            Some(last) => (now - last).num_hours(),
+            None => (now - self.born_at).num_hours(),
+        };
+        // Perd 1 de bonheur pour chaque 2h sans interaction, min 2
+        let decay = ((hours_since / 2) as i32).max(0).min(5);
+        if decay > 0 {
+            self.adjust_happiness(-decay);
+        }
+
+        // La faim rend malheureux
+        match self.hunger_level() {
+            HungerLevel::Starving => self.adjust_happiness(-10),
+            HungerLevel::Hungry => self.adjust_happiness(-2),
+            _ => {}
+        }
+    }
+
+    // ── Système de lien ─────────────────────────────────────
+
+    /// Retourne le niveau de lien actuel.
+    pub fn bond_level(&self) -> BondLevel {
+        BondLevel::from_value(self.bond)
+    }
+
+    /// Enregistre une interaction (nourrir, jouer, combattre...).
+    /// Augmente le lien de 1 (ne descend jamais).
+    pub fn record_interaction(&mut self) {
+        self.last_interaction = Some(Utc::now());
+        self.bond = (self.bond + 1).min(100);
+    }
+
+    /// Augmente le lien d'un montant spécifique.
+    pub fn increase_bond(&mut self, amount: u32) {
+        self.bond = (self.bond + amount).min(100);
+    }
+
+    // ── Buff de nourriture ──────────────────────────────────
+
+    /// Retourne le buff de nourriture actif (s'il n'a pas expiré).
+    pub fn active_food_buff(&self) -> Option<FoodType> {
+        if let Some((food, expires)) = &self.food_buff {
+            if Utc::now() < *expires {
+                Some(*food)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Multiplicateur de buff de nourriture pour l'attaque.
+    pub fn food_attack_multiplier(&self) -> f64 {
+        match self.active_food_buff() {
+            Some(FoodType::Meat) => 1.15,
+            _ => 1.0,
+        }
+    }
+
+    /// Multiplicateur de buff de nourriture pour la vitesse.
+    pub fn food_speed_multiplier(&self) -> f64 {
+        match self.active_food_buff() {
+            Some(FoodType::Fish) => 1.15,
+            _ => 1.0,
+        }
+    }
+
+    // ── Événements aléatoires ───────────────────────────────
+
+    /// Tente de déclencher un événement aléatoire.
+    /// Retourne `Some(event)` si un événement se produit (max 1 par heure).
+    pub fn try_random_event(&mut self) -> Option<RandomEvent> {
+        if self.is_dead() {
+            return None;
+        }
+
+        let now = Utc::now();
+
+        // Limiter à 1 événement par heure
+        if let Some(last_check) = self.last_event_check {
+            if (now - last_check).num_minutes() < 60 {
+                return None;
+            }
+        }
+
+        self.last_event_check = Some(now);
+
+        let mut rng = rand::thread_rng();
+        use rand::Rng;
+
+        // 30% de chance qu'un événement se produise
+        if !rng.gen_bool(0.30) {
+            return None;
+        }
+
+        // Choix pondéré de l'événement
+        let roll: f64 = rng.r#gen();
+        let event = if roll < 0.25 {
+            // 25% : trouvé de la nourriture
+            let foods = FoodType::all();
+            let food = foods[rng.gen_range(0..foods.len())];
+            RandomEvent::FoundFood(food)
+        } else if roll < 0.40 {
+            // 15% : entraînement solo
+            RandomEvent::SoloTraining
+        } else if roll < 0.55 {
+            // 15% : cauchemar
+            RandomEvent::Nightmare
+        } else if roll < 0.70 {
+            // 15% : bonne humeur
+            RandomEvent::GoodMood
+        } else if roll < 0.85 {
+            // 15% : illumination
+            RandomEvent::Epiphany
+        } else {
+            // 15% : trésor
+            RandomEvent::TreasureFound
+        };
+
+        Some(event)
+    }
+
+    /// Applique les effets d'un événement aléatoire sur le monstre.
+    /// Retourne un message descriptif.
+    pub fn apply_event(&mut self, event: &RandomEvent) -> String {
+        let desc = event.description(&self.name);
+        match event {
+            RandomEvent::FoundFood(food) => {
+                self.feed_with(*food);
+                format!("{} (nourri avec {} {})", desc, food.icon(), food)
+            }
+            RandomEvent::SoloTraining => {
+                // Petit boost de stats aléatoire
+                let mut rng = rand::thread_rng();
+                use rand::Rng;
+                match rng.gen_range(0..6) {
+                    0 => self.base_stats.hp += 1,
+                    1 => self.base_stats.attack += 1,
+                    2 => self.base_stats.defense += 1,
+                    3 => self.base_stats.speed += 1,
+                    4 => self.base_stats.special_attack += 1,
+                    _ => self.base_stats.special_defense += 1,
+                }
+                self.adjust_happiness(5);
+                desc
+            }
+            RandomEvent::Nightmare => {
+                self.adjust_happiness(-15);
+                desc
+            }
+            RandomEvent::GoodMood => {
+                self.adjust_happiness(20);
+                desc
+            }
+            RandomEvent::Epiphany => {
+                self.gain_xp(20);
+                self.adjust_happiness(10);
+                desc
+            }
+            RandomEvent::TreasureFound => {
+                self.increase_bond(5);
+                self.adjust_happiness(10);
+                desc
+            }
+        }
+    }
+
     /// PV max effectifs (stats de base × facteur de niveau × facteur d'âge).
-    /// Note : les PV max ne sont PAS affectés par la faim pour éviter une spirale de mort.
+    /// Note : les PV max ne sont PAS affectés par la faim/bonheur pour éviter une spirale de mort.
     pub fn max_hp(&self) -> u32 {
         let raw = (self.base_stats.hp + (self.level * 2)) * 2;
         (raw as f64 * self.age_stage().stat_multiplier()) as u32
     }
 
-    /// Attaque effective (stats de base × facteur de niveau × facteur d'âge × faim).
+    /// Multiplicateur combiné de stats (âge × faim × bonheur).
+    fn combined_stat_multiplier(&self) -> f64 {
+        self.age_stage().stat_multiplier()
+            * self.hunger_level().stat_multiplier()
+            * self.happiness_level().stat_multiplier()
+    }
+
+    /// Attaque effective (stats de base × facteur de niveau × facteur d'âge × faim × bonheur × buff food).
     pub fn effective_attack(&self) -> u32 {
         let raw = self.base_stats.attack + (self.level / 2);
-        (raw as f64 * self.age_stage().stat_multiplier() * self.hunger_level().stat_multiplier())
-            as u32
+        (raw as f64 * self.combined_stat_multiplier() * self.food_attack_multiplier()) as u32
     }
 
-    /// Défense effective (facteur d'âge × faim inclus).
+    /// Défense effective (facteur d'âge × faim × bonheur inclus).
     pub fn effective_defense(&self) -> u32 {
         let raw = self.base_stats.defense + (self.level / 2);
-        (raw as f64 * self.age_stage().stat_multiplier() * self.hunger_level().stat_multiplier())
-            as u32
+        (raw as f64 * self.combined_stat_multiplier()) as u32
     }
 
-    /// Vitesse effective (facteur d'âge × faim inclus).
+    /// Vitesse effective (facteur d'âge × faim × bonheur × buff food inclus).
     pub fn effective_speed(&self) -> u32 {
         let raw = self.base_stats.speed + (self.level / 3);
-        (raw as f64 * self.age_stage().stat_multiplier() * self.hunger_level().stat_multiplier())
-            as u32
+        (raw as f64 * self.combined_stat_multiplier() * self.food_speed_multiplier()) as u32
     }
 
-    /// Attaque spéciale effective (facteur d'âge × faim inclus).
+    /// Attaque spéciale effective (facteur d'âge × faim × bonheur inclus).
     pub fn effective_sp_attack(&self) -> u32 {
         let raw = self.base_stats.special_attack + (self.level / 2);
-        (raw as f64 * self.age_stage().stat_multiplier() * self.hunger_level().stat_multiplier())
-            as u32
+        (raw as f64 * self.combined_stat_multiplier()) as u32
     }
 
-    /// Défense spéciale effective (facteur d'âge × faim inclus).
+    /// Défense spéciale effective (facteur d'âge × faim × bonheur inclus).
     pub fn effective_sp_defense(&self) -> u32 {
         let raw = self.base_stats.special_defense + (self.level / 2);
-        (raw as f64 * self.age_stage().stat_multiplier() * self.hunger_level().stat_multiplier())
-            as u32
+        (raw as f64 * self.combined_stat_multiplier()) as u32
     }
 
     /// XP nécessaire pour passer au niveau suivant.
@@ -408,13 +653,15 @@ impl Monster {
             return 0;
         }
 
-        let xp_multiplier = if self.traits.contains(&Trait::FastLearner) {
+        let trait_multiplier = if self.traits.contains(&Trait::FastLearner) {
             1.5
         } else {
             1.0
         };
 
-        self.xp += (amount as f64 * xp_multiplier) as u32;
+        let happiness_multiplier = self.happiness_level().xp_multiplier();
+
+        self.xp += (amount as f64 * trait_multiplier * happiness_multiplier) as u32;
         let mut levels_gained = 0;
 
         while self.level < 100 && self.xp >= self.xp_to_next_level() {
@@ -446,8 +693,15 @@ impl Monster {
         let actual_damage = raw_damage.min(self.current_hp);
 
         if actual_damage >= self.current_hp {
+            // Tenacity : chance de survivre avec 1 PV
             if self.traits.contains(&Trait::Tenacity) && rand::random::<f64>() < 0.15 {
-                // Survit avec 1 PV
+                let dmg = self.current_hp - 1;
+                self.current_hp = 1;
+                return dmg;
+            }
+            // Bond survival : chance de survivre grâce au lien
+            let bond_chance = self.bond_level().survival_chance();
+            if bond_chance > 0.0 && rand::random::<f64>() < bond_chance {
                 let dmg = self.current_hp - 1;
                 self.current_hp = 1;
                 return dmg;
@@ -474,9 +728,16 @@ impl Monster {
         };
         let stage = self.age_stage();
         let hunger = self.hunger_level();
+        let happiness = self.happiness_level();
+        let bond = self.bond_level();
+        let bond_title = bond
+            .title()
+            .map(|t| format!(" «{}»", t))
+            .unwrap_or_default();
         format!(
-            "{} [{}] — Nv.{} — {} — PV: {}/{} — {} {} ({}j/{}j) — {} {} — {}",
+            "{}{} [{}] — Nv.{} — {} — PV: {}/{} — {} {} ({}j/{}j) — {} {} — {} {} — {} {} — {}",
             self.name,
+            bond_title,
             types,
             self.level,
             status,
@@ -488,6 +749,10 @@ impl Monster {
             self.max_age_days(),
             hunger.icon(),
             hunger,
+            happiness.icon(),
+            happiness,
+            bond.icon(),
+            bond,
             if self.traits.is_empty() {
                 "Aucun trait".to_string()
             } else {

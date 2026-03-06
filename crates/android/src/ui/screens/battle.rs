@@ -894,8 +894,14 @@ fn apply_battle_results(data: &mut GameData) {
         fighter.wins += 1;
         fighter.gain_xp(battle.xp_gained);
         fighter.current_hp = fighter.max_hp();
+        // Victoire → bonheur + lien
+        fighter.adjust_happiness(10);
+        fighter.record_interaction();
+        fighter.increase_bond(2);
     } else {
         fighter.losses += 1;
+        // Défaite → perte de bonheur
+        fighter.adjust_happiness(-5);
         if battle.loser_died {
             fighter.died_at = Some(chrono::Utc::now());
         } else {
