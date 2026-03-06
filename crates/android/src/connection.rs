@@ -559,7 +559,7 @@ fn show_update_modal(
 
     // Nettoyer d'éventuels doublons
     for entity in &existing {
-        commands.entity(entity).despawn();
+        commands.entity(entity).despawn_recursive();
     }
 
     shown.0 = true;
@@ -720,7 +720,7 @@ fn handle_modal_dismiss(
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
             for entity in &modal_query {
-                commands.entity(entity).despawn();
+                commands.entity(entity).despawn_recursive();
             }
         }
     }
