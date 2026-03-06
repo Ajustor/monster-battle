@@ -216,7 +216,18 @@ fn spawn_battle_ui_inner(
                     &mut images,
                 );
 
-                let opponent_dead = battle.opponent.current_hp == 0;
+                // Le sprite reste visible tant que l'animation de K.O. n'a pas été
+                // déclenchée (message courant ou encore dans la file).
+                let faint_still_pending = battle.opponent.current_hp == 0
+                    && (battle
+                        .current_message
+                        .as_ref()
+                        .map_or(false, |m| matches!(m.anim_type, Some(AnimationType::OpponentFaint)))
+                        || battle
+                            .message_queue
+                            .iter()
+                            .any(|m| matches!(m.anim_type, Some(AnimationType::OpponentFaint))));
+                let opponent_dead = battle.opponent.current_hp == 0 && !faint_still_pending;
                 top.spawn((
                     ImageNode::new(handle),
                     Node {
@@ -260,7 +271,18 @@ fn spawn_battle_ui_inner(
                     &mut images,
                 );
 
-                let player_dead = battle.player.current_hp == 0;
+                // Même logique : garder le sprite visible jusqu'à ce que
+                // l'animation de K.O. ait été consommée.
+                let faint_still_pending = battle.player.current_hp == 0
+                    && (battle
+                        .current_message
+                        .as_ref()
+                        .map_or(false, |m| matches!(m.anim_type, Some(AnimationType::PlayerFaint)))
+                        || battle
+                            .message_queue
+                            .iter()
+                            .any(|m| matches!(m.anim_type, Some(AnimationType::PlayerFaint))));
+                let player_dead = battle.player.current_hp == 0 && !faint_still_pending;
                 bottom.spawn((
                     ImageNode::new(handle),
                     Node {
