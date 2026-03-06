@@ -286,12 +286,14 @@ fn spawn_arrow_btn(parent: &mut ChildBuilder, arrow: Arrow) {
 // ═══════════════════════════════════════════════════════════════════
 
 pub fn handle_reflex_play_input(
+    mut commands: Commands,
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
     arrow_query: Query<(&Interaction, &ArrowButton), Changed<Interaction>>,
     back_query: Query<&Interaction, (Changed<Interaction>, With<MinigameBackButton>)>,
     continue_query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
+    screen_entities: Query<Entity, With<ScreenEntity>>,
 ) {
     let is_over = data
         .reflex_game
@@ -318,17 +320,15 @@ pub fn handle_reflex_play_input(
         }
     }
 
+    let mut needs_rebuild = false;
+
     // Toucher une flèche
     if !is_over {
         for (interaction, arrow_btn) in &arrow_query {
             if *interaction == Interaction::Pressed {
                 if let Some(ref mut game) = data.reflex_game {
                     game.submit(arrow_btn.arrow);
-                    // Reconstruct UI after action (Bevy respawns via StateScoped)
-                    if game.is_over() || !game.is_over() {
-                        // Force UI rebuild
-                        next_state.set(GameScreen::ReflexPlay);
-                    }
+                    needs_rebuild = true;
                 }
             }
         }
@@ -351,8 +351,7 @@ pub fn handle_reflex_play_input(
         if let Some(a) = arrow {
             if let Some(ref mut game) = data.reflex_game {
                 game.submit(a);
-                // Force UI rebuild
-                next_state.set(GameScreen::ReflexPlay);
+                needs_rebuild = true;
             }
         }
     } else if keyboard.just_pressed(KeyCode::Enter) {
@@ -365,5 +364,14 @@ pub fn handle_reflex_play_input(
     if keyboard.just_pressed(KeyCode::Escape) {
         clear_minigame_state(&mut data);
         next_state.set(GameScreen::MainMenu);
+        return;
+    }
+
+    // Reconstruire l'UI après une action (despawn + respawn)
+    if needs_rebuild {
+        for entity in &screen_entities {
+            commands.entity(entity).despawn_recursive();
+        }
+        spawn_reflex_play(commands, data.into());
     }
 }

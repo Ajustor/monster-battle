@@ -356,7 +356,10 @@ fn spawn_monster_list_inner(
                                     let bond = monster.bond_level();
                                     let bond_title = bond.title().unwrap_or("");
                                     info.spawn((
-                                        Text::new(format!("Lien: {} {}", bond, bond_title,)),
+                                        Text::new(format!(
+                                            "Lien affectif: {} {}",
+                                            bond, bond_title,
+                                        )),
                                         TextFont {
                                             font_size: fonts::SMALL,
                                             ..default()
