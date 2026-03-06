@@ -1,14 +1,18 @@
-//! Écran du mini-jeu morpion (Tic-Tac-Toe).
+//! Écran du mini-jeu morpion (Tic-Tac-Toe) — Android / Bevy.
 
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
-use monster_battle_core::minigame::apply_reward;
+use monster_battle_core::minigame::MinigameType;
 use monster_battle_core::minigame::tictactoe::{Cell, Difficulty, TicTacToe};
 use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, colors, fonts};
+
+use super::{
+    ContinueButton, MinigameBackButton, StatusText, apply_minigame_reward, clear_minigame_state,
+};
 
 // ═══════════════════════════════════════════════════════════════════
 //  Composants
@@ -20,23 +24,11 @@ pub(crate) struct DifficultyButton {
     pub difficulty: Difficulty,
 }
 
-/// Marqueur pour le bouton retour.
-#[derive(Component)]
-pub(crate) struct MinigameBackButton;
-
 /// Marqueur pour les cases du morpion.
 #[derive(Component)]
 pub(crate) struct BoardCell {
     pub index: usize,
 }
-
-/// Marqueur pour le bouton "Continuer" après fin de partie.
-#[derive(Component)]
-pub(crate) struct ContinueButton;
-
-/// Marqueur pour le texte de statut.
-#[derive(Component)]
-pub(crate) struct StatusText;
 
 /// Marqueur pour le texte d'une case.
 #[derive(Component)]
@@ -48,12 +40,14 @@ pub(crate) struct CellText {
 //  Sélection de la difficulté
 // ═══════════════════════════════════════════════════════════════════
 
-pub(crate) fn spawn_minigame_select(mut commands: Commands, data: Res<GameData>) {
+pub fn spawn_minigame_select(mut commands: Commands, data: Res<GameData>) {
     let monster_name = data
         .minigame_monster_name
         .as_deref()
         .unwrap_or("?")
         .to_string();
+
+    let game_type = data.minigame_type.unwrap_or(MinigameType::TicTacToe);
 
     commands
         .spawn((
@@ -108,7 +102,12 @@ pub(crate) fn spawn_minigame_select(mut commands: Commands, data: Res<GameData>)
 
             // Titre
             parent.spawn((
-                Text::new(format!("Morpion -- {}", monster_name)),
+                Text::new(format!(
+                    "{} {} -- {}",
+                    game_type.icon(),
+                    game_type.label(),
+                    monster_name
+                )),
                 TextFont {
                     font_size: fonts::HEADING,
                     ..default()
@@ -133,14 +132,9 @@ pub(crate) fn spawn_minigame_select(mut commands: Commands, data: Res<GameData>)
                 },
             ));
 
-            // Boutons de difficulté
-            for d in Difficulty::all() {
-                let desc = match d {
-                    Difficulty::Easy => "IA aleatoire -- recompense faible",
-                    Difficulty::Medium => "IA mixte -- recompense moyenne",
-                    Difficulty::Hard => "IA imbattable -- recompense elevee",
-                };
-
+            // Boutons de difficulté (selon le type de jeu)
+            let difficulties = difficulty_labels(game_type);
+            for (label, desc, idx) in difficulties {
                 parent
                     .spawn((
                         Node {
@@ -153,12 +147,14 @@ pub(crate) fn spawn_minigame_select(mut commands: Commands, data: Res<GameData>)
                         },
                         BackgroundColor(colors::PANEL),
                         BorderRadius::all(Val::Px(8.0)),
-                        DifficultyButton { difficulty: *d },
+                        DifficultyButton {
+                            difficulty: idx_to_difficulty(idx),
+                        },
                         Interaction::default(),
                     ))
                     .with_children(|btn| {
                         btn.spawn((
-                            Text::new(d.label().to_string()),
+                            Text::new(label.to_string()),
                             TextFont {
                                 font_size: fonts::BODY,
                                 ..default()
@@ -178,7 +174,40 @@ pub(crate) fn spawn_minigame_select(mut commands: Commands, data: Res<GameData>)
         });
 }
 
-pub(crate) fn handle_minigame_select_input(
+fn difficulty_labels(game_type: MinigameType) -> Vec<(&'static str, &'static str, usize)> {
+    match game_type {
+        MinigameType::TicTacToe => vec![
+            ("Facile", "IA aleatoire -- recompense faible", 0),
+            ("Moyen", "IA mixte -- recompense moyenne", 1),
+            ("Difficile", "IA imbattable -- recompense elevee", 2),
+        ],
+        MinigameType::Memory => vec![
+            ("Facile", "Grille 4x3 -- recompense faible", 0),
+            ("Moyen", "Grille 4x4 -- recompense moyenne", 1),
+            ("Difficile", "Grille 4x5 -- recompense elevee", 2),
+        ],
+        MinigameType::Reflex => vec![
+            ("Facile", "8 rounds -- recompense faible", 0),
+            ("Moyen", "12 rounds -- recompense moyenne", 1),
+            ("Difficile", "16 rounds -- recompense elevee", 2),
+        ],
+        MinigameType::Rps => vec![
+            ("Facile", "BO3 -- recompense faible", 0),
+            ("Moyen", "BO5 -- recompense moyenne", 1),
+            ("Difficile", "BO7 -- recompense elevee", 2),
+        ],
+    }
+}
+
+fn idx_to_difficulty(idx: usize) -> Difficulty {
+    match idx {
+        0 => Difficulty::Easy,
+        1 => Difficulty::Medium,
+        _ => Difficulty::Hard,
+    }
+}
+
+pub fn handle_minigame_select_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
@@ -188,10 +217,7 @@ pub(crate) fn handle_minigame_select_input(
     // Toucher retour
     for interaction in &back_query {
         if *interaction == Interaction::Pressed {
-            data.tictactoe = None;
-            data.minigame_monster_id = None;
-            data.minigame_monster_name = None;
-            next_state.set(GameScreen::MainMenu);
+            next_state.set(GameScreen::MinigameTypeSelect);
             data.menu_index = 0;
             return;
         }
@@ -200,27 +226,79 @@ pub(crate) fn handle_minigame_select_input(
     // Toucher difficulté
     for (interaction, btn) in &difficulty_query {
         if *interaction == Interaction::Pressed {
-            data.tictactoe = Some(TicTacToe::new(btn.difficulty));
-            next_state.set(GameScreen::MinigamePlay);
+            let game_type = data.minigame_type.unwrap_or(MinigameType::TicTacToe);
+            start_game(&mut data, &mut next_state, game_type, btn.difficulty);
             return;
         }
     }
 
     // Clavier
     if keyboard.just_pressed(KeyCode::Escape) {
-        data.tictactoe = None;
-        data.minigame_monster_id = None;
-        data.minigame_monster_name = None;
-        next_state.set(GameScreen::MainMenu);
+        next_state.set(GameScreen::MinigameTypeSelect);
         data.menu_index = 0;
     }
 }
 
+fn start_game(
+    data: &mut ResMut<GameData>,
+    next_state: &mut ResMut<NextState<GameScreen>>,
+    game_type: MinigameType,
+    difficulty: Difficulty,
+) {
+    match game_type {
+        MinigameType::TicTacToe => {
+            data.tictactoe = Some(TicTacToe::new(difficulty));
+            next_state.set(GameScreen::MinigamePlay);
+        }
+        MinigameType::Memory => {
+            use monster_battle_core::minigame::memory;
+            let d = match difficulty {
+                Difficulty::Easy => memory::Difficulty::Easy,
+                Difficulty::Medium => memory::Difficulty::Medium,
+                Difficulty::Hard => memory::Difficulty::Hard,
+            };
+            data.memory_game = Some(memory::MemoryGame::new(d));
+            next_state.set(GameScreen::MemoryPlay);
+        }
+        MinigameType::Reflex => {
+            use monster_battle_core::minigame::reflex;
+            let d = match difficulty {
+                Difficulty::Easy => reflex::Difficulty::Easy,
+                Difficulty::Medium => reflex::Difficulty::Medium,
+                Difficulty::Hard => reflex::Difficulty::Hard,
+            };
+            data.reflex_game = Some(reflex::ReflexGame::new(d));
+            next_state.set(GameScreen::ReflexPlay);
+        }
+        MinigameType::Rps => {
+            use monster_battle_core::minigame::rps;
+            let d = match difficulty {
+                Difficulty::Easy => rps::Difficulty::Easy,
+                Difficulty::Medium => rps::Difficulty::Medium,
+                Difficulty::Hard => rps::Difficulty::Hard,
+            };
+            // Récupérer le type du monstre pour le bonus
+            let monster_type = data
+                .minigame_monster_id
+                .and_then(|id| {
+                    data.storage
+                        .list_alive()
+                        .ok()
+                        .and_then(|ms| ms.into_iter().find(|m| m.id == id))
+                })
+                .map(|m| m.primary_type)
+                .unwrap_or(monster_battle_core::types::ElementType::Fire);
+            data.rps_game = Some(rps::RpsGame::new(d, monster_type));
+            next_state.set(GameScreen::RpsPlay);
+        }
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════
-//  Plateau de jeu
+//  Plateau de jeu morpion
 // ═══════════════════════════════════════════════════════════════════
 
-pub(crate) fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>) {
+pub fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>) {
     let monster_name = data
         .minigame_monster_name
         .as_deref()
@@ -340,7 +418,7 @@ pub(crate) fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>) {
                     }
                 });
 
-            // Bouton retour (en bas)
+            // Boutons en bas
             parent
                 .spawn(Node {
                     margin: UiRect::top(Val::Px(24.0)),
@@ -349,7 +427,6 @@ pub(crate) fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>) {
                     ..default()
                 })
                 .with_children(|bar| {
-                    // Bouton continuer (caché initialement, affiché à la fin)
                     bar.spawn((
                         Node {
                             padding: UiRect::axes(Val::Px(20.0), Val::Px(12.0)),
@@ -372,7 +449,6 @@ pub(crate) fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>) {
                         ));
                     });
 
-                    // Bouton abandon
                     bar.spawn((
                         Node {
                             padding: UiRect::axes(Val::Px(20.0), Val::Px(12.0)),
@@ -397,7 +473,7 @@ pub(crate) fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>) {
         });
 }
 
-pub(crate) fn handle_minigame_play_input(
+pub fn handle_minigame_play_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
@@ -413,11 +489,8 @@ pub(crate) fn handle_minigame_play_input(
     // Toucher retour / abandon
     for interaction in &back_query {
         if *interaction == Interaction::Pressed {
-            data.tictactoe = None;
-            data.minigame_monster_id = None;
-            data.minigame_monster_name = None;
+            clear_minigame_state(&mut data);
             next_state.set(GameScreen::MainMenu);
-            data.menu_index = 0;
             return;
         }
     }
@@ -426,11 +499,8 @@ pub(crate) fn handle_minigame_play_input(
     for interaction in &continue_query {
         if *interaction == Interaction::Pressed && is_over {
             apply_minigame_reward(&mut data);
-            data.tictactoe = None;
-            data.minigame_monster_id = None;
-            data.minigame_monster_name = None;
+            clear_minigame_state(&mut data);
             next_state.set(GameScreen::MainMenu);
-            data.menu_index = 0;
             return;
         }
     }
@@ -468,26 +538,19 @@ pub(crate) fn handle_minigame_play_input(
         }
     } else if keyboard.just_pressed(KeyCode::Enter) {
         apply_minigame_reward(&mut data);
-        data.tictactoe = None;
-        data.minigame_monster_id = None;
-        data.minigame_monster_name = None;
+        clear_minigame_state(&mut data);
         next_state.set(GameScreen::MainMenu);
-        data.menu_index = 0;
         return;
     }
 
     if keyboard.just_pressed(KeyCode::Escape) {
-        data.tictactoe = None;
-        data.minigame_monster_id = None;
-        data.minigame_monster_name = None;
+        clear_minigame_state(&mut data);
         next_state.set(GameScreen::MainMenu);
-        data.menu_index = 0;
         return;
     }
 
     // Rafraîchir l'affichage
     if let Some(ref game) = data.tictactoe {
-        // Mettre à jour le statut
         let status_msg = if game.is_over() {
             let reward = game.reward();
             if reward.is_empty() {
@@ -503,7 +566,6 @@ pub(crate) fn handle_minigame_play_input(
             **text = status_msg.clone();
         }
 
-        // Mettre à jour les cases
         let winning = game.winning_line.unwrap_or([usize::MAX; 3]);
         for (mut text, mut bg, cell_marker) in &mut cell_texts {
             let cell = game.board[cell_marker.index];
@@ -512,7 +574,6 @@ pub(crate) fn handle_minigame_play_input(
             *bg = BackgroundColor(cell_bg(cell, is_winning));
         }
 
-        // Afficher le bouton continuer si la partie est finie
         if game.is_over() {
             for mut node in &mut continue_btn {
                 node.display = Display::Flex;
@@ -542,38 +603,5 @@ fn cell_text_color(cell: Cell) -> Color {
         Cell::Empty => colors::TEXT_SECONDARY,
         Cell::X => Color::srgb(0.4, 0.8, 1.0),
         Cell::O => Color::srgb(1.0, 0.4, 0.4),
-    }
-}
-
-/// Applique la récompense du mini-jeu au monstre sélectionné et sauvegarde.
-fn apply_minigame_reward(data: &mut ResMut<GameData>) {
-    let Some(ref game) = data.tictactoe else {
-        return;
-    };
-    let reward = game.reward();
-    if reward.is_empty() {
-        data.message = Some(format!("{} -- Pas de recompense.", game.result_label()));
-        return;
-    }
-
-    let Some(monster_id) = data.minigame_monster_id else {
-        return;
-    };
-
-    if let Ok(mut monsters) = data.storage.list_alive() {
-        if let Some(m) = monsters.iter_mut().find(|m| m.id == monster_id) {
-            apply_reward(&mut m.base_stats, &reward);
-            let levels = m.gain_xp(reward.xp);
-            let mut msg = format!("{} -- {}", game.result_label(), reward.summary());
-            if levels > 0 {
-                msg.push_str(&format!(
-                    " +{} niveau{} !",
-                    levels,
-                    if levels > 1 { "x" } else { "" }
-                ));
-            }
-            data.message = Some(msg);
-            let _ = data.storage.save(m);
-        }
     }
 }

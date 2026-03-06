@@ -16,6 +16,10 @@ use uuid::Uuid;
 
 use monster_battle_core::Monster;
 use monster_battle_core::battle::{BattleMessage, BattlePhase, BattleState, MessageStyle};
+use monster_battle_core::minigame::MinigameType;
+use monster_battle_core::minigame::memory::MemoryGame;
+use monster_battle_core::minigame::reflex::ReflexGame;
+use monster_battle_core::minigame::rps::RpsGame;
 use monster_battle_core::minigame::tictactoe::TicTacToe;
 use monster_battle_network::{
     GameClient, NetAction, NetMessage, check_server_health, check_server_version,
@@ -126,12 +130,30 @@ pub struct App {
     pub monster_select_index: usize,
 
     // --- Mini-jeu ---
+    /// Type de mini-jeu sélectionné.
+    pub minigame_type: Option<MinigameType>,
     /// État de la partie de morpion en cours.
     pub tictactoe: Option<TicTacToe>,
+    /// État de la partie de Memory en cours.
+    pub memory_game: Option<MemoryGame>,
+    /// État de la partie de Réflexe en cours.
+    pub reflex_game: Option<ReflexGame>,
+    /// État de la partie de PPC en cours.
+    pub rps_game: Option<RpsGame>,
     /// UUID du monstre participant au mini-jeu.
     pub minigame_monster_id: Option<Uuid>,
     /// Nom du monstre (pour affichage).
     pub minigame_monster_name: Option<String>,
+
+    // --- Nourriture ---
+    /// En cours de sélection de nourriture ?
+    pub food_selecting: bool,
+    /// Index de sélection du type de nourriture.
+    pub food_select_index: usize,
+
+    // --- Événements aléatoires ---
+    /// Message d'événement aléatoire en attente d'affichage.
+    pub event_message: Option<String>,
 }
 
 impl App {
@@ -169,9 +191,16 @@ impl App {
             net_task: None,
             pvp_attack_tx: None,
             monster_select_index: 0,
+            minigame_type: None,
             tictactoe: None,
+            memory_game: None,
+            reflex_game: None,
+            rps_game: None,
             minigame_monster_id: None,
             minigame_monster_name: None,
+            food_selecting: false,
+            food_select_index: 0,
+            event_message: None,
         })
     }
 
@@ -440,6 +469,43 @@ impl App {
             return;
         }
 
+        // ── Mini-jeu : sélection du type de jeu ──
+        if self.current_screen == Screen::MinigameTypeSelect {
+            let types = MinigameType::all();
+            match code {
+                KeyCode::Up => {
+                    if self.menu_index > 0 {
+                        self.menu_index -= 1;
+                        crate::audio::sfx_menu_move();
+                    }
+                }
+                KeyCode::Down => {
+                    if self.menu_index < types.len() - 1 {
+                        self.menu_index += 1;
+                    }
+                    crate::audio::sfx_menu_move();
+                }
+                KeyCode::Enter => {
+                    let selected = types[self.menu_index % types.len()];
+                    self.minigame_type = Some(selected);
+                    self.current_screen = Screen::MinigameSelect;
+                    self.menu_index = 0;
+                    crate::audio::sfx_menu_select();
+                }
+                KeyCode::Esc => {
+                    self.current_screen = Screen::MainMenu;
+                    self.menu_index = 0;
+                    self.minigame_monster_id = None;
+                    self.minigame_monster_name = None;
+                    self.minigame_type = None;
+                    self.message = None;
+                    crate::audio::play_title_music();
+                }
+                _ => {}
+            }
+            return;
+        }
+
         // ── Mini-jeu : sélection de la difficulté ──
         if self.current_screen == Screen::MinigameSelect {
             match code {
@@ -454,22 +520,59 @@ impl App {
                     crate::audio::sfx_menu_move();
                 }
                 KeyCode::Enter => {
-                    use monster_battle_core::minigame::tictactoe::Difficulty;
-                    let diffs = Difficulty::all();
-                    let d = diffs[self.menu_index % diffs.len()];
-                    self.tictactoe = Some(TicTacToe::new(d));
-                    self.current_screen = Screen::MinigamePlay;
+                    let game_type = self.minigame_type.unwrap_or(MinigameType::TicTacToe);
+                    match game_type {
+                        MinigameType::TicTacToe => {
+                            use monster_battle_core::minigame::tictactoe::Difficulty;
+                            let diffs = Difficulty::all();
+                            let d = diffs[self.menu_index % diffs.len()];
+                            self.tictactoe = Some(TicTacToe::new(d));
+                            self.current_screen = Screen::MinigamePlay;
+                        }
+                        MinigameType::Memory => {
+                            use monster_battle_core::minigame::memory::Difficulty;
+                            let diffs = Difficulty::all();
+                            let d = diffs[self.menu_index % diffs.len()];
+                            self.memory_game = Some(MemoryGame::new(d));
+                            self.current_screen = Screen::MemoryPlay;
+                        }
+                        MinigameType::Reflex => {
+                            use monster_battle_core::minigame::reflex::Difficulty;
+                            let diffs = Difficulty::all();
+                            let d = diffs[self.menu_index % diffs.len()];
+                            self.reflex_game = Some(ReflexGame::new(d));
+                            self.current_screen = Screen::ReflexPlay;
+                        }
+                        MinigameType::Rps => {
+                            use monster_battle_core::minigame::rps::Difficulty;
+                            let diffs = Difficulty::all();
+                            let d = diffs[self.menu_index % diffs.len()];
+                            // Récupérer le type du monstre sélectionné
+                            let monster_type = self
+                                .minigame_monster_id
+                                .and_then(|id| {
+                                    self.storage
+                                        .list_alive()
+                                        .ok()
+                                        .and_then(|ms| ms.into_iter().find(|m| m.id == id))
+                                })
+                                .map(|m| m.primary_type)
+                                .unwrap_or(monster_battle_core::types::ElementType::Fire);
+                            self.rps_game = Some(RpsGame::new(d, monster_type));
+                            self.current_screen = Screen::RpsPlay;
+                        }
+                    }
                     self.menu_index = 0;
                     crate::audio::sfx_menu_select();
                 }
                 KeyCode::Esc => {
-                    self.current_screen = Screen::MainMenu;
+                    self.current_screen = Screen::MinigameTypeSelect;
                     self.menu_index = 0;
                     self.tictactoe = None;
-                    self.minigame_monster_id = None;
-                    self.minigame_monster_name = None;
+                    self.memory_game = None;
+                    self.reflex_game = None;
+                    self.rps_game = None;
                     self.message = None;
-                    crate::audio::play_title_music();
                 }
                 _ => {}
             }
@@ -486,6 +589,7 @@ impl App {
                         self.tictactoe = None;
                         self.minigame_monster_id = None;
                         self.minigame_monster_name = None;
+                        self.minigame_type = None;
                         self.current_screen = Screen::MainMenu;
                         self.menu_index = 0;
                         crate::audio::play_title_music();
@@ -504,6 +608,152 @@ impl App {
                             self.tictactoe = None;
                             self.minigame_monster_id = None;
                             self.minigame_monster_name = None;
+                            self.minigame_type = None;
+                            self.current_screen = Screen::MainMenu;
+                            self.menu_index = 0;
+                            self.message = None;
+                            crate::audio::play_title_music();
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            return;
+        }
+
+        // ── Mini-jeu : Memory ──
+        if self.current_screen == Screen::MemoryPlay {
+            if let Some(ref mut game) = self.memory_game {
+                if game.is_over() {
+                    if code == KeyCode::Enter || code == KeyCode::Esc {
+                        self.apply_minigame_reward();
+                        self.memory_game = None;
+                        self.minigame_monster_id = None;
+                        self.minigame_monster_name = None;
+                        self.minigame_type = None;
+                        self.current_screen = Screen::MainMenu;
+                        self.menu_index = 0;
+                        crate::audio::play_title_music();
+                    }
+                } else {
+                    match code {
+                        KeyCode::Up => game.move_cursor_up(),
+                        KeyCode::Down => game.move_cursor_down(),
+                        KeyCode::Left => game.move_cursor_left(),
+                        KeyCode::Right => game.move_cursor_right(),
+                        KeyCode::Enter => {
+                            game.reveal();
+                        }
+                        KeyCode::Esc => {
+                            self.memory_game = None;
+                            self.minigame_monster_id = None;
+                            self.minigame_monster_name = None;
+                            self.minigame_type = None;
+                            self.current_screen = Screen::MainMenu;
+                            self.menu_index = 0;
+                            self.message = None;
+                            crate::audio::play_title_music();
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            return;
+        }
+
+        // ── Mini-jeu : Réflexe ──
+        if self.current_screen == Screen::ReflexPlay {
+            if let Some(ref mut game) = self.reflex_game {
+                if game.is_over() {
+                    if code == KeyCode::Enter || code == KeyCode::Esc {
+                        self.apply_minigame_reward();
+                        self.reflex_game = None;
+                        self.minigame_monster_id = None;
+                        self.minigame_monster_name = None;
+                        self.minigame_type = None;
+                        self.current_screen = Screen::MainMenu;
+                        self.menu_index = 0;
+                        crate::audio::play_title_music();
+                    }
+                } else {
+                    use monster_battle_core::minigame::reflex::Arrow;
+                    match code {
+                        KeyCode::Up => {
+                            game.submit(Arrow::Up);
+                        }
+                        KeyCode::Down => {
+                            game.submit(Arrow::Down);
+                        }
+                        KeyCode::Left => {
+                            game.submit(Arrow::Left);
+                        }
+                        KeyCode::Right => {
+                            game.submit(Arrow::Right);
+                        }
+                        KeyCode::Esc => {
+                            self.reflex_game = None;
+                            self.minigame_monster_id = None;
+                            self.minigame_monster_name = None;
+                            self.minigame_type = None;
+                            self.current_screen = Screen::MainMenu;
+                            self.menu_index = 0;
+                            self.message = None;
+                            crate::audio::play_title_music();
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            return;
+        }
+
+        // ── Mini-jeu : PPC élémentaire ──
+        if self.current_screen == Screen::RpsPlay {
+            if let Some(ref mut game) = self.rps_game {
+                if game.is_over() {
+                    if code == KeyCode::Enter || code == KeyCode::Esc {
+                        self.apply_minigame_reward();
+                        self.rps_game = None;
+                        self.minigame_monster_id = None;
+                        self.minigame_monster_name = None;
+                        self.minigame_type = None;
+                        self.current_screen = Screen::MainMenu;
+                        self.menu_index = 0;
+                        crate::audio::play_title_music();
+                    }
+                } else if game.waiting_confirm {
+                    if code == KeyCode::Enter {
+                        game.confirm();
+                    } else if code == KeyCode::Esc {
+                        self.rps_game = None;
+                        self.minigame_monster_id = None;
+                        self.minigame_monster_name = None;
+                        self.minigame_type = None;
+                        self.current_screen = Screen::MainMenu;
+                        self.menu_index = 0;
+                        self.message = None;
+                        crate::audio::play_title_music();
+                    }
+                } else {
+                    match code {
+                        KeyCode::Left => {
+                            if game.cursor > 0 {
+                                game.cursor -= 1;
+                            }
+                        }
+                        KeyCode::Right => {
+                            if game.cursor < 2 {
+                                game.cursor += 1;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            game.play(game.cursor);
+                        }
+                        KeyCode::Esc => {
+                            self.rps_game = None;
+                            self.minigame_monster_id = None;
+                            self.minigame_monster_name = None;
+                            self.minigame_type = None;
                             self.current_screen = Screen::MainMenu;
                             self.menu_index = 0;
                             self.message = None;
@@ -550,7 +800,7 @@ impl App {
                                 self.run_breeding();
                             }
                             SelectMonsterTarget::Minigame => {
-                                // Stocker le monstre sélectionné et aller à la sélection de difficulté
+                                // Stocker le monstre sélectionné et aller à la sélection du type de jeu
                                 let monsters = self.storage.list_alive().unwrap_or_default();
                                 let idx = self
                                     .monster_select_index
@@ -559,7 +809,7 @@ impl App {
                                     self.minigame_monster_id = Some(m.id);
                                     self.minigame_monster_name = Some(m.name.clone());
                                 }
-                                self.current_screen = Screen::MinigameSelect;
+                                self.current_screen = Screen::MinigameTypeSelect;
                                 self.menu_index = 0;
                             }
                         }
@@ -613,6 +863,38 @@ impl App {
 
         // Écran « Mes Monstres » — navigation propre
         if self.current_screen == Screen::MonsterList {
+            // Mode sélection de nourriture
+            if self.food_selecting {
+                let food_count = monster_battle_core::FoodType::all().len();
+                match code {
+                    KeyCode::Up => {
+                        if self.food_select_index > 0 {
+                            self.food_select_index -= 1;
+                            crate::audio::sfx_menu_move();
+                        }
+                    }
+                    KeyCode::Down => {
+                        if self.food_select_index < food_count - 1 {
+                            self.food_select_index += 1;
+                            crate::audio::sfx_menu_move();
+                        }
+                    }
+                    KeyCode::Enter => {
+                        let food = monster_battle_core::FoodType::all()[self.food_select_index];
+                        self.feed_monster_with(food);
+                        self.food_selecting = false;
+                        self.food_select_index = 0;
+                    }
+                    KeyCode::Esc => {
+                        self.food_selecting = false;
+                        self.food_select_index = 0;
+                        self.message = None;
+                    }
+                    _ => {}
+                }
+                return;
+            }
+
             let monster_count = self.storage.list_alive().map(|v| v.len()).unwrap_or(0);
             match code {
                 KeyCode::Char('m') | KeyCode::Char('M') => {
@@ -621,6 +903,8 @@ impl App {
                 KeyCode::Up => {
                     if self.monster_select_index > 0 {
                         self.monster_select_index -= 1;
+                        self.event_message = None;
+                        self.check_random_event();
                         crate::audio::sfx_menu_move();
                     }
                 }
@@ -629,16 +913,22 @@ impl App {
                         && self.monster_select_index < monster_count.saturating_sub(1)
                     {
                         self.monster_select_index += 1;
+                        self.event_message = None;
+                        self.check_random_event();
                         crate::audio::sfx_menu_move();
                     }
                 }
                 KeyCode::Char('f') | KeyCode::Char('F') => {
-                    self.feed_monster();
+                    // Ouvrir le menu de sélection de nourriture
+                    self.food_selecting = true;
+                    self.food_select_index = 0;
+                    self.message = Some("Choisissez un aliment :".to_string());
                 }
                 KeyCode::Char('q') | KeyCode::Esc => {
                     self.current_screen = Screen::MainMenu;
                     self.menu_index = 0;
                     self.message = None;
+                    self.event_message = None;
                     crate::audio::play_title_music();
                 }
                 _ => {}
@@ -719,7 +1009,10 @@ impl App {
             self.monster_select_index = 0;
             self.current_screen = Screen::MonsterList;
             self.menu_index = 0;
+            self.food_selecting = false;
+            self.event_message = None;
             crate::audio::play_exploration_music();
+            self.check_random_event();
             return;
         }
         idx += 1;
@@ -1116,12 +1409,31 @@ impl App {
 
     /// Applique la récompense du mini-jeu au monstre sélectionné.
     fn apply_minigame_reward(&mut self) {
-        let Some(ref game) = self.tictactoe else {
+        use monster_battle_core::minigame::StatReward;
+
+        // Récupérer reward + result_label selon le jeu actif
+        let (reward, label): (StatReward, String) = if let Some(ref game) = self.tictactoe {
+            (game.reward(), game.result_label().to_string())
+        } else if let Some(ref game) = self.memory_game {
+            let lbl = match game.result {
+                Some(monster_battle_core::minigame::MinigameResult::Win) => "Victoire !",
+                Some(monster_battle_core::minigame::MinigameResult::Draw) => "Correct.",
+                Some(monster_battle_core::minigame::MinigameResult::Loss) => {
+                    "Trop de tentatives..."
+                }
+                None => "En cours...",
+            };
+            (game.reward(), lbl.to_string())
+        } else if let Some(ref game) = self.reflex_game {
+            (game.reward(), game.result_label().to_string())
+        } else if let Some(ref game) = self.rps_game {
+            (game.reward(), game.result_label().to_string())
+        } else {
             return;
         };
-        let reward = game.reward();
+
         if reward.is_empty() {
-            self.message = Some(format!("{} — Pas de récompense.", game.result_label()));
+            self.message = Some(format!("{} — Pas de récompense.", label));
             return;
         }
 
@@ -1134,7 +1446,11 @@ impl App {
                 use monster_battle_core::minigame::apply_reward;
                 apply_reward(&mut m.base_stats, &reward);
                 let levels = m.gain_xp(reward.xp);
-                let mut msg = format!("{} — {}", game.result_label(), reward.summary());
+                // Mini-jeu → bonheur + lien
+                m.adjust_happiness(10);
+                m.record_interaction();
+                m.increase_bond(1);
+                let mut msg = format!("{} — {}", label, reward.summary());
                 if levels > 0 {
                     msg.push_str(&format!(
                         " +{} niveau{} !",
@@ -1483,8 +1799,14 @@ impl App {
                 crate::audio::sfx_level_up();
             }
             fighter.current_hp = fighter.max_hp();
+            // Victoire → bonheur + lien
+            fighter.adjust_happiness(10);
+            fighter.record_interaction();
+            fighter.increase_bond(2);
         } else {
             fighter.losses += 1;
+            // Défaite → perte de bonheur
+            fighter.adjust_happiness(-5);
             if battle.loser_died {
                 fighter.died_at = Some(chrono::Utc::now());
             } else {
@@ -1845,6 +2167,9 @@ impl App {
     fn check_all_aging(&mut self) {
         if let Ok(mut monsters) = self.storage.list_alive() {
             for monster in &mut monsters {
+                // Décroissance passive du bonheur
+                monster.decay_happiness();
+
                 let died_of_age = monster.check_aging();
                 let died_of_hunger = if !died_of_age {
                     monster.check_hunger()
@@ -1866,6 +2191,8 @@ impl App {
                         monster.hours_since_fed()
                     ));
                     let _ = self.storage.save(monster);
+                } else {
+                    let _ = self.storage.save(monster);
                 }
             }
         }
@@ -1873,7 +2200,7 @@ impl App {
 
     // ─── Nourrir le monstre ──────────────────────────────────
 
-    fn feed_monster(&mut self) {
+    fn feed_monster_with(&mut self, food: monster_battle_core::FoodType) {
         let mut monsters = match self.storage.list_alive() {
             Ok(m) if !m.is_empty() => m,
             _ => {
@@ -1887,35 +2214,75 @@ impl App {
             .min(monsters.len().saturating_sub(1));
         let monster = &mut monsters[idx];
         let hunger_before = monster.hunger_level();
-        let hunger_after = monster.feed();
+        let hunger_after = monster.feed_with(food);
 
         use monster_battle_core::HungerLevel;
-        let msg = match hunger_after {
+        let mut msg = match hunger_after {
             HungerLevel::Overfed => format!(
-                "🤢 {} a trop mangé ! Malus de stats... (×{:.0}%)",
+                "🤢 {} a trop mangé de {} ! Malus de stats... (×{:.0}%)",
                 monster.name,
+                food,
                 hunger_after.stat_multiplier() * 100.0
             ),
             HungerLevel::Satisfied => {
                 if hunger_before == HungerLevel::Starving || hunger_before == HungerLevel::Hungry {
                     format!(
-                        "😊 {} est rassasié ! Boost de stats ! (×{:.0}%)",
+                        "😊 {} a mangé {} {} et est rassasié ! Boost de stats ! (×{:.0}%)",
                         monster.name,
+                        food.icon(),
+                        food,
                         hunger_after.stat_multiplier() * 100.0
                     )
                 } else {
                     format!(
-                        "😊 {} a bien mangé ! (×{:.0}%)",
+                        "😊 {} a mangé {} {} ! (×{:.0}%)",
                         monster.name,
+                        food.icon(),
+                        food,
                         hunger_after.stat_multiplier() * 100.0
                     )
                 }
             }
-            _ => format!("🍽️ {} a été nourri.", monster.name),
+            _ => format!("🍽️ {} a mangé {} {}.", monster.name, food.icon(), food),
         };
+
+        // Indiquer les buffs temporaires
+        match food {
+            monster_battle_core::FoodType::Meat => {
+                msg.push_str(" 🥩 Boost ATK pendant 1h !");
+            }
+            monster_battle_core::FoodType::Fish => {
+                msg.push_str(" 🐟 Boost VIT pendant 1h !");
+            }
+            _ => {}
+        }
+
+        // Afficher le bonheur
+        let happiness = monster.happiness_level();
+        msg.push_str(&format!(" {} {}", happiness.icon(), happiness));
 
         let _ = self.storage.save(monster);
         self.message = Some(msg);
+    }
+
+    // ─── Événements aléatoires ───────────────────────────────
+
+    fn check_random_event(&mut self) {
+        let mut monsters = match self.storage.list_alive() {
+            Ok(m) if !m.is_empty() => m,
+            _ => return,
+        };
+
+        let idx = self
+            .monster_select_index
+            .min(monsters.len().saturating_sub(1));
+        let monster = &mut monsters[idx];
+
+        if let Some(event) = monster.try_random_event() {
+            let msg = monster.apply_event(&event);
+            let _ = self.storage.save(monster);
+            self.event_message = Some(msg);
+        }
     }
 
     // ─── Health check serveur ────────────────────────────────

@@ -292,7 +292,7 @@ fn dispatch_selection(
             next_state.set(GameScreen::BreedingSearching);
         }
         Some(SelectMonsterTarget::Minigame) => {
-            // Stocker le monstre sélectionné et aller à la sélection de difficulté
+            // Stocker le monstre sélectionné et aller à la sélection du type de jeu
             let monsters = data.storage.list_alive().unwrap_or_default();
             let idx = data
                 .monster_select_index
@@ -302,7 +302,7 @@ fn dispatch_selection(
                 data.minigame_monster_name = Some(m.name.clone());
             }
             data.menu_index = 0;
-            next_state.set(GameScreen::MinigameSelect);
+            next_state.set(GameScreen::MinigameTypeSelect);
         }
         None => {
             // Fallback → entraînement

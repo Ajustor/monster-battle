@@ -76,6 +76,21 @@ pub fn breed(
     // --- Traits : héritage + mutation ---
     let (traits, mutation_occurred) = inherit_traits(parent_a, parent_b, &mut rng);
 
+    // Bonus de stats de reproduction grâce au lien des parents
+    let bond_bonus_a = parent_a.bond_level().breeding_bonus();
+    let bond_bonus_b = parent_b.bond_level().breeding_bonus();
+    let avg_bond_bonus = (bond_bonus_a + bond_bonus_b) / 2.0;
+
+    // Appliquer le bonus de lien aux stats
+    let base_stats = Stats {
+        hp: (base_stats.hp as f64 * avg_bond_bonus) as u32,
+        attack: (base_stats.attack as f64 * avg_bond_bonus) as u32,
+        defense: (base_stats.defense as f64 * avg_bond_bonus) as u32,
+        speed: (base_stats.speed as f64 * avg_bond_bonus) as u32,
+        special_attack: (base_stats.special_attack as f64 * avg_bond_bonus) as u32,
+        special_defense: (base_stats.special_defense as f64 * avg_bond_bonus) as u32,
+    };
+
     let max_hp = base_stats.hp;
     let generation = parent_a.generation.max(parent_b.generation) + 1;
 
@@ -99,6 +114,11 @@ pub fn breed(
         last_fed: Some(Utc::now()),
         meals_today: 0,
         meals_window_start: None,
+        happiness: 60, // Les bébés commencent un peu plus heureux
+        bond: 0,
+        food_buff: None,
+        last_interaction: Some(Utc::now()),
+        last_event_check: None,
     };
 
     let mut desc = format!(

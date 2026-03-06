@@ -39,13 +39,47 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
+    // Réserver de la place pour l'événement aléatoire si présent
+    let has_event = app.event_message.is_some();
+    let main_area = if has_event {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(10)])
+            .split(area);
+
+        // Afficher le bandeau d'événement
+        if let Some(ref msg) = app.event_message {
+            let event_block = Block::default()
+                .title(" ✨ Événement ! ")
+                .title_style(
+                    Style::default()
+                        .fg(Color::Magenta)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Magenta));
+            let event_text = Paragraph::new(Line::from(Span::styled(
+                format!("  {}", msg),
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::ITALIC),
+            )))
+            .block(event_block);
+            frame.render_widget(event_text, chunks[0]);
+        }
+
+        chunks[1]
+    } else {
+        area
+    };
+
     let selected = app
         .monster_select_index
         .min(monsters.len().saturating_sub(1));
 
     if monsters.len() == 1 {
-        // Un seul monstre : afficher directement la fiche détaillée
-        draw_monster_detail(frame, area, &monsters[0]);
+        draw_monster_detail(frame, main_area, &monsters[0]);
+        draw_food_overlay(frame, main_area, app);
         return;
     }
 
@@ -53,7 +87,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(36), Constraint::Min(30)])
-        .split(area);
+        .split(main_area);
 
     // ── Liste des monstres (gauche) ─────────────────────────
     let list_items: Vec<ListItem> = monsters
@@ -105,6 +139,9 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 
     // ── Détail du monstre sélectionné (droite) ──────────────
     draw_monster_detail(frame, cols[1], &monsters[selected]);
+
+    // ── Overlay de sélection de nourriture ──────────────────
+    draw_food_overlay(frame, main_area, app);
 }
 
 /// Affiche la fiche détaillée d'un monstre dans la zone donnée.
@@ -231,19 +268,36 @@ fn draw_monster_detail(frame: &mut Frame, area: Rect, m: &monster_battle_core::M
     let hunger_info = format!("{} {}", hunger.icon(), hunger);
     let hunger_modifier = format!("{}%", (hunger.stat_multiplier() * 100.0) as i32);
 
+    let happiness = m.happiness_level();
+    let happiness_info = format!("{} {} ({})", happiness.icon(), happiness, m.happiness);
+    let happiness_modifier = format!("{}%", (happiness.stat_multiplier() * 100.0) as i32);
+
+    let bond = m.bond_level();
+    let bond_info = format!("{} {} ({}/100)", bond.icon(), bond, m.bond);
+    let bond_title = bond
+        .title()
+        .map(|t| format!(" «{}»", t))
+        .unwrap_or_default();
+
+    let food_buff_info = match m.active_food_buff() {
+        Some(monster_battle_core::FoodType::Meat) => "🥩 ATK+15%".to_string(),
+        Some(monster_battle_core::FoodType::Fish) => "🐟 VIT+15%".to_string(),
+        Some(other) => format!("{} {}", other.icon(), other),
+        None => "Aucun".to_string(),
+    };
+
     let stat_modifier = format!(
-        "{}% ({})",
-        (stage.stat_multiplier() * hunger.stat_multiplier() * 100.0) as i32,
-        if hunger.stat_multiplier() != 1.0 {
-            format!("{} × {}", stage, hunger)
-        } else {
-            format!("{}", stage)
-        }
+        "{}% ({} × {} × {})",
+        (stage.stat_multiplier() * hunger.stat_multiplier() * happiness.stat_multiplier() * 100.0)
+            as i32,
+        stage,
+        hunger,
+        happiness,
     );
 
     let info = format!(
         r#"
-  {} {}{}
+  {} {}{}{}
   Niveau : {}
   XP     : {}
   PV     : {}
@@ -258,12 +312,19 @@ fn draw_monster_detail(frame: &mut Frame, area: Rect, m: &monster_battle_core::M
   Stade      : {} {}
   Âge        : {}
   Faim       : {} (stats: {})
+  Bonheur    : {} (stats: {})
+  Lien       : {}
+  Buff food  : {}
   Puissance  : {}
   Génération : {}
   Victoires  : {}  |  Défaites : {}
+
+  ── Raccourcis ─────────
+  [F] Nourrir  [Esc] Retour
 "#,
         type_icon,
         m.name,
+        bond_title,
         secondary,
         m.level,
         xp_bar,
@@ -279,6 +340,10 @@ fn draw_monster_detail(frame: &mut Frame, area: Rect, m: &monster_battle_core::M
         age_bar,
         hunger_info,
         hunger_modifier,
+        happiness_info,
+        happiness_modifier,
+        bond_info,
+        food_buff_info,
         stat_modifier,
         m.generation,
         m.wins,
@@ -290,4 +355,74 @@ fn draw_monster_detail(frame: &mut Frame, area: Rect, m: &monster_battle_core::M
         .wrap(Wrap { trim: false });
 
     frame.render_widget(detail, cols[1]);
+}
+
+/// Affiche une fenêtre modale de sélection de nourriture par-dessus tout.
+fn draw_food_overlay(frame: &mut Frame, area: Rect, app: &App) {
+    if !app.food_selecting {
+        return;
+    }
+
+    use monster_battle_core::FoodType;
+
+    let foods = FoodType::all();
+    let popup_height = (foods.len() as u16) + 4;
+    let popup_width = 36;
+
+    // Centrer la popup
+    let x = area.x + (area.width.saturating_sub(popup_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(popup_height)) / 2;
+    let popup_area = Rect::new(
+        x,
+        y,
+        popup_width.min(area.width),
+        popup_height.min(area.height),
+    );
+
+    // Fond sombre
+    let bg = Block::default().style(Style::default().bg(Color::Black));
+    frame.render_widget(ratatui::widgets::Clear, popup_area);
+    frame.render_widget(bg, popup_area);
+
+    let items: Vec<ListItem> = foods
+        .iter()
+        .enumerate()
+        .map(|(i, food)| {
+            let is_selected = i == app.food_select_index;
+            let cursor = if is_selected { "▸ " } else { "  " };
+            let bonus = format!("+{} bonheur", food.happiness_bonus());
+            let extra = match food {
+                FoodType::Meat => " | ATK+15% 1h",
+                FoodType::Fish => " | VIT+15% 1h",
+                FoodType::Herbs => " | Soigne humeur",
+                FoodType::Cake => " | x2 repas",
+                FoodType::Berry => "",
+            };
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            ListItem::new(Line::from(Span::styled(
+                format!("{}{} {} ({}{})", cursor, food.icon(), food, bonus, extra),
+                style,
+            )))
+        })
+        .collect();
+
+    let list = List::new(items).block(
+        Block::default()
+            .title(" 🍽️ Choisir un aliment ")
+            .title_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow)),
+    );
+
+    frame.render_widget(list, popup_area);
 }

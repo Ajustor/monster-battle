@@ -99,8 +99,7 @@ pub fn start_pvp_task(commands: &mut Commands, monster: Monster, fighter_id: uui
 
         rt.block_on(async move {
             let result: Result<(), anyhow::Error> = async {
-                let ip = resolved_ip
-                    .ok_or_else(|| anyhow::anyhow!("Résolution DNS échouée"))?;
+                let ip = resolved_ip.ok_or_else(|| anyhow::anyhow!("Résolution DNS échouée"))?;
 
                 let client = GameClient::new();
                 client.connect_with_resolved_ip(SERVER_ADDR, ip).await?;
@@ -295,8 +294,7 @@ pub fn start_breeding_task(commands: &mut Commands, monster: Monster, fighter_id
 
         rt.block_on(async move {
             let result: Result<Monster, anyhow::Error> = async {
-                let ip = resolved_ip
-                    .ok_or_else(|| anyhow::anyhow!("Résolution DNS échouée"))?;
+                let ip = resolved_ip.ok_or_else(|| anyhow::anyhow!("Résolution DNS échouée"))?;
 
                 let client = GameClient::new();
                 client.connect_with_resolved_ip(SERVER_ADDR, ip).await?;

@@ -1,6 +1,320 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// Types de nourriture disponibles pour nourrir un monstre.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FoodType {
+    /// Baie basique — restaure la faim normalement.
+    Berry,
+    /// Viande — boost temporaire d'attaque.
+    Meat,
+    /// Poisson — boost temporaire de vitesse.
+    Fish,
+    /// Herbes — soigne un malus de bonheur.
+    Herbs,
+    /// Gâteau — gros boost de bonheur mais risque de suralimentation.
+    Cake,
+}
+
+impl FoodType {
+    /// Toutes les variantes de nourriture.
+    pub fn all() -> &'static [FoodType] {
+        &[
+            FoodType::Berry,
+            FoodType::Meat,
+            FoodType::Fish,
+            FoodType::Herbs,
+            FoodType::Cake,
+        ]
+    }
+
+    /// Icône emoji pour le type de nourriture.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            FoodType::Berry => "🫐",
+            FoodType::Meat => "🥩",
+            FoodType::Fish => "🐟",
+            FoodType::Herbs => "🌿",
+            FoodType::Cake => "🍰",
+        }
+    }
+
+    /// Bonus de bonheur accordé par cet aliment.
+    pub fn happiness_bonus(&self) -> i32 {
+        match self {
+            FoodType::Berry => 5,
+            FoodType::Meat => 8,
+            FoodType::Fish => 8,
+            FoodType::Herbs => 15,
+            FoodType::Cake => 25,
+        }
+    }
+
+    /// Nombre de repas que cet aliment compte (pour le calcul overfed).
+    pub fn meal_weight(&self) -> u32 {
+        match self {
+            FoodType::Berry => 1,
+            FoodType::Meat => 1,
+            FoodType::Fish => 1,
+            FoodType::Herbs => 0, // Les herbes ne remplissent pas vraiment
+            FoodType::Cake => 2,  // Le gâteau compte double
+        }
+    }
+}
+
+impl fmt::Display for FoodType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            FoodType::Berry => "Baie",
+            FoodType::Meat => "Viande",
+            FoodType::Fish => "Poisson",
+            FoodType::Herbs => "Herbes",
+            FoodType::Cake => "Gâteau",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+/// Niveau de bonheur d'un monstre.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HappinessLevel {
+    /// Très malheureux (0–19).
+    Miserable,
+    /// Malheureux (20–39).
+    Sad,
+    /// Neutre (40–59).
+    Neutral,
+    /// Content (60–79).
+    Happy,
+    /// Très heureux (80–100).
+    Joyful,
+}
+
+impl HappinessLevel {
+    /// Calcule le niveau de bonheur à partir de la valeur brute (0–100).
+    pub fn from_value(value: u32) -> Self {
+        match value {
+            0..=19 => HappinessLevel::Miserable,
+            20..=39 => HappinessLevel::Sad,
+            40..=59 => HappinessLevel::Neutral,
+            60..=79 => HappinessLevel::Happy,
+            _ => HappinessLevel::Joyful,
+        }
+    }
+
+    /// Icône emoji pour le niveau de bonheur.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            HappinessLevel::Miserable => "😭",
+            HappinessLevel::Sad => "😢",
+            HappinessLevel::Neutral => "😐",
+            HappinessLevel::Happy => "😊",
+            HappinessLevel::Joyful => "🥰",
+        }
+    }
+
+    /// Multiplicateur de stats lié au bonheur.
+    pub fn stat_multiplier(&self) -> f64 {
+        match self {
+            HappinessLevel::Miserable => 0.85,
+            HappinessLevel::Sad => 0.93,
+            HappinessLevel::Neutral => 1.00,
+            HappinessLevel::Happy => 1.05,
+            HappinessLevel::Joyful => 1.10,
+        }
+    }
+
+    /// Multiplicateur d'XP lié au bonheur.
+    pub fn xp_multiplier(&self) -> f64 {
+        match self {
+            HappinessLevel::Miserable => 0.80,
+            HappinessLevel::Sad => 0.90,
+            HappinessLevel::Neutral => 1.00,
+            HappinessLevel::Happy => 1.10,
+            HappinessLevel::Joyful => 1.25,
+        }
+    }
+}
+
+impl fmt::Display for HappinessLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            HappinessLevel::Miserable => "Misérable",
+            HappinessLevel::Sad => "Triste",
+            HappinessLevel::Neutral => "Neutre",
+            HappinessLevel::Happy => "Content",
+            HappinessLevel::Joyful => "Joyeux",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+/// Niveau de lien/affection entre le joueur et son monstre.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum BondLevel {
+    /// Lien naissant (0–24).
+    Stranger,
+    /// Lien amical (25–49).
+    Companion,
+    /// Lien fort (50–74).
+    Partner,
+    /// Lien profond (75–99).
+    SoulBond,
+    /// Lien maximal (100).
+    Eternal,
+}
+
+impl BondLevel {
+    /// Calcule le niveau de lien à partir de la valeur brute (0–100).
+    pub fn from_value(value: u32) -> Self {
+        match value {
+            0..=24 => BondLevel::Stranger,
+            25..=49 => BondLevel::Companion,
+            50..=74 => BondLevel::Partner,
+            75..=99 => BondLevel::SoulBond,
+            _ => BondLevel::Eternal,
+        }
+    }
+
+    /// Icône emoji pour le niveau de lien.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            BondLevel::Stranger => "🤝",
+            BondLevel::Companion => "💛",
+            BondLevel::Partner => "🧡",
+            BondLevel::SoulBond => "❤️",
+            BondLevel::Eternal => "💎",
+        }
+    }
+
+    /// Bonus de survie à un coup fatal (en plus de Tenacity) grâce au lien.
+    pub fn survival_chance(&self) -> f64 {
+        match self {
+            BondLevel::Stranger => 0.0,
+            BondLevel::Companion => 0.0,
+            BondLevel::Partner => 0.05,
+            BondLevel::SoulBond => 0.10,
+            BondLevel::Eternal => 0.15,
+        }
+    }
+
+    /// Multiplicateur de stats en reproduction grâce au lien.
+    pub fn breeding_bonus(&self) -> f64 {
+        match self {
+            BondLevel::Stranger => 1.0,
+            BondLevel::Companion => 1.0,
+            BondLevel::Partner => 1.02,
+            BondLevel::SoulBond => 1.05,
+            BondLevel::Eternal => 1.10,
+        }
+    }
+
+    /// Titre affiché à côté du nom du monstre quand le lien est suffisant.
+    pub fn title(&self) -> Option<&'static str> {
+        match self {
+            BondLevel::Stranger => None,
+            BondLevel::Companion => Some("Compagnon"),
+            BondLevel::Partner => Some("Partenaire"),
+            BondLevel::SoulBond => Some("Âme liée"),
+            BondLevel::Eternal => Some("Lien Éternel"),
+        }
+    }
+}
+
+impl fmt::Display for BondLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            BondLevel::Stranger => "Inconnu",
+            BondLevel::Companion => "Compagnon",
+            BondLevel::Partner => "Partenaire",
+            BondLevel::SoulBond => "Âme liée",
+            BondLevel::Eternal => "Lien Éternel",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+/// Événement aléatoire pouvant survenir lors de la consultation d'un monstre.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RandomEvent {
+    /// Le monstre a trouvé de la nourriture.
+    FoundFood(FoodType),
+    /// Le monstre s'est entraîné seul (bonus de stats).
+    SoloTraining,
+    /// Le monstre fait un cauchemar (perte de bonheur).
+    Nightmare,
+    /// Le monstre est de très bonne humeur aujourd'hui.
+    GoodMood,
+    /// Le monstre a eu une illumination (bonus d'XP).
+    Epiphany,
+    /// Le monstre a trouvé un trésor (bonus de lien).
+    TreasureFound,
+}
+
+impl RandomEvent {
+    /// Icône emoji de l'événement.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            RandomEvent::FoundFood(_) => "🎁",
+            RandomEvent::SoloTraining => "💪",
+            RandomEvent::Nightmare => "😱",
+            RandomEvent::GoodMood => "🌟",
+            RandomEvent::Epiphany => "💡",
+            RandomEvent::TreasureFound => "💎",
+        }
+    }
+
+    /// Description de l'événement.
+    pub fn description(&self, monster_name: &str) -> String {
+        match self {
+            RandomEvent::FoundFood(food) => {
+                format!(
+                    "{} {} a trouvé {} {} !",
+                    self.icon(),
+                    monster_name,
+                    food.icon(),
+                    food
+                )
+            }
+            RandomEvent::SoloTraining => {
+                format!(
+                    "{} {} s'est entraîné seul et a gagné en puissance !",
+                    self.icon(),
+                    monster_name
+                )
+            }
+            RandomEvent::Nightmare => {
+                format!(
+                    "{} {} a fait un cauchemar cette nuit...",
+                    self.icon(),
+                    monster_name
+                )
+            }
+            RandomEvent::GoodMood => {
+                format!(
+                    "{} {} est de très bonne humeur aujourd'hui !",
+                    self.icon(),
+                    monster_name
+                )
+            }
+            RandomEvent::Epiphany => {
+                format!(
+                    "{} {} a eu une illumination mystérieuse !",
+                    self.icon(),
+                    monster_name
+                )
+            }
+            RandomEvent::TreasureFound => {
+                format!(
+                    "{} {} a trouvé un trésor caché !",
+                    self.icon(),
+                    monster_name
+                )
+            }
+        }
+    }
+}
+
 /// Types élémentaires des monstres.
 /// Chaque monstre possède un type primaire et optionnellement un type secondaire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

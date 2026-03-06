@@ -7,6 +7,10 @@ use bevy::state::state::{OnEnter, OnExit, States};
 
 use monster_battle_core::Monster;
 use monster_battle_core::battle::BattleState;
+use monster_battle_core::minigame::MinigameType;
+use monster_battle_core::minigame::memory::MemoryGame;
+use monster_battle_core::minigame::reflex::ReflexGame;
+use monster_battle_core::minigame::rps::RpsGame;
 use monster_battle_core::minigame::tictactoe::TicTacToe;
 use monster_battle_storage::{LocalStorage, MonsterStorage};
 
@@ -44,10 +48,18 @@ pub enum GameScreen {
     Cemetery,
     /// Écran d'aide.
     Help,
+    /// Sélection du type de mini-jeu.
+    MinigameTypeSelect,
     /// Sélection de la difficulté du mini-jeu.
     MinigameSelect,
     /// Partie de morpion en cours.
     MinigamePlay,
+    /// Partie de Memory en cours.
+    MemoryPlay,
+    /// Partie de Réflexe en cours.
+    ReflexPlay,
+    /// Partie de PPC élémentaire en cours.
+    RpsPlay,
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -92,12 +104,26 @@ pub struct GameData {
     pub scroll_offset: usize,
     /// Drapeau signalant que l'UI de combat doit être reconstruite (polling réseau).
     pub battle_ui_dirty: bool,
+    /// Type de mini-jeu sélectionné.
+    pub minigame_type: Option<MinigameType>,
     /// État de la partie de morpion en cours.
     pub tictactoe: Option<TicTacToe>,
+    /// État de la partie de Memory en cours.
+    pub memory_game: Option<MemoryGame>,
+    /// État de la partie de Réflexe en cours.
+    pub reflex_game: Option<ReflexGame>,
+    /// État de la partie de PPC en cours.
+    pub rps_game: Option<RpsGame>,
     /// UUID du monstre participant au mini-jeu.
     pub minigame_monster_id: Option<uuid::Uuid>,
     /// Nom du monstre participant au mini-jeu.
     pub minigame_monster_name: Option<String>,
+    /// Vrai si le popup de sélection de nourriture est affiché.
+    pub food_selecting: bool,
+    /// Index courant dans la liste des types de nourriture.
+    pub food_select_index: usize,
+    /// Message d'événement aléatoire à afficher.
+    pub event_message: Option<String>,
 }
 
 impl GameData {
@@ -121,9 +147,16 @@ impl GameData {
             breed_result: None,
             scroll_offset: 0,
             battle_ui_dirty: false,
+            minigame_type: None,
             tictactoe: None,
+            memory_game: None,
+            reflex_game: None,
+            rps_game: None,
             minigame_monster_id: None,
             minigame_monster_name: None,
+            food_selecting: false,
+            food_select_index: 0,
+            event_message: None,
         }
     }
 
@@ -181,10 +214,17 @@ impl Plugin for GamePlugin {
                 on_enter_breeding_result,
             )
             .add_systems(
+                OnEnter(GameScreen::MinigameTypeSelect),
+                on_enter_minigame_type_select,
+            )
+            .add_systems(
                 OnEnter(GameScreen::MinigameSelect),
                 on_enter_minigame_select,
             )
-            .add_systems(OnEnter(GameScreen::MinigamePlay), on_enter_minigame_play);
+            .add_systems(OnEnter(GameScreen::MinigamePlay), on_enter_minigame_play)
+            .add_systems(OnEnter(GameScreen::MemoryPlay), on_enter_memory_play)
+            .add_systems(OnEnter(GameScreen::ReflexPlay), on_enter_reflex_play)
+            .add_systems(OnEnter(GameScreen::RpsPlay), on_enter_rps_play);
     }
 }
 
@@ -229,6 +269,31 @@ fn on_enter_main_menu(mut data: ResMut<GameData>) {
 
 fn on_enter_monster_list(mut data: ResMut<GameData>) {
     data.monster_select_index = 0;
+    data.food_selecting = false;
+    data.food_select_index = 0;
+    data.event_message = None;
+
+    // Décroissance du bonheur des monstres vivants
+    if let Ok(mut monsters) = data.storage.list_alive() {
+        for m in monsters.iter_mut() {
+            m.decay_happiness();
+            let _ = data.storage.save(m);
+        }
+    }
+
+    // Vérifier un événement aléatoire pour le monstre sélectionné
+    if let Ok(mut monsters) = data.storage.list_alive() {
+        let idx = data
+            .monster_select_index
+            .min(monsters.len().saturating_sub(1));
+        if let Some(monster) = monsters.get_mut(idx) {
+            if let Some(event) = monster.try_random_event() {
+                let msg = monster.apply_event(&event);
+                let _ = data.storage.save(monster);
+                data.event_message = Some(msg);
+            }
+        }
+    }
 }
 
 fn on_enter_new_monster(mut data: ResMut<GameData>) {
@@ -308,12 +373,28 @@ fn on_enter_breeding_result(mut data: ResMut<GameData>) {
     data.scroll_offset = 0;
 }
 
+fn on_enter_minigame_type_select(mut data: ResMut<GameData>) {
+    data.menu_index = 0;
+}
+
 fn on_enter_minigame_select(mut data: ResMut<GameData>) {
     data.menu_index = 0;
 }
 
 fn on_enter_minigame_play(_data: ResMut<GameData>) {
     // Le tictactoe est déjà configuré avant la transition.
+}
+
+fn on_enter_memory_play(_data: ResMut<GameData>) {
+    // Le memory_game est déjà configuré avant la transition.
+}
+
+fn on_enter_reflex_play(_data: ResMut<GameData>) {
+    // Le reflex_game est déjà configuré avant la transition.
+}
+
+fn on_enter_rps_play(_data: ResMut<GameData>) {
+    // Le rps_game est déjà configuré avant la transition.
 }
 
 /// Active le clavier système pour les écrans de saisie de texte.

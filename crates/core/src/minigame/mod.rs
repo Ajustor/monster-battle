@@ -3,9 +3,85 @@
 //! Chaque mini-jeu est une partie rapide contre une IA. La récompense
 //! dépend de la difficulté et du résultat (victoire / nul / défaite).
 
+pub mod memory;
+pub mod reflex;
+pub mod rps;
 pub mod tictactoe;
 
+use std::fmt;
+
 use crate::types::Stats;
+
+/// Types de mini-jeux disponibles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MinigameType {
+    /// Morpion (Tic-Tac-Toe).
+    TicTacToe,
+    /// Memory (paires).
+    Memory,
+    /// Réflexe (QTE).
+    Reflex,
+    /// Pierre-Papier-Ciseaux élémentaire.
+    Rps,
+}
+
+impl MinigameType {
+    /// Toutes les variantes.
+    pub fn all() -> &'static [MinigameType] {
+        &[
+            MinigameType::TicTacToe,
+            MinigameType::Memory,
+            MinigameType::Reflex,
+            MinigameType::Rps,
+        ]
+    }
+
+    /// Nom du mini-jeu.
+    pub fn label(self) -> &'static str {
+        match self {
+            MinigameType::TicTacToe => "Morpion",
+            MinigameType::Memory => "Memory",
+            MinigameType::Reflex => "Reflexe",
+            MinigameType::Rps => "PPC Elementaire",
+        }
+    }
+
+    /// Icône emoji.
+    pub fn icon(self) -> &'static str {
+        match self {
+            MinigameType::TicTacToe => "❌",
+            MinigameType::Memory => "🃏",
+            MinigameType::Reflex => "⚡",
+            MinigameType::Rps => "🪨",
+        }
+    }
+
+    /// Description courte.
+    pub fn description(self) -> &'static str {
+        match self {
+            MinigameType::TicTacToe => "Morpion classique contre une IA",
+            MinigameType::Memory => "Retrouvez les paires de cartes",
+            MinigameType::Reflex => "Appuyez sur la bonne direction",
+            MinigameType::Rps => "Pierre-papier-ciseaux avec les types",
+        }
+    }
+
+    /// Stats principalement boostées.
+    pub fn stat_focus(self) -> &'static str {
+        match self {
+            MinigameType::TicTacToe => "PV, ATK, VIT",
+            MinigameType::Memory => "DEF, DEF.S",
+            MinigameType::Reflex => "VIT, ATK",
+            MinigameType::Rps => "ATK, ATK.S",
+        }
+    }
+}
+
+impl fmt::Display for MinigameType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.label())
+    }
+}
 
 /// Résultat d'un mini-jeu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
