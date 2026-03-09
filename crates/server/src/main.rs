@@ -1,5 +1,7 @@
 use std::sync::Arc;
+use std::time::Duration;
 
+use rand::Rng;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{Mutex, oneshot};
@@ -7,8 +9,13 @@ use tokio_tungstenite::WebSocketStream;
 
 use monster_battle_core::Monster;
 use monster_battle_core::battle::{BattleMessage, BattlePhase, BattleState, MessageStyle};
+use monster_battle_core::genetics::generate_training_opponent;
+use monster_battle_core::types::ElementType;
 use monster_battle_network::protocol::NetAction;
 use monster_battle_network::{NetMessage, read_message, write_message};
+
+/// Délai avant de générer un partenaire de reproduction aléatoire (1min30).
+const BREEDING_TIMEOUT: Duration = Duration::from_secs(90);
 
 /// Entrée dans la file d'attente — le WebSocket n'est PAS stocké ici.
 /// Le handler garde le WebSocket et écoute la déconnexion.
@@ -327,8 +334,18 @@ async fn handle_wait_in_queue(
         );
     }
 
-    // Attendre soit un signal de match, soit une déconnexion du joueur.
+    // Attendre soit un signal de match, soit une déconnexion du joueur,
+    // soit un timeout (pour la reproduction uniquement : 1min30).
     // `biased` donne la priorité au match (si les deux arrivent en même temps).
+    let breeding_timeout = async {
+        if action == NetAction::Breed {
+            tokio::time::sleep(BREEDING_TIMEOUT).await;
+        } else {
+            // Pour le combat, pas de timeout → attendre indéfiniment
+            std::future::pending::<()>().await;
+        }
+    };
+
     tokio::select! {
         biased;
 
@@ -387,6 +404,60 @@ async fn handle_wait_in_queue(
                     // On ne fait rien, le handler va se terminer.
                 }
             }
+        }
+
+        _ = breeding_timeout => {
+            // Timeout de reproduction atteint — générer un monstre aléatoire
+            // Retirer le joueur de la file d'attente
+            {
+                let mut guard = state.lock().await;
+                guard.breed_queue.retain(|e| e.id != peer);
+            }
+
+            // Générer le type et le niveau cible avant tout await
+            let (random_type, target_level) = {
+                let mut rng = rand::thread_rng();
+                let all_types = ElementType::all();
+                let random_type = all_types[rng.gen_range(0..all_types.len())];
+
+                // Niveau toujours inférieur au monstre du joueur (1 à 5 niveaux en dessous, min 1)
+                let level_sub = rng.gen_range(1..=5u32);
+                let target_level = monster.level.saturating_sub(level_sub).max(1);
+                (random_type, target_level)
+            };
+
+            // On utilise le système de génération des opposants pour créer le partenaire.
+            // Mode docile avec target_level assure un monstre autour du niveau souhaité.
+            let mut random_partner = generate_training_opponent(target_level, random_type, false);
+            // S'assurer que le niveau ne dépasse jamais celui du joueur
+            if random_partner.level >= monster.level && monster.level > 1 {
+                random_partner = generate_training_opponent(monster.level, random_type, false);
+            }
+
+            println!(
+                "⏰ Timeout reproduction pour {} — partenaire généré : {} (niv. {}, type {:?})",
+                player_name, random_partner.name, random_partner.level, random_type
+            );
+
+            // Envoyer Matched avec un nom générique
+            write_message(
+                &mut ws,
+                &NetMessage::Matched {
+                    opponent_name: "Monstre sauvage".to_string(),
+                },
+            )
+            .await?;
+
+            // Envoyer le monstre partenaire généré
+            write_message(
+                &mut ws,
+                &NetMessage::BreedingPartner {
+                    partner_monster: random_partner,
+                },
+            )
+            .await?;
+
+            println!("🧬 Reproduction (auto) : {} ← données envoyées", player_name);
         }
 
         result = read_message(&mut ws) => {
