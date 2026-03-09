@@ -17,6 +17,7 @@ pub mod net_task;
 pub mod screens;
 pub mod sprites;
 pub mod ui;
+pub mod updater;
 
 use bevy::prelude::*;
 use bevy::state::app::AppExtStates;
