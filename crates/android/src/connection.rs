@@ -177,6 +177,31 @@ struct UpdateModalDismiss;
 #[derive(Resource, Default)]
 struct UpdateModalShown(bool);
 
+/// État du téléchargement de la mise à jour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DownloadStatus {
+    /// Pas encore lancé.
+    Idle,
+    /// Téléchargement en cours (notification système).
+    Downloading,
+    /// Le lancement du téléchargement a échoué.
+    Failed,
+}
+
+/// Ressource de suivi du téléchargement.
+#[derive(Resource)]
+struct UpdateDownloadState {
+    status: DownloadStatus,
+}
+
+impl Default for UpdateDownloadState {
+    fn default() -> Self {
+        Self {
+            status: DownloadStatus::Idle,
+        }
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  Marqueurs UI
 // ═══════════════════════════════════════════════════════════════════
@@ -205,6 +230,7 @@ impl Plugin for ConnectionPlugin {
         app.insert_resource(ConnectionState::default())
             .insert_resource(VersionState::default())
             .insert_resource(UpdateModalShown::default())
+            .insert_resource(UpdateDownloadState::default())
             .add_systems(Startup, spawn_status_bar)
             .add_systems(
                 Update,
@@ -432,13 +458,35 @@ fn trigger_version_check(mut version: ResMut<VersionState>) {
     }
 }
 
-/// Gère le toucher sur le bouton de mise à jour — ouvre le navigateur.
+/// Gère le toucher sur le bouton de mise à jour — lance le téléchargement.
 fn handle_update_button(
+    mut commands: Commands,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<UpdateButton>)>,
+    version: Res<VersionState>,
+    mut download_state: ResMut<UpdateDownloadState>,
+    modal_query: Query<Entity, With<UpdateModal>>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
-            open_update_url();
+            // Extraire la version serveur pour l'afficher dans la notification
+            let sv = match &version.status {
+                VersionStatus::UpdateRequired { server_version } => server_version.clone(),
+                _ => "?".to_string(),
+            };
+
+            let success = crate::updater::download_update(&sv);
+            download_state.status = if success {
+                DownloadStatus::Downloading
+            } else {
+                DownloadStatus::Failed
+            };
+
+            // Fermer la modale après le lancement du téléchargement
+            if success {
+                for entity in &modal_query {
+                    commands.entity(entity).despawn_recursive();
+                }
+            }
         }
     }
 }
@@ -647,7 +695,7 @@ fn show_update_modal(
 
                     // Explication
                     card.spawn((
-                        Text::new("Veuillez telecharger la derniere version pour continuer a jouer en ligne."),
+                        Text::new("Appuyez sur Installer pour telecharger et installer la mise a jour automatiquement."),
                         TextFont {
                             font_size: 14.0,
                             ..default()
@@ -659,7 +707,7 @@ fn show_update_modal(
                         },
                     ));
 
-                    // Bouton « Télécharger »
+                    // Bouton « Installer »
                     card.spawn((
                         Node {
                             width: Val::Percent(80.0),
@@ -675,7 +723,7 @@ fn show_update_modal(
                     ))
                     .with_children(|btn| {
                         btn.spawn((
-                            Text::new("Telecharger la mise a jour"),
+                            Text::new("Installer la mise a jour"),
                             TextFont {
                                 font_size: 16.0,
                                 ..default()
