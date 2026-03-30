@@ -7,5 +7,5 @@ pub mod types;
 
 pub use attack::Attack;
 pub use battle::BattleState;
-pub use monster::{AgeStage, HungerLevel, Monster};
+pub use monster::{AgeStage, DevourResult, HungerLevel, Monster};
 pub use types::{BondLevel, ElementType, FoodType, HappinessLevel, RandomEvent};

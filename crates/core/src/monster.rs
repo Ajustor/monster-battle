@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use uuid::Uuid;
 
+use rand::Rng;
+
 use crate::types::{BondLevel, ElementType, FoodType, HappinessLevel, RandomEvent, Stats, Trait};
 
 /// Durée de vie maximale d'un monstre en jours (sans le trait Longévité).
@@ -10,9 +12,6 @@ const BASE_MAX_AGE_DAYS: i64 = 30;
 
 /// Bonus de longévité en jours.
 const LONGEVITY_BONUS_DAYS: i64 = 15;
-
-/// Nombre de jours sans manger avant la mort de faim.
-const STARVATION_DAYS: i64 = 3;
 
 /// Nombre d'heures pendant lesquelles le monstre est rassasié après avoir mangé.
 const SATISFIED_HOURS: i64 = 12;
@@ -113,6 +112,19 @@ impl fmt::Display for HungerLevel {
     }
 }
 
+/// Résultat d'une dévoration après victoire en combat.
+#[derive(Debug, Clone)]
+pub struct DevourResult {
+    /// Gains de stats obtenus.
+    pub stat_gains: Stats,
+    /// Vrai si une mutation de trait s'est produite.
+    pub mutation_occurred: bool,
+    /// Nouveau type secondaire acquis (si applicable).
+    pub new_secondary_type: Option<ElementType>,
+    /// Description narrative de la dévoration.
+    pub description: String,
+}
+
 /// Représente un monstre unique et irremplaçable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Monster {
@@ -193,6 +205,11 @@ pub struct Monster {
     /// Dernier événement aléatoire vérifié (pour limiter la fréquence).
     #[serde(default)]
     pub last_event_check: Option<DateTime<Utc>>,
+
+    /// Indices des 4 attaques actives dans la liste complète des attaques connues.
+    /// Si vide, les 4 premières attaques connues sont utilisées.
+    #[serde(default)]
+    pub active_attack_indices: Vec<usize>,
 }
 
 fn default_happiness() -> u32 {
@@ -228,6 +245,7 @@ impl Monster {
             food_buff: None,
             last_interaction: Some(Utc::now()),
             last_event_check: None,
+            active_attack_indices: Vec::new(),
         }
     }
 
@@ -311,8 +329,8 @@ impl Monster {
 
         let days_since_fed = hours_since_fed / 24;
 
-        // Mort de faim après STARVATION_DAYS jours
-        if days_since_fed >= STARVATION_DAYS {
+        // Starving après 3 jours sans manger (malus de stats, mais pas de mort)
+        if days_since_fed >= 3 {
             return HungerLevel::Starving;
         }
 
@@ -334,17 +352,151 @@ impl Monster {
         HungerLevel::Hungry
     }
 
-    /// Vérifie si le monstre devrait mourir de faim et le tue le cas échéant.
-    /// Retourne `true` si le monstre vient de mourir de faim.
+    /// Vérifie le niveau de faim. Le monstre NE meurt plus de faim (malus de stats uniquement).
+    /// Retourne `true` si le monstre est en état de famine (pour affichage d'avertissement).
     pub fn check_hunger(&mut self) -> bool {
         if self.is_dead() {
             return false;
         }
-        if self.hunger_level() == HungerLevel::Starving {
-            self.died_at = Some(Utc::now());
-            true
+        self.hunger_level() == HungerLevel::Starving
+    }
+
+    // ── Système d'attaques actives ──────────────────────────────
+
+    /// Retourne toutes les attaques connues par le monstre.
+    pub fn known_attacks(&self) -> Vec<crate::attack::Attack> {
+        crate::attack::Attack::all_attacks_for_type(self.primary_type, self.secondary_type)
+    }
+
+    /// Retourne les 4 attaques actives du monstre.
+    /// Utilise `active_attack_indices` si défini, sinon les 4 premières.
+    pub fn active_attacks(&self) -> Vec<crate::attack::Attack> {
+        let known = self.known_attacks();
+        if self.active_attack_indices.is_empty() {
+            known.into_iter().take(4).collect()
         } else {
-            false
+            self.active_attack_indices
+                .iter()
+                .filter_map(|&i| known.get(i).cloned())
+                .take(4)
+                .collect()
+        }
+    }
+
+    /// Définit les indices des attaques actives (max 4, indices valides).
+    /// Retourne une erreur si les indices sont invalides ou si plus de 4 sont fournis.
+    pub fn set_active_attacks(&mut self, indices: Vec<usize>) -> Result<(), String> {
+        if indices.len() > 4 {
+            return Err(format!(
+                "Trop d'attaques sélectionnées : {} (max 4)",
+                indices.len()
+            ));
+        }
+        let known_count = self.known_attacks().len();
+        for &idx in &indices {
+            if idx >= known_count {
+                return Err(format!(
+                    "Index d'attaque invalide : {} (max {})",
+                    idx,
+                    known_count.saturating_sub(1)
+                ));
+            }
+        }
+        self.active_attack_indices = indices;
+        Ok(())
+    }
+
+    // ── Système de dévoration ───────────────────────────────────
+
+    /// Résultat d'une dévoration après victoire en combat.
+    pub fn devour(&mut self, prey: &Monster) -> DevourResult {
+        let mut rng = rand::thread_rng();
+
+        // Calcul des gains de stats (moitié des stats de prey, min 1 si > 0)
+        let gain_stat = |v: u32| -> u32 {
+            if v > 0 { (v / 2).max(1) } else { 0 }
+        };
+        let stat_gains = Stats {
+            hp: gain_stat(prey.base_stats.hp),
+            attack: gain_stat(prey.base_stats.attack),
+            defense: gain_stat(prey.base_stats.defense),
+            speed: gain_stat(prey.base_stats.speed),
+            special_attack: gain_stat(prey.base_stats.special_attack),
+            special_defense: gain_stat(prey.base_stats.special_defense),
+        };
+
+        // Appliquer les gains
+        self.base_stats.hp += stat_gains.hp;
+        self.base_stats.attack += stat_gains.attack;
+        self.base_stats.defense += stat_gains.defense;
+        self.base_stats.speed += stat_gains.speed;
+        self.base_stats.special_attack += stat_gains.special_attack;
+        self.base_stats.special_defense += stat_gains.special_defense;
+
+        // Mutation de trait (20%)
+        let mutation_occurred = rng.gen_bool(0.20);
+        if mutation_occurred {
+            // Tire un trait aléatoire de prey ou un trait aléatoire parmi tous les Trait
+            let all_traits = [
+                Trait::Regeneration,
+                Trait::Evasion,
+                Trait::CriticalStrike,
+                Trait::Longevity,
+                Trait::FastLearner,
+                Trait::Thorns,
+                Trait::Berserk,
+                Trait::Tenacity,
+            ];
+            // 50% chance de prendre un trait du prey, 50% trait aléatoire global
+            let new_trait = if !prey.traits.is_empty() && rng.gen_bool(0.5) {
+                prey.traits[rng.gen_range(0..prey.traits.len())].clone()
+            } else {
+                all_traits[rng.gen_range(0..all_traits.len())].clone()
+            };
+            if !self.traits.contains(&new_trait) {
+                self.traits.push(new_trait);
+            }
+        }
+
+        // Type secondaire par dévoration (30%) — seulement si pas encore de type secondaire
+        let new_secondary_type = if self.secondary_type.is_none()
+            && prey.primary_type != self.primary_type
+            && rng.gen_bool(0.30)
+        {
+            self.secondary_type = Some(prey.primary_type);
+            Some(prey.primary_type)
+        } else {
+            None
+        };
+
+        self.record_interaction();
+
+        // Description
+        let mut desc_parts = vec![format!(
+            "{} a dévoré {} et gagné +{} PV, +{} ATQ, +{} DEF, +{} VIT, +{} ATQ.SP, +{} DEF.SP !",
+            self.name,
+            prey.name,
+            stat_gains.hp,
+            stat_gains.attack,
+            stat_gains.defense,
+            stat_gains.speed,
+            stat_gains.special_attack,
+            stat_gains.special_defense,
+        )];
+        if mutation_occurred {
+            if let Some(t) = self.traits.last() {
+                desc_parts.push(format!("🧬 Mutation ! Nouveau trait : {} !", t));
+            }
+        }
+        if let Some(st) = new_secondary_type {
+            desc_parts.push(format!("🌀 {} absorbe le type {} !", self.name, st));
+        }
+
+        DevourResult {
+            stat_gains,
+            mutation_occurred,
+            new_secondary_type,
+            description: desc_parts.join("\n"),
         }
     }
 

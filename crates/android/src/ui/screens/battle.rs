@@ -3,6 +3,7 @@
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
+use crate::battle_effects::PlayAttackEffect;
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::net_task::{NetTask, NetTaskAction};
 use crate::sprites;
@@ -587,6 +588,7 @@ pub(crate) fn handle_battle_input(
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
     net_task: Option<ResMut<NetTask>>,
+    mut attack_effects: EventWriter<PlayAttackEffect>,
     attack_query: Query<(&Interaction, &AttackButton), Changed<Interaction>>,
     flee_query: Query<&Interaction, (Changed<Interaction>, With<FleeButton>)>,
     continue_query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,

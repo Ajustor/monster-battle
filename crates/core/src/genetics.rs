@@ -119,6 +119,7 @@ pub fn breed(
         food_buff: None,
         last_interaction: Some(Utc::now()),
         last_event_check: None,
+        active_attack_indices: Vec::new(),
     };
 
     let mut desc = format!(

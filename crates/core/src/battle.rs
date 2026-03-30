@@ -34,7 +34,7 @@ pub struct BattleMonster {
 impl BattleMonster {
     /// Crée un `BattleMonster` à partir d'un `Monster` existant.
     pub fn from_monster(monster: &Monster) -> Self {
-        let attacks = Attack::attacks_for_type(monster.primary_type, monster.secondary_type);
+        let attacks = monster.active_attacks();
         let max_hp = monster.max_hp();
         BattleMonster {
             name: monster.name.clone(),

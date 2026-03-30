@@ -66,6 +66,19 @@ impl Plugin for UiPlugin {
                 select_monster::handle_select_monster_input
                     .run_if(in_state(GameScreen::SelectMonster)),
             )
+            // ── Sélection des attaques ──────────────────────────
+            .add_systems(
+                OnEnter(GameScreen::SelectAttacks),
+                select_attacks::spawn_select_attacks,
+            )
+            .add_systems(
+                Update,
+                (
+                    select_attacks::handle_select_attacks_input,
+                    select_attacks::refresh_select_attacks_ui,
+                )
+                    .run_if(in_state(GameScreen::SelectAttacks)),
+            )
             // ── Entraînement ────────────────────────────────────
             .add_systems(OnEnter(GameScreen::Training), training::spawn_training)
             .add_systems(

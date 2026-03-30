@@ -10,5 +10,6 @@ pub mod monster_list;
 pub mod naming;
 pub mod new_monster;
 pub mod pvp;
+pub mod select_attacks;
 pub mod select_monster;
 pub mod training;

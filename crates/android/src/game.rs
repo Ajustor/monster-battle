@@ -44,6 +44,8 @@ pub enum GameScreen {
     BreedingNaming,
     /// Résultat de la reproduction.
     BreedingResult,
+    /// Sélection des attaques actives.
+    SelectAttacks,
     /// Cimetière (monstres morts).
     Cemetery,
     /// Écran d'aide.
@@ -184,7 +186,8 @@ impl Plugin for GamePlugin {
         // `StateScoped` + `enable_state_scoped_entities` (despawn_recursive).
         // Ne PAS utiliser de cleanup_screen manuel avec despawn() non-récursif
         // car l'ordre d'exécution avec StateScoped est ambigu dans ExitSchedules.
-        app.insert_resource(GameData::new(data_dir))
+        app.add_plugins(crate::battle_effects::BattleEffectsPlugin)
+            .insert_resource(GameData::new(data_dir))
             .insert_resource(crate::ui::screens::training::TrainingWild(false))
             .enable_state_scoped_entities::<GameScreen>()
             .add_systems(OnEnter(GameScreen::MainMenu), on_enter_main_menu)
@@ -195,6 +198,18 @@ impl Plugin for GamePlugin {
             .add_systems(OnExit(GameScreen::NamingMonster), disable_ime)
             .add_systems(OnEnter(GameScreen::SelectMonster), on_enter_select_monster)
             .add_systems(OnEnter(GameScreen::Training), on_enter_training)
+            .add_systems(OnEnter(GameScreen::SelectAttacks), (
+                    on_enter_select_attacks,
+                    crate::ui::screens::select_attacks::spawn_select_attacks,
+                ))
+            .add_systems(
+                Update,
+                (
+                    crate::ui::screens::select_attacks::handle_select_attacks_input,
+                    crate::ui::screens::select_attacks::refresh_select_attacks_ui,
+                )
+                    .run_if(in_state(GameScreen::SelectAttacks)),
+            )
             .add_systems(OnEnter(GameScreen::Cemetery), on_enter_cemetery)
             .add_systems(OnEnter(GameScreen::Help), on_enter_help)
             .add_systems(OnEnter(GameScreen::Battle), on_enter_battle)
@@ -298,6 +313,20 @@ fn on_enter_monster_list(mut data: ResMut<GameData>) {
 
 fn on_enter_new_monster(mut data: ResMut<GameData>) {
     data.type_choice_index = 0;
+}
+
+fn on_enter_select_attacks(mut commands: Commands, data: Res<GameData>) {
+    // Initialiser la ressource de sélection avec les indices actuels du monstre
+    let monsters = data.storage.list_alive().unwrap_or_default();
+    let idx = data.monster_select_index.min(monsters.len().saturating_sub(1));
+    let selected = monsters
+        .get(idx)
+        .map(|m| m.active_attack_indices.clone())
+        .unwrap_or_default();
+    commands.insert_resource(crate::ui::screens::select_attacks::AttackSelectionState {
+        selected,
+        dirty: false,
+    });
 }
 
 fn on_enter_cemetery(mut data: ResMut<GameData>) {
