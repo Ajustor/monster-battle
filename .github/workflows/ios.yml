@@ -1,0 +1,78 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [feat/v1, main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-ios:
+    name: Build iOS (aarch64-apple-ios)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,x86_64-apple-ios
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-ios-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-ios-
+
+      - name: Build iOS (arm64 device)
+        run: cargo build -p monster-battle-ios --target aarch64-apple-ios --release
+
+      - name: Build iOS (x86_64 simulator)
+        run: cargo build -p monster-battle-ios --target x86_64-apple-ios --release
+
+      - name: Create universal library (lipo)
+        run: |
+          mkdir -p ios-out
+          lipo -create \
+            target/aarch64-apple-ios/release/libmonster_battle_ios.a \
+            target/x86_64-apple-ios/release/libmonster_battle_ios.a \
+            -output ios-out/libmonster_battle_ios.a
+          echo "✅ Universal lib créée : $(ls -lh ios-out/libmonster_battle_ios.a)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmonster-battle-ios
+          path: ios-out/libmonster_battle_ios.a
+          retention-days: 7
+
+  build-android:
+    name: Build Android check (Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-android-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check workspace (Linux)
+        run: cargo check --workspace --exclude monster-battle-ios
