@@ -319,10 +319,17 @@ fn on_enter_select_attacks(mut commands: Commands, data: Res<GameData>) {
     // Initialiser la ressource de sélection avec les indices actuels du monstre
     let monsters = data.storage.list_alive().unwrap_or_default();
     let idx = data.monster_select_index.min(monsters.len().saturating_sub(1));
-    let selected = monsters
-        .get(idx)
-        .map(|m| m.active_attack_indices.clone())
-        .unwrap_or_default();
+    let selected = if let Some(monster) = monsters.get(idx) {
+        if monster.active_attack_indices.is_empty() {
+            // Par défaut : sélectionner les 4 premières attaques connues
+            let known = monster.known_attacks();
+            (0..4.min(known.len())).collect()
+        } else {
+            monster.active_attack_indices.clone()
+        }
+    } else {
+        Vec::new()
+    };
     commands.insert_resource(crate::ui::screens::select_attacks::AttackSelectionState {
         selected,
         dirty: false,

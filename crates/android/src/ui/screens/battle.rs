@@ -645,7 +645,14 @@ pub(crate) fn handle_battle_input(
                             if is_pvp {
                                 act = Action::PvpSendAttack(btn.index);
                             } else {
+                                // Capture l'élément de l'attaque avant de l'exécuter
+                                let attack_element = battle.player.attacks[btn.index].element;
                                 battle.player_attack(btn.index);
+                                // Émettre l'effet de combat (particules)
+                                attack_effects.send(PlayAttackEffect {
+                                    element: attack_element,
+                                    position: Vec2::new(250.0, 150.0), // Position approximative de l'adversaire
+                                });
                                 act = Action::Rebuild;
                             }
                             break;
@@ -683,7 +690,13 @@ pub(crate) fn handle_battle_input(
                             if is_pvp {
                                 act = Action::PvpSendAttack(idx);
                             } else {
+                                // Capture l'élément avant l'attaque
+                                let attack_element = battle.player.attacks[idx].element;
                                 battle.player_attack(idx);
+                                attack_effects.send(PlayAttackEffect {
+                                    element: attack_element,
+                                    position: Vec2::new(250.0, 150.0),
+                                });
                                 act = Action::Rebuild;
                             }
                         }
