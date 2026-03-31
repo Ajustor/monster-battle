@@ -270,6 +270,17 @@ pub fn handle_touch_scroll(
     }
 }
 
+/// Système qui synchronise la position de scroll actuelle avec `GameData.scroll_offset`.
+/// Cela permet de restaurer la position lors du rebuild de l'UI.
+pub fn sync_scroll_position(
+    mut data: ResMut<crate::game::GameData>,
+    scroll_query: Query<&ScrollPosition, With<ScrollableContent>>,
+) {
+    if let Some(scroll) = scroll_query.iter().next() {
+        data.scroll_offset = scroll.offset_y.round() as usize;
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  Clavier système Android
 // ═══════════════════════════════════════════════════════════════════

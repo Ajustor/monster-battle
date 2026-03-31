@@ -146,7 +146,8 @@ fn spawn_monster_list_inner(
                             flex_grow: 1.0,
                             ..default()
                         },
-                        ScrollPosition::default(),
+                        // Restaurer la position de scroll enregistrée
+                        ScrollPosition { offset_y: data.scroll_offset as f32, ..default() },
                         ScrollableContent,
                     ))
                     .with_children(|list| {
@@ -838,5 +839,16 @@ fn feed_monster_with(data: &mut ResMut<GameData>, food: FoodType) {
         data.message = Some(msg);
     } else {
         data.message = Some("Pas de monstre a nourrir.".to_string());
+    }
+}
+
+/// Sauvegarde la position de scroll actuelle dans GameData.
+/// Fonctionne seulement quand un ScrollPosition est présent (un seul ScrollableContent dans l'écran).
+pub(crate) fn save_scroll_offset(
+    mut data: ResMut<GameData>,
+    query: Query<&ScrollPosition, With<ScrollableContent>>,
+) {
+    if let Ok(scroll) = query.get_single() {
+        data.scroll_offset = scroll.offset_y as usize;
     }
 }
