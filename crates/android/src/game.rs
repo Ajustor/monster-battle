@@ -192,6 +192,10 @@ impl Plugin for GamePlugin {
             .enable_state_scoped_entities::<GameScreen>()
             .add_systems(OnEnter(GameScreen::MainMenu), on_enter_main_menu)
             .add_systems(OnEnter(GameScreen::MonsterList), on_enter_monster_list)
+            .add_systems(
+                Update,
+                crate::ui::common::sync_scroll_position.run_if(in_state(GameScreen::MonsterList)),
+            )
             .add_systems(OnEnter(GameScreen::NewMonster), on_enter_new_monster)
             .add_systems(OnEnter(GameScreen::NamingMonster), on_enter_naming)
             .add_systems(OnEnter(GameScreen::NamingMonster), enable_ime)
