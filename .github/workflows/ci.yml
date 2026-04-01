@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+<<<<<<< HEAD
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
 
@@ -15,6 +16,72 @@ jobs:
   # ── Check + Test + Clippy (un seul job Linux, 3x plus rapide) ────
   check-test-lint:
     name: Check / Test / Clippy (Linux)
+=======
+
+jobs:
+  # ── Check workspace Linux (crates portables) ─────────────────────
+  check-linux:
+    name: Check (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies (ALSA + udev)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            libasound2-dev \
+            libudev-dev \
+            pkg-config
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-check-
+
+      - name: Check workspace
+        run: cargo check --workspace --exclude monster-battle-ios --exclude monster-battle-android
+
+  # ── Tests unitaires ───────────────────────────────────────────────
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-test-
+
+      - name: Run tests
+        run: cargo test --workspace --exclude monster-battle-ios --exclude monster-battle-android
+
+  # ── Lint (clippy) ─────────────────────────────────────────────────
+  clippy:
+    name: Clippy
+>>>>>>> c9dfb87 (ci: add full CI workflow (check/test/clippy/android/ios))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +91,7 @@ jobs:
         with:
           components: clippy
 
+<<<<<<< HEAD
       - name: Install sccache
         uses: mozilla-actions/sccache-action@v0.0.9
 
@@ -63,6 +131,25 @@ jobs:
           --exclude monster-battle-ios
           --exclude monster-battle-android
           -- -D warnings
+=======
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-clippy-
+
+      - name: Clippy
+        run: cargo clippy --workspace --exclude monster-battle-ios --exclude monster-battle-android -- -D warnings
+>>>>>>> c9dfb87 (ci: add full CI workflow (check/test/clippy/android/ios))
 
   # ── Check Android (cross-compile) ────────────────────────────────
   check-android:
@@ -71,20 +158,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+<<<<<<< HEAD
       - name: Install Rust + Android target
+=======
+      - name: Install Rust toolchain + Android target
+>>>>>>> c9dfb87 (ci: add full CI workflow (check/test/clippy/android/ios))
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
 
+<<<<<<< HEAD
       - name: Install sccache
         uses: mozilla-actions/sccache-action@v0.0.9
 
+=======
+>>>>>>> c9dfb87 (ci: add full CI workflow (check/test/clippy/android/ios))
       - name: Install Android NDK
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r27c
 
       - name: Install cargo-ndk
+<<<<<<< HEAD
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-ndk
@@ -96,6 +191,17 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
+=======
+        run: cargo install cargo-ndk --locked
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+>>>>>>> c9dfb87 (ci: add full CI workflow (check/test/clippy/android/ios))
           key: ${{ runner.os }}-cargo-android-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-android-
 
@@ -106,16 +212,25 @@ jobs:
 
   # ── Build iOS (macOS) ────────────────────────────────────────────
   build-ios:
+<<<<<<< HEAD
     name: Build iOS (arm64 + simulator)
+=======
+    name: Build iOS (aarch64-apple-ios)
+>>>>>>> c9dfb87 (ci: add full CI workflow (check/test/clippy/android/ios))
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
+<<<<<<< HEAD
       - name: Install Rust + iOS targets
+=======
+      - name: Install Rust toolchain
+>>>>>>> c9dfb87 (ci: add full CI workflow (check/test/clippy/android/ios))
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios,x86_64-apple-ios
 
+<<<<<<< HEAD
       - name: Install sccache
         uses: mozilla-actions/sccache-action@v0.0.9
 
@@ -133,6 +248,22 @@ jobs:
         run: cargo build -p monster-battle-ios --target aarch64-apple-ios --release
 
       - name: Build iOS simulator (x86_64)
+=======
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-ios-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-ios-
+
+      - name: Build iOS (arm64)
+        run: cargo build -p monster-battle-ios --target aarch64-apple-ios --release
+
+      - name: Build iOS (x86_64 simulator)
+>>>>>>> c9dfb87 (ci: add full CI workflow (check/test/clippy/android/ios))
         run: cargo build -p monster-battle-ios --target x86_64-apple-ios --release
 
       - name: Create universal library
