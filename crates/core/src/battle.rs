@@ -129,6 +129,8 @@ pub enum AnimationType {
 pub struct BattleState {
     pub player: BattleMonster,
     pub opponent: BattleMonster,
+    /// Données complètes de l'adversaire, conservées pour la dévoration en fin de combat.
+    pub opponent_data: Option<Monster>,
     pub turn: u32,
     pub phase: BattlePhase,
     /// File de messages à afficher.
@@ -171,6 +173,7 @@ impl BattleState {
         let mut state = BattleState {
             player,
             opponent,
+            opponent_data: Some(opponent_monster.clone()),
             turn: 0,
             phase: BattlePhase::Intro,
             message_queue: VecDeque::new(),
