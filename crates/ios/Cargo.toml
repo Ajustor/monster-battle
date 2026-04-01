@@ -15,6 +15,7 @@ bevy = { version = "0.15", default-features = false, features = [
   "bevy_core_pipeline",
   "bevy_render",
   "bevy_sprite",
+  "bevy_state",
   "bevy_text",
   "bevy_ui",
   "bevy_winit",
@@ -25,7 +26,7 @@ bevy = { version = "0.15", default-features = false, features = [
 
 # Logging
 log = "0.4"
-oslog = "0.2"
+env_logger = "0.11"
 
 # Workspace internes
 monster-battle-core = { path = "../core" }

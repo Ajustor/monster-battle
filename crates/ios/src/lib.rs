@@ -26,15 +26,14 @@ use bevy::state::app::AppExtStates;
 use game::{GamePlugin, GameScreen};
 
 /// Point d'entrée iOS — appelé depuis AppDelegate.swift.
-/// Le nom `ios_main` doit être exposé avec `#[no_mangle]`.
-#[no_mangle]
+/// Le nom `ios_main` doit être exposé avec `#[unsafe(no_mangle)]`.
+#[unsafe(no_mangle)]
 pub extern "C" fn ios_main() {
-    // Initialiser le logger iOS (OSLog)
-    #[cfg(target_os = "ios")]
-    {
-        oslog::init().ok();
-        log::info!("🐉 Monster Battle — démarrage iOS");
-    }
+    // Logging iOS via env_logger (compatible iOS)
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .try_init();
+    log::info!("🐉 Monster Battle — démarrage iOS");
 
     App::new()
         .add_plugins(
