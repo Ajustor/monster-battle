@@ -907,6 +907,7 @@ fn apply_battle_results(data: &mut GameData) {
     };
 
     let is_victory = battle.phase == BattlePhase::Victory;
+    let mut devour_message: Option<String> = None;
 
     if is_victory {
         fighter.wins += 1;
@@ -916,6 +917,25 @@ fn apply_battle_results(data: &mut GameData) {
         fighter.adjust_happiness(10);
         fighter.record_interaction();
         fighter.increase_bond(2);
+
+        // Dévoration du monstre battu : gains de stats + mutation + type secondaire
+        let prey_stats = monster_battle_core::types::Stats {
+            hp: battle.opponent.attack_stat,
+            attack: battle.opponent.attack_stat,
+            defense: battle.opponent.defense_stat,
+            speed: battle.opponent.speed_stat,
+            special_attack: battle.opponent.sp_attack,
+            special_defense: battle.opponent.sp_defense,
+        };
+        let mut prey = monster_battle_core::Monster::new_starter(
+            battle.opponent.name.clone(),
+            battle.opponent.element,
+            prey_stats,
+        );
+        prey.traits = battle.opponent.traits.clone();
+        let devour_result = fighter.devour(&prey);
+        // Ajouter la description de dévoration au message
+        devour_message = Some(devour_result.description);
     } else {
         fighter.losses += 1;
         // Défaite → perte de bonheur
@@ -931,15 +951,17 @@ fn apply_battle_results(data: &mut GameData) {
     let _ = data.storage.save(fighter);
 
     if is_victory {
-        data.message = Some(format!(
+        let base_msg = format!(
             "🏆 Victoire ! +{} XP{}",
             battle.xp_gained,
-            if battle.is_training {
-                " (entraînement docile)"
-            } else {
-                ""
-            }
-        ));
+            if battle.is_training { " (entraînement docile)" } else { "" }
+        );
+        let full_msg = if let Some(devour) = devour_message {
+            format!("{}\n\n🍖 {}", base_msg, devour)
+        } else {
+            base_msg
+        };
+        data.message = Some(full_msg);
     } else if !battle.loser_died {
         if battle.is_training {
             data.message = Some("Défaite à l'entraînement docile — pas de pénalité !".to_string());
