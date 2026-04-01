@@ -1,0 +1,63 @@
+[package]
+name = "monster-battle-ios"
+version = "0.10.3"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["staticlib", "lib"]
+
+[dependencies]
+# Framework
+bevy = { version = "0.15", default-features = false, features = [
+  "bevy_asset",
+  "bevy_color",
+  "bevy_core_pipeline",
+  "bevy_render",
+  "bevy_sprite",
+  "bevy_state",
+  "bevy_text",
+  "bevy_ui",
+  "bevy_winit",
+  "default_font",
+  "multi_threaded",
+  "png",
+] }
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# Workspace internes
+monster-battle-core = { path = "../core" }
+monster-battle-sprites = { path = "../sprites" }
+monster-battle-storage = { path = "../storage" }
+monster-battle-network = { path = "../network" }
+monster-battle-audio = { path = "../audio" }
+
+# Réseau & crypto (commun)
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "net",
+  "io-util",
+  "macros",
+  "sync",
+  "time",
+] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+rustls = { version = "0.23", features = ["ring"] }
+futures-util = "0.3"
+
+# Gestion d'erreur
+anyhow = "1"
+thiserror = "2"
+
+# Serialisation
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# UUID & temps
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+
