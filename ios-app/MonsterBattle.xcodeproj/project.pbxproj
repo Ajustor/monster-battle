@@ -1,0 +1,279 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1498D2341E8E89230040F4C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89230040F4C /* Assets.xcassets */; };
+		1498D2361E8E89230040F4C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2351E8E89230040F4C /* AppDelegate.swift */; };
+		1498D2381E8E89230040F4C /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2371E8E89230040F4C /* main.m */; };
+		1498D23A1E8E89230040F4C /* libmonster-battle-ios.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1498D2391E8E89230040F4C /* libmonster-battle-ios.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1498D22E1E8E89230040F4C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1498D22C1E8E89230040F4C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1498D2311E8E89230040F4C;
+			remoteInfo = monster-battle-ios;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		1498D2331E8E89230040F4C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1498D2351E8E89230040F4C /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		1498D2371E8E89230040F4C /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		1498D2391E8E89230040F4C /* libmonster-battle-ios.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libmonster-battle-ios.a; path = libmonster-battle-ios.a; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1498D23B1E8E89230040F4C /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			name = "Build Rust library";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if which cargo > /dev/null; then\\n    cargo lipo --release\\n    cp target/universal/release/libmonster-battle-ios.a \\"$SRCROOT/\\"\\nelse\\n    echo \\"cargo not found, skipping\\"\\n    exit 0\\nfi\\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1498D2311E8E89230040F4C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1498D23A1E8E89230040F4C /* libmonster-battle-ios.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1498D22D1E8E89230040F4C = {
+			isa = PBXGroup;
+			children = (
+				1498D22F1E8E89230040F4C /* monster-battle-ios */,
+				1498D2331E8E89230040F4C /* Assets.xcassets */,
+				1498D2351E8E89230040F4C /* AppDelegate.swift */,
+				1498D2371E8E89230040F4C /* main.m */,
+				1498D2391E8E89230040F4C /* libmonster-battle-ios.a */,
+			);
+			sourceTree = "<group>";
+		};
+		1498D22F1E8E89230040F4C /* monster-battle-ios */ = {
+			isa = PBXGroup;
+			children = (
+				1498D22E1E8E89230040F4C /* PBXContainerItemProxy */,
+			);
+			name = monster-battle-ios;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1498D2311E8E89230040F4C /* monster-battle-ios */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1498D2451E8E89230040F4C /* Build configuration list for PBXNativeTarget "monster-battle-ios" */;
+			buildPhases = (
+				1498D22A1E8E89230040F4C /* Sources */,
+				1498D23B1E8E89230040F4C /* ShellScript */,
+				1498D2311E8E89230040F4C /* Frameworks */,
+				1498D22C1E8E89230040F4C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = monster-battle-ios;
+			productName = monster-battle-ios;
+			productReference = 1498D2321E8E89230040F4C /* monster-battle-ios.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1498D22C1E8E89230040F4C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					1498D2311E8E89230040F4C = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = 1498D22B1E8E89230040F4C /* Build configuration list for PBXProject "monster-battle-ios" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1498D22D1E8E89230040F4C;
+			productRefGroup = 1498D22D1E8E89230040F4C;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1498D2311E8E89230040F4C /* monster-battle-ios */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1498D22C1E8E89230040F4C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1498D2341E8E89230040F4C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1498D22A1E8E89230040F4C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1498D2361E8E89230040F4C /* AppDelegate.swift in Sources */,
+				1498D2381E8E89230040F4C /* main.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1498D2471E8E89230040F4C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_BITCODE = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ajustor.monsterbattle;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		1498D2481E8E89230040F4C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_BITCODE = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ajustor.monsterbattle;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		1498D2491E8E89230040F4C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ENABLE_BITCODE = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lstdc++",
+					"-lm",
+					"-lobjc",
+					"-framework",
+					Foundation,
+					"-framework",
+					CoreFoundation,
+					"-framework",
+					Security,
+					"-lz",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ajustor.monsterbattle;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = monster_battle_ios-Bridging-Header.h;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		1498D24A1E8E89230040F4C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ENABLE_BITCODE = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lstdc++",
+					"-lm",
+					"-lobjc",
+					"-framework",
+					Foundation,
+					"-framework",
+					CoreFoundation,
+					"-framework",
+					Security,
+					"-lz",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ajustor.monsterbattle;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = monster_battle_ios-Bridging-Header.h;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1498D22B1E8E89230040F4C /* Build configuration list for PBXProject "monster-battle-ios" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1498D2471E8E89230040F4C /* Debug */,
+				1498D2481E8E89230040F4C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1498D2451E8E89230040F4C /* Build configuration list for PBXNativeTarget "monster-battle-ios" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1498D2491E8E89230040F4C /* Debug */,
+				1498D24A1E8E89230040F4C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 1498D22C1E8E89230040F4C /* Project object */;
+}
