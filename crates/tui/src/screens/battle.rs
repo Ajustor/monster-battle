@@ -133,7 +133,7 @@ fn draw_opponent_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
                 Style::default().fg(Color::DarkGray),
             )),
         ]
-    } else if is_hit && battle.anim_frame % 2 == 0 {
+    } else if is_hit && battle.anim_frame.is_multiple_of(2) {
         vec![
             Line::from(""),
             Line::from(""),
@@ -177,7 +177,7 @@ fn draw_player_side(frame: &mut Frame, area: Rect, battle: &BattleState) {
             Line::from(""),
             Line::from(""),
         ]
-    } else if is_hit && battle.anim_frame % 2 == 0 {
+    } else if is_hit && battle.anim_frame.is_multiple_of(2) {
         vec![
             Line::from(Span::styled("  💥", Style::default().fg(Color::Red))),
             Line::from(""),

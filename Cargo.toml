@@ -10,10 +10,11 @@ members = [
   "crates/audio",
   "crates/android",
   "crates/composer",
+  "crates/ios",
 ]
 
 [workspace.package]
-version = "0.10.3"
+version = "1.0.0"
 edition = "2024"
 license = "MIT"
 
@@ -70,4 +71,5 @@ monster-battle-network = { path = "crates/network" }
 monster-battle-server = { path = "crates/server" }
 monster-battle-audio = { path = "crates/audio" }
 monster-battle-android = { path = "crates/android" }
+monster-battle-ios = { path = "crates/ios" }
 monster-battle-composer = { path = "crates/composer" }

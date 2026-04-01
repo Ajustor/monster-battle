@@ -68,13 +68,12 @@ fn save_settings(settings: &AudioSettings) {
 pub fn init() {
     ENGINE.with(|cell| {
         let mut opt = cell.borrow_mut();
-        if opt.is_none() {
-            if let Some(engine) = AudioEngine::try_new() {
+        if opt.is_none()
+            && let Some(engine) = AudioEngine::try_new() {
                 let settings = load_settings();
                 engine.set_muted(settings.muted);
                 *opt = Some(engine);
             }
-        }
     });
 }
 

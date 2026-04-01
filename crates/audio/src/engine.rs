@@ -37,6 +37,7 @@ impl AudioEngine {
     /// Create a new audio engine.
     ///
     /// Returns `None` if no audio output device is available (e.g. CI, headless).
+    #[allow(clippy::arc_with_non_send_sync)]
     pub fn try_new() -> Option<Self> {
         let (stream, handle) = OutputStream::try_default().ok()?;
         let music_sink = Sink::try_new(&handle).ok()?;

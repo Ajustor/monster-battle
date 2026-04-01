@@ -49,6 +49,25 @@ impl Attack {
         attacks
     }
 
+    /// Retourne TOUTES les attaques disponibles pour un monstre (non limitées à 4).
+    pub fn all_attacks_for_type(primary: ElementType, secondary: Option<ElementType>) -> Vec<Attack> {
+        let mut attacks = vec![Attack {
+            name: "Charge".to_string(),
+            element: ElementType::Normal,
+            power: 40,
+            accuracy: 100,
+            is_special: false,
+        }];
+
+        attacks.extend(Self::type_attacks(primary));
+
+        if let Some(sec) = secondary {
+            attacks.extend(Self::type_attacks(sec));
+        }
+
+        attacks
+    }
+
     /// Attaques spécifiques à un type élémentaire (3 attaques de puissance croissante).
     fn type_attacks(element: ElementType) -> Vec<Attack> {
         match element {

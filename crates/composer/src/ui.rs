@@ -63,7 +63,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
 fn timeline_lanes_height(app: &App) -> u16 {
     let lanes = app.project.voices.len() as u16;
     // 2 for borders + 1 header line + 1 per voice, min 4
-    (lanes + 3).max(4).min(14)
+    (lanes + 3).clamp(4, 14)
 }
 
 // ── Header: track name + BPM ────────────────────────────────────
@@ -96,13 +96,13 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let name_text = if app.editing && focused && app.header_field == HeaderField::Name {
-        format!("{}", app.input_buf)
+        app.input_buf.to_string()
     } else {
         app.project.name.clone()
     };
 
     let bpm_text = if app.editing && focused && app.header_field == HeaderField::Bpm {
-        format!("{}", app.input_buf)
+        app.input_buf.to_string()
     } else {
         format!("{:.0}", app.project.bpm)
     };
@@ -369,8 +369,8 @@ fn draw_pattern_vis(frame: &mut Frame, voice: &VoiceDef, playback_pos: Option<f6
         let start_col = (ev.start * width as f64) as usize;
         let end_col = ((ev.start + ev.duration) * width as f64).ceil() as usize;
         let end_col = end_col.min(width);
-        for col in start_col..end_col {
-            grid[col] = ('█', color);
+        for cell in grid[start_col..end_col].iter_mut() {
+            *cell = ('█', color);
         }
     }
 
@@ -456,11 +456,11 @@ fn draw_timeline(frame: &mut Frame, app: &App, area: Rect) {
             let start_col = (ev.start * lane_width as f64) as usize;
             let end_col = ((ev.start + ev.duration) * lane_width as f64).ceil() as usize;
             let end_col = end_col.min(lane_width);
-            for col in start_col..end_col {
+            for cell in grid[start_col..end_col].iter_mut() {
                 if voice.is_drum {
-                    grid[col] = ('▮', DRUM_COLOR);
+                    *cell = ('▮', DRUM_COLOR);
                 } else {
-                    grid[col] = ('█', color);
+                    *cell = ('█', color);
                 }
             }
         }

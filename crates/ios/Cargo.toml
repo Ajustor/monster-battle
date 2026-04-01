@@ -1,0 +1,65 @@
+[package]
+name = "monster-battle-ios"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["staticlib", "lib"]
+
+[dependencies]
+# ── Crates internes ──────────────────────────────────────────────
+monster-battle-core.workspace = true
+monster-battle-sprites.workspace = true
+monster-battle-storage.workspace = true
+monster-battle-network.workspace = true
+monster-battle-audio.workspace = true
+
+# ── Moteur de jeu ────────────────────────────────────────────────
+bevy = { version = "0.15", default-features = false, features = [
+  "bevy_asset",
+  "bevy_color",
+  "bevy_core_pipeline",
+  "bevy_render",
+  "bevy_sprite",
+  "bevy_state",
+  "bevy_text",
+  "bevy_ui",
+  "bevy_winit",
+  "default_font",
+  "multi_threaded",
+  "png",
+] }
+
+# ── Sérialisation ────────────────────────────────────────────────
+serde.workspace = true
+serde_json.workspace = true
+
+# ── Identifiants ─────────────────────────────────────────────────
+uuid.workspace = true
+
+# ── Temps ────────────────────────────────────────────────────────
+chrono.workspace = true
+
+# ── Async (pour le réseau) ───────────────────────────────────────
+tokio.workspace = true
+
+# ── WebSocket + TLS ──────────────────────────────────────────────
+tokio-tungstenite.workspace = true
+rustls.workspace = true
+futures-util.workspace = true
+
+# ── Erreurs ──────────────────────────────────────────────────────
+anyhow.workspace = true
+thiserror.workspace = true
+
+# ── Logging ──────────────────────────────────────────────────────
+log = "0.4"
+env_logger = "0.11"
+
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+# x11 pour le build desktop (dev/test sur Linux)
+bevy = { version = "0.15", default-features = false, features = ["x11"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+# Features spécifiques iOS si nécessaire
