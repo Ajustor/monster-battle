@@ -110,7 +110,7 @@ impl TicTacToe {
     }
 
     pub fn move_cursor_left(&mut self) {
-        if !self.cursor.is_multiple_of(3) {
+        if !self.cursor % 3 == 0 {
             self.cursor -= 1;
         }
     }

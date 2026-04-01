@@ -180,7 +180,7 @@ impl MemoryGame {
     }
 
     pub fn move_cursor_left(&mut self) {
-        if !self.cursor.is_multiple_of(self.cols) {
+        if !self.cursor % self.cols == 0 {
             self.cursor -= 1;
         }
     }
