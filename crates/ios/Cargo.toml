@@ -1,14 +1,21 @@
 [package]
 name = "monster-battle-ios"
-version = "0.10.3"
-edition = "2024"
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [lib]
 crate-type = ["staticlib", "lib"]
 
 [dependencies]
-# Framework
+# ── Crates internes ──────────────────────────────────────────────
+monster-battle-core.workspace = true
+monster-battle-sprites.workspace = true
+monster-battle-storage.workspace = true
+monster-battle-network.workspace = true
+monster-battle-audio.workspace = true
+
+# ── Moteur de jeu ────────────────────────────────────────────────
 bevy = { version = "0.15", default-features = false, features = [
   "bevy_asset",
   "bevy_color",
@@ -24,40 +31,35 @@ bevy = { version = "0.15", default-features = false, features = [
   "png",
 ] }
 
-# Logging
+# ── Sérialisation ────────────────────────────────────────────────
+serde.workspace = true
+serde_json.workspace = true
+
+# ── Identifiants ─────────────────────────────────────────────────
+uuid.workspace = true
+
+# ── Temps ────────────────────────────────────────────────────────
+chrono.workspace = true
+
+# ── Async (pour le réseau) ───────────────────────────────────────
+tokio.workspace = true
+
+# ── WebSocket + TLS ──────────────────────────────────────────────
+tokio-tungstenite.workspace = true
+rustls.workspace = true
+futures-util.workspace = true
+
+# ── Erreurs ──────────────────────────────────────────────────────
+anyhow.workspace = true
+thiserror.workspace = true
+
+# ── Logging ──────────────────────────────────────────────────────
 log = "0.4"
 env_logger = "0.11"
 
-# Workspace internes
-monster-battle-core = { path = "../core" }
-monster-battle-sprites = { path = "../sprites" }
-monster-battle-storage = { path = "../storage" }
-monster-battle-network = { path = "../network" }
-monster-battle-audio = { path = "../audio" }
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+# x11 pour le build desktop (dev/test sur Linux)
+bevy = { version = "0.15", default-features = false, features = ["x11"] }
 
-# Réseau & crypto (commun)
-tokio = { version = "1", features = [
-  "rt-multi-thread",
-  "net",
-  "io-util",
-  "macros",
-  "sync",
-  "time",
-] }
-tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
-rustls = { version = "0.23", features = ["ring"] }
-futures-util = "0.3"
-
-# Gestion d'erreur
-anyhow = "1"
-thiserror = "2"
-
-# Serialisation
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
-# UUID & temps
-uuid = { version = "1", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
-
-
+[target.'cfg(target_os = "ios")'.dependencies]
+# Features spécifiques iOS si nécessaire
