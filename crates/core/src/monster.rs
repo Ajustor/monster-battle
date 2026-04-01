@@ -335,13 +335,11 @@ impl Monster {
         }
 
         // Vérifier si on a trop mangé (3+ repas en 12h)
-        if self.meals_today >= 3 {
-            if let Some(window_start) = self.meals_window_start {
-                if (now - window_start).num_hours() < SATISFIED_HOURS {
+        if self.meals_today >= 3
+            && let Some(window_start) = self.meals_window_start
+                && (now - window_start).num_hours() < SATISFIED_HOURS {
                     return HungerLevel::Overfed;
                 }
-            }
-        }
 
         // Rassasié si nourri dans les SATISFIED_HOURS dernières heures
         if hours_since_fed < SATISFIED_HOURS {
@@ -483,11 +481,10 @@ impl Monster {
             stat_gains.special_attack,
             stat_gains.special_defense,
         )];
-        if mutation_occurred {
-            if let Some(t) = self.traits.last() {
+        if mutation_occurred
+            && let Some(t) = self.traits.last() {
                 desc_parts.push(format!("🧬 Mutation ! Nouveau trait : {} !", t));
             }
-        }
         if let Some(st) = new_secondary_type {
             desc_parts.push(format!("🌀 {} absorbe le type {} !", self.name, st));
         }
@@ -509,12 +506,11 @@ impl Monster {
         let now = Utc::now();
 
         // Reset le compteur de repas si la fenêtre a expiré (12h)
-        if let Some(window_start) = self.meals_window_start {
-            if (now - window_start).num_hours() >= SATISFIED_HOURS {
+        if let Some(window_start) = self.meals_window_start
+            && (now - window_start).num_hours() >= SATISFIED_HOURS {
                 self.meals_today = 0;
                 self.meals_window_start = None;
             }
-        }
 
         // Démarrer une nouvelle fenêtre si nécessaire
         if self.meals_window_start.is_none() {
@@ -587,7 +583,7 @@ impl Monster {
             None => (now - self.born_at).num_hours(),
         };
         // Perd 1 de bonheur pour chaque 2h sans interaction, min 2
-        let decay = ((hours_since / 2) as i32).max(0).min(5);
+        let decay = ((hours_since / 2) as i32).clamp(0, 5);
         if decay > 0 {
             self.adjust_happiness(-decay);
         }
@@ -662,11 +658,10 @@ impl Monster {
         let now = Utc::now();
 
         // Limiter à 1 événement par heure
-        if let Some(last_check) = self.last_event_check {
-            if (now - last_check).num_minutes() < 60 {
+        if let Some(last_check) = self.last_event_check
+            && (now - last_check).num_minutes() < 60 {
                 return None;
             }
-        }
 
         self.last_event_check = Some(now);
 

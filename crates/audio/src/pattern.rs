@@ -264,15 +264,10 @@ impl Parser {
         };
 
         // Parse modifiers: *N (speed)
-        loop {
-            match self.peek() {
-                Some('*') => {
-                    self.advance();
-                    let factor = self.parse_number();
-                    pattern = Pattern::Speed(Box::new(pattern), factor);
-                }
-                _ => break,
-            }
+        while let Some('*') = self.peek() {
+            self.advance();
+            let factor = self.parse_number();
+            pattern = Pattern::Speed(Box::new(pattern), factor);
         }
 
         pattern
@@ -316,7 +311,7 @@ impl Parser {
     /// Parse a note (`c4`, `eb3`, `f#5`) or a drum hit (`x`).
     fn parse_note_or_hit(&mut self) -> Pattern {
         // Drum hit: 'x' followed by non-alpha (or end)
-        if self.peek() == Some('x') && self.peek_at(1).map_or(true, |c| !c.is_alphabetic()) {
+        if self.peek() == Some('x') && self.peek_at(1).is_none_or(|c| !c.is_alphabetic()) {
             self.advance();
             return Pattern::Note(DRUM_HIT);
         }
@@ -355,7 +350,7 @@ impl Parser {
             Some('b') => {
                 if note_char == 'b' {
                     // "bb" — flat only if followed by a digit (otherwise it's a new note)
-                    if self.peek_at(1).map_or(false, |c| c.is_ascii_digit()) {
+                    if self.peek_at(1).is_some_and(|c| c.is_ascii_digit()) {
                         self.advance();
                         accidental = -1;
                     }
@@ -369,9 +364,9 @@ impl Parser {
         }
 
         // Octave number (default 4 if absent)
-        let octave: i16 = if self.peek().map_or(false, |c| c.is_ascii_digit()) {
+        let octave: i16 = if self.peek().is_some_and(|c| c.is_ascii_digit()) {
             let mut num_str = String::new();
-            while self.peek().map_or(false, |c| c.is_ascii_digit()) {
+            while self.peek().is_some_and(|c| c.is_ascii_digit()) {
                 num_str.push(self.advance().unwrap());
             }
             num_str.parse().unwrap_or(4)
@@ -392,7 +387,7 @@ impl Parser {
         let mut s = String::new();
         while self
             .peek()
-            .map_or(false, |c| c.is_ascii_digit() || c == '.')
+            .is_some_and(|c| c.is_ascii_digit() || c == '.')
         {
             s.push(self.advance().unwrap());
         }
