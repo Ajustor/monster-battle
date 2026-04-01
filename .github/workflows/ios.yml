@@ -65,6 +65,14 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install system dependencies (ALSA + udev)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            libasound2-dev \
+            libudev-dev \
+            pkg-config
+
       - name: Cache Cargo
         uses: actions/cache@v4
         with:
