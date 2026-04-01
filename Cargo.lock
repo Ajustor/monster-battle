@@ -2968,7 +2968,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2988,7 +2988,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-android"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -3010,7 +3010,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-audio"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "rand 0.8.5",
  "rodio",
@@ -3020,7 +3020,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-composer"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "crossterm",
@@ -3032,7 +3032,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-core"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "chrono",
  "rand 0.8.5",
@@ -3044,7 +3044,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-ios"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "bevy",
@@ -3068,7 +3068,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-network"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -3084,7 +3084,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-server"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -3099,14 +3099,14 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-sprites"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "monster-battle-core",
 ]
 
 [[package]]
 name = "monster-battle-storage"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "aes-gcm",
  "anyhow",

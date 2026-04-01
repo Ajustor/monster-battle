@@ -943,10 +943,22 @@ fn apply_battle_results(data: &mut GameData) {
         }
     }
 
+    // Dévoration de l'adversaire (uniquement en combat réel, pas en entraînement)
+    let devour_msg = if is_victory && !battle.is_training {
+        if let Some(ref prey) = battle.opponent_data {
+            let result = fighter.devour(prey);
+            Some(result.description)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let _ = data.storage.save(fighter);
 
     if is_victory {
-        data.message = Some(format!(
+        let xp_msg = format!(
             "🏆 Victoire ! +{} XP{}",
             battle.xp_gained,
             if battle.is_training {
@@ -954,7 +966,11 @@ fn apply_battle_results(data: &mut GameData) {
             } else {
                 ""
             }
-        ));
+        );
+        data.message = Some(match devour_msg {
+            Some(d) => format!("{}\n{}", xp_msg, d),
+            None => xp_msg,
+        });
     } else if !battle.loser_died {
         if battle.is_training {
             data.message = Some("Défaite à l'entraînement docile — pas de pénalité !".to_string());
