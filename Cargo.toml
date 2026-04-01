@@ -9,6 +9,7 @@ members = [
   "crates/server",
   "crates/audio",
   "crates/android",
+  "crates/mobile-ui",
   "crates/composer",
 ]
 
@@ -70,4 +71,5 @@ monster-battle-network = { path = "crates/network" }
 monster-battle-server = { path = "crates/server" }
 monster-battle-audio = { path = "crates/audio" }
 monster-battle-android = { path = "crates/android" }
+monster-battle-mobile-ui = { path = "crates/mobile-ui" }
 monster-battle-composer = { path = "crates/composer" }
