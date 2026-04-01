@@ -147,7 +147,10 @@ fn spawn_monster_list_inner(
                             ..default()
                         },
                         // Restaurer la position de scroll enregistrée
-                        ScrollPosition { offset_y: data.scroll_offset as f32, ..default() },
+                        ScrollPosition {
+                            offset_y: data.scroll_offset as f32,
+                            ..default()
+                        },
                         ScrollableContent,
                     ))
                     .with_children(|list| {

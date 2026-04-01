@@ -279,9 +279,9 @@ impl App {
                 if let Some(style) = pending_effect_style.take()
                     && let (Some(player), Some(opponent)) =
                         (pending_effect_player.take(), pending_effect_opponent.take())
-                    {
-                        Self::push_battle_effects(&mut battle_effects, &style, &player, &opponent);
-                    }
+                {
+                    Self::push_battle_effects(&mut battle_effects, &style, &player, &opponent);
+                }
 
                 // Détecter les nouveaux messages → différer l'effet au prochain frame
                 if battle.message_counter != last_msg_counter {
@@ -329,12 +329,13 @@ impl App {
 
             // Poll avec timeout pour le blink
             if crossterm::event::poll(Duration::from_millis(50))?
-                && let Event::Key(key) = event::read()? {
-                    if key.kind != KeyEventKind::Press {
-                        continue;
-                    }
-                    self.handle_key(key.code);
+                && let Event::Key(key) = event::read()?
+            {
+                if key.kind != KeyEventKind::Press {
+                    continue;
                 }
+                self.handle_key(key.code);
+            }
 
             if self.should_quit {
                 return Ok(());
@@ -1440,25 +1441,26 @@ impl App {
         };
 
         if let Ok(mut monsters) = self.storage.list_alive()
-            && let Some(m) = monsters.iter_mut().find(|m| m.id == monster_id) {
-                use monster_battle_core::minigame::apply_reward;
-                apply_reward(&mut m.base_stats, &reward);
-                let levels = m.gain_xp(reward.xp);
-                // Mini-jeu → bonheur + lien
-                m.adjust_happiness(10);
-                m.record_interaction();
-                m.increase_bond(1);
-                let mut msg = format!("{} — {}", label, reward.summary());
-                if levels > 0 {
-                    msg.push_str(&format!(
-                        " +{} niveau{} !",
-                        levels,
-                        if levels > 1 { "x" } else { "" }
-                    ));
-                }
-                self.message = Some(msg);
-                let _ = self.storage.save(m);
+            && let Some(m) = monsters.iter_mut().find(|m| m.id == monster_id)
+        {
+            use monster_battle_core::minigame::apply_reward;
+            apply_reward(&mut m.base_stats, &reward);
+            let levels = m.gain_xp(reward.xp);
+            // Mini-jeu → bonheur + lien
+            m.adjust_happiness(10);
+            m.record_interaction();
+            m.increase_bond(1);
+            let mut msg = format!("{} — {}", label, reward.summary());
+            if levels > 0 {
+                msg.push_str(&format!(
+                    " +{} niveau{} !",
+                    levels,
+                    if levels > 1 { "x" } else { "" }
+                ));
             }
+            self.message = Some(msg);
+            let _ = self.storage.save(m);
+        }
     }
 
     fn run_training_fight(&mut self, wild: bool) {
@@ -2349,16 +2351,17 @@ impl App {
     /// Vérifie le résultat du check de version.
     fn poll_version_check(&mut self) {
         if let Some(rx) = &self.version_rx
-            && let Ok(server_version) = rx.try_recv() {
-                if let Some(ref sv) = server_version {
-                    let client_version = env!("CARGO_PKG_VERSION");
-                    if sv != client_version {
-                        self.server_version = Some(sv.clone());
-                        self.show_update_modal = true;
-                    }
+            && let Ok(server_version) = rx.try_recv()
+        {
+            if let Some(ref sv) = server_version {
+                let client_version = env!("CARGO_PKG_VERSION");
+                if sv != client_version {
+                    self.server_version = Some(sv.clone());
+                    self.show_update_modal = true;
                 }
-                self.version_rx = None;
             }
+            self.version_rx = None;
+        }
     }
 }
 

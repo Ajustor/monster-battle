@@ -177,9 +177,10 @@ fn ws_port(url: &str) -> u16 {
     {
         let host_part = rest.split('/').next().unwrap_or(rest);
         if let Some(port_str) = host_part.rsplit(':').next()
-            && let Ok(port) = port_str.parse::<u16>() {
-                return port;
-            }
+            && let Ok(port) = port_str.parse::<u16>()
+        {
+            return port;
+        }
     }
     if url.starts_with("wss://") { 443 } else { 80 }
 }

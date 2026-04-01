@@ -385,10 +385,7 @@ impl Parser {
     /// Parse a decimal number (e.g. `2`, `2.5`).
     fn parse_number(&mut self) -> f64 {
         let mut s = String::new();
-        while self
-            .peek()
-            .is_some_and(|c| c.is_ascii_digit() || c == '.')
-        {
+        while self.peek().is_some_and(|c| c.is_ascii_digit() || c == '.') {
             s.push(self.advance().unwrap());
         }
         s.parse().unwrap_or(1.0)

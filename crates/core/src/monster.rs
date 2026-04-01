@@ -337,9 +337,10 @@ impl Monster {
         // Vérifier si on a trop mangé (3+ repas en 12h)
         if self.meals_today >= 3
             && let Some(window_start) = self.meals_window_start
-                && (now - window_start).num_hours() < SATISFIED_HOURS {
-                    return HungerLevel::Overfed;
-                }
+            && (now - window_start).num_hours() < SATISFIED_HOURS
+        {
+            return HungerLevel::Overfed;
+        }
 
         // Rassasié si nourri dans les SATISFIED_HOURS dernières heures
         if hours_since_fed < SATISFIED_HOURS {
@@ -411,9 +412,7 @@ impl Monster {
         let mut rng = rand::thread_rng();
 
         // Calcul des gains de stats (moitié des stats de prey, min 1 si > 0)
-        let gain_stat = |v: u32| -> u32 {
-            if v > 0 { (v / 2).max(1) } else { 0 }
-        };
+        let gain_stat = |v: u32| -> u32 { if v > 0 { (v / 2).max(1) } else { 0 } };
         let stat_gains = Stats {
             hp: gain_stat(prey.base_stats.hp),
             attack: gain_stat(prey.base_stats.attack),
@@ -481,10 +480,9 @@ impl Monster {
             stat_gains.special_attack,
             stat_gains.special_defense,
         )];
-        if mutation_occurred
-            && let Some(t) = self.traits.last() {
-                desc_parts.push(format!("🧬 Mutation ! Nouveau trait : {} !", t));
-            }
+        if mutation_occurred && let Some(t) = self.traits.last() {
+            desc_parts.push(format!("🧬 Mutation ! Nouveau trait : {} !", t));
+        }
         if let Some(st) = new_secondary_type {
             desc_parts.push(format!("🌀 {} absorbe le type {} !", self.name, st));
         }
@@ -507,10 +505,11 @@ impl Monster {
 
         // Reset le compteur de repas si la fenêtre a expiré (12h)
         if let Some(window_start) = self.meals_window_start
-            && (now - window_start).num_hours() >= SATISFIED_HOURS {
-                self.meals_today = 0;
-                self.meals_window_start = None;
-            }
+            && (now - window_start).num_hours() >= SATISFIED_HOURS
+        {
+            self.meals_today = 0;
+            self.meals_window_start = None;
+        }
 
         // Démarrer une nouvelle fenêtre si nécessaire
         if self.meals_window_start.is_none() {
@@ -659,9 +658,10 @@ impl Monster {
 
         // Limiter à 1 événement par heure
         if let Some(last_check) = self.last_event_check
-            && (now - last_check).num_minutes() < 60 {
-                return None;
-            }
+            && (now - last_check).num_minutes() < 60
+        {
+            return None;
+        }
 
         self.last_event_check = Some(now);
 

@@ -11,15 +11,14 @@ pub struct BattleEffectsPlugin;
 
 impl Plugin for BattleEffectsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<PlayAttackEffect>()
-            .add_systems(
-                Update,
-                (
-                    handle_play_attack_effect,
-                    animate_attack_effects,
-                    cleanup_finished_effects,
-                ),
-            );
+        app.add_event::<PlayAttackEffect>().add_systems(
+            Update,
+            (
+                handle_play_attack_effect,
+                animate_attack_effects,
+                cleanup_finished_effects,
+            ),
+        );
     }
 }
 

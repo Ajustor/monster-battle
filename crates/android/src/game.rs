@@ -202,10 +202,13 @@ impl Plugin for GamePlugin {
             .add_systems(OnExit(GameScreen::NamingMonster), disable_ime)
             .add_systems(OnEnter(GameScreen::SelectMonster), on_enter_select_monster)
             .add_systems(OnEnter(GameScreen::Training), on_enter_training)
-            .add_systems(OnEnter(GameScreen::SelectAttacks), (
+            .add_systems(
+                OnEnter(GameScreen::SelectAttacks),
+                (
                     on_enter_select_attacks,
                     crate::ui::screens::select_attacks::spawn_select_attacks,
-                ))
+                ),
+            )
             .add_systems(
                 Update,
                 (
@@ -322,7 +325,9 @@ fn on_enter_new_monster(mut data: ResMut<GameData>) {
 fn on_enter_select_attacks(mut commands: Commands, data: Res<GameData>) {
     // Initialiser la ressource de sélection avec les indices actuels du monstre
     let monsters = data.storage.list_alive().unwrap_or_default();
-    let idx = data.monster_select_index.min(monsters.len().saturating_sub(1));
+    let idx = data
+        .monster_select_index
+        .min(monsters.len().saturating_sub(1));
     let selected = if let Some(monster) = monsters.get(idx) {
         if monster.active_attack_indices.is_empty() {
             // Par défaut : sélectionner les 4 premières attaques connues

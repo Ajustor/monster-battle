@@ -50,7 +50,10 @@ impl Attack {
     }
 
     /// Retourne TOUTES les attaques disponibles pour un monstre (non limitées à 4).
-    pub fn all_attacks_for_type(primary: ElementType, secondary: Option<ElementType>) -> Vec<Attack> {
+    pub fn all_attacks_for_type(
+        primary: ElementType,
+        secondary: Option<ElementType>,
+    ) -> Vec<Attack> {
         let mut attacks = vec![Attack {
             name: "Charge".to_string(),
             element: ElementType::Normal,

@@ -47,12 +47,12 @@ fn spawn_select_attacks_ui(
     selection: &AttackSelectionState,
 ) {
     let monsters = data.storage.list_alive().unwrap_or_default();
-    let idx = data.monster_select_index.min(monsters.len().saturating_sub(1));
+    let idx = data
+        .monster_select_index
+        .min(monsters.len().saturating_sub(1));
     let monster_opt = monsters.get(idx);
 
-    let known_attacks: Vec<Attack> = monster_opt
-        .map(|m| m.known_attacks())
-        .unwrap_or_default();
+    let known_attacks: Vec<Attack> = monster_opt.map(|m| m.known_attacks()).unwrap_or_default();
 
     let monster_name = monster_opt
         .map(|m| m.name.clone())
@@ -99,7 +99,10 @@ fn spawn_select_attacks_ui(
                     .with_children(|btn| {
                         btn.spawn((
                             Text::new("< Retour"),
-                            TextFont { font_size: fonts::SMALL, ..default() },
+                            TextFont {
+                                font_size: fonts::SMALL,
+                                ..default()
+                            },
                             TextColor(colors::TEXT_PRIMARY),
                         ));
                     });
@@ -108,9 +111,15 @@ fn spawn_select_attacks_ui(
             // Titre
             parent.spawn((
                 Text::new(format!("Attaques actives - {}", monster_name)),
-                TextFont { font_size: fonts::HEADING, ..default() },
+                TextFont {
+                    font_size: fonts::HEADING,
+                    ..default()
+                },
                 TextColor(colors::ACCENT_YELLOW),
-                Node { margin: UiRect::bottom(Val::Px(4.0)), ..default() },
+                Node {
+                    margin: UiRect::bottom(Val::Px(4.0)),
+                    ..default()
+                },
             ));
 
             // Sous-titre
@@ -119,15 +128,24 @@ fn spawn_select_attacks_ui(
                     "Selectionnez jusqu'a 4 attaques ({}/4 choisies)",
                     selection.selected.len()
                 )),
-                TextFont { font_size: fonts::SMALL, ..default() },
+                TextFont {
+                    font_size: fonts::SMALL,
+                    ..default()
+                },
                 TextColor(colors::TEXT_SECONDARY),
-                Node { margin: UiRect::bottom(Val::Px(12.0)), ..default() },
+                Node {
+                    margin: UiRect::bottom(Val::Px(12.0)),
+                    ..default()
+                },
             ));
 
             if known_attacks.is_empty() {
                 parent.spawn((
                     Text::new("Aucune attaque disponible."),
-                    TextFont { font_size: fonts::BODY, ..default() },
+                    TextFont {
+                        font_size: fonts::BODY,
+                        ..default()
+                    },
                     TextColor(colors::TEXT_SECONDARY),
                 ));
                 return;
@@ -149,7 +167,11 @@ fn spawn_select_attacks_ui(
                 .with_children(|scroll| {
                     for (i, attack) in known_attacks.iter().enumerate() {
                         let is_selected = selection.selected.contains(&i);
-                        let border_color = if is_selected { colors::ACCENT_YELLOW } else { colors::BORDER };
+                        let border_color = if is_selected {
+                            colors::ACCENT_YELLOW
+                        } else {
+                            colors::BORDER
+                        };
                         let bg_color: Color = if is_selected {
                             Color::srgba(0.3, 0.25, 0.0, 0.4)
                         } else {
@@ -176,32 +198,44 @@ fn spawn_select_attacks_ui(
                                 Interaction::default(),
                             ))
                             .with_children(|card| {
-                                card.spawn(Node { flex_direction: FlexDirection::Column, ..default() })
-                                    .with_children(|info| {
-                                        info.spawn((
-                                            Text::new(format!(
-                                                "{} {}  [{}]",
-                                                attack.element.icon(),
-                                                attack.name,
-                                                attack.element,
-                                            )),
-                                            TextFont { font_size: fonts::BODY, ..default() },
-                                            TextColor(colors::TEXT_PRIMARY),
-                                        ));
-                                        info.spawn((
-                                            Text::new(format!(
-                                                "{} | Force: {} | Precision: {}%",
-                                                special_label, attack.power, attack.accuracy
-                                            )),
-                                            TextFont { font_size: fonts::SMALL, ..default() },
-                                            TextColor(colors::TEXT_SECONDARY),
-                                        ));
-                                    });
+                                card.spawn(Node {
+                                    flex_direction: FlexDirection::Column,
+                                    ..default()
+                                })
+                                .with_children(|info| {
+                                    info.spawn((
+                                        Text::new(format!(
+                                            "{} {}  [{}]",
+                                            attack.element.icon(),
+                                            attack.name,
+                                            attack.element,
+                                        )),
+                                        TextFont {
+                                            font_size: fonts::BODY,
+                                            ..default()
+                                        },
+                                        TextColor(colors::TEXT_PRIMARY),
+                                    ));
+                                    info.spawn((
+                                        Text::new(format!(
+                                            "{} | Force: {} | Precision: {}%",
+                                            special_label, attack.power, attack.accuracy
+                                        )),
+                                        TextFont {
+                                            font_size: fonts::SMALL,
+                                            ..default()
+                                        },
+                                        TextColor(colors::TEXT_SECONDARY),
+                                    ));
+                                });
 
                                 if is_selected {
                                     card.spawn((
                                         Text::new("OK"),
-                                        TextFont { font_size: fonts::BODY, ..default() },
+                                        TextFont {
+                                            font_size: fonts::BODY,
+                                            ..default()
+                                        },
                                         TextColor(colors::ACCENT_YELLOW),
                                     ));
                                 }
@@ -230,7 +264,10 @@ fn spawn_select_attacks_ui(
                 .with_children(|btn| {
                     btn.spawn((
                         Text::new("Confirmer la selection"),
-                        TextFont { font_size: fonts::BODY, ..default() },
+                        TextFont {
+                            font_size: fonts::BODY,
+                            ..default()
+                        },
                         TextColor(colors::TEXT_PRIMARY),
                     ));
                 });
@@ -308,7 +345,9 @@ pub(crate) fn handle_select_attacks_input(
     }
     if confirmed {
         if let Ok(mut monsters) = data.storage.list_alive() {
-            let idx = data.monster_select_index.min(monsters.len().saturating_sub(1));
+            let idx = data
+                .monster_select_index
+                .min(monsters.len().saturating_sub(1));
             if let Some(monster) = monsters.get_mut(idx) {
                 let selected = selection.selected.clone();
                 match monster.set_active_attacks(selected) {
