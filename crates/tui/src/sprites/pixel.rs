@@ -7,6 +7,7 @@
 //! Le rendu utilise le caractère Unicode `▀` (upper half block) avec :
 //! - fg = couleur du pixel du haut
 //! - bg = couleur du pixel du bas
+//!
 //! ce qui permet d'afficher 2 rangées de pixels par ligne terminale → 8 lignes pour 16 rangées.
 
 use ratatui::{
@@ -108,7 +109,7 @@ pub fn render_pixel_sprite(
 ) -> Vec<Line<'static>> {
     let primary_pal = tui_palette(element);
     let secondary_pal = secondary
-        .map(|e| tui_palette(e))
+        .map(tui_palette)
         .unwrap_or_else(|| tui_palette(element));
     let resolver: fn(u8, &TuiPalette, &TuiPalette) -> Option<Color> = match age {
         AgeStage::Old => resolve_color_old,

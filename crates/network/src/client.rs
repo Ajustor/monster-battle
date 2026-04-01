@@ -24,12 +24,18 @@ pub struct GameClient {
     pub stream: Arc<Mutex<Option<WsStream>>>,
 }
 
-impl GameClient {
-    /// Crée un nouveau client non connecté.
-    pub fn new() -> Self {
+impl Default for GameClient {
+    fn default() -> Self {
         Self {
             stream: Arc::new(Mutex::new(None)),
         }
+    }
+}
+
+impl GameClient {
+    /// Crée un nouveau client non connecté.
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Se connecte au serveur relais via WebSocket.
@@ -92,10 +98,7 @@ impl GameClient {
 pub async fn check_server_health(addr: &str) -> bool {
     ensure_crypto_provider();
     let url = make_ws_url(addr);
-    match connect_async(&url).await {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    connect_async(&url).await.is_ok()
 }
 
 /// Vérifie si le serveur est joignable via une IP déjà résolue.
@@ -173,11 +176,10 @@ fn ws_port(url: &str) -> u16 {
         .or_else(|| url.strip_prefix("ws://"))
     {
         let host_part = rest.split('/').next().unwrap_or(rest);
-        if let Some(port_str) = host_part.rsplit(':').next() {
-            if let Ok(port) = port_str.parse::<u16>() {
+        if let Some(port_str) = host_part.rsplit(':').next()
+            && let Ok(port) = port_str.parse::<u16>() {
                 return port;
             }
-        }
     }
     if url.starts_with("wss://") { 443 } else { 80 }
 }

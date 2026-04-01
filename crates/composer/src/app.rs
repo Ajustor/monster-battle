@@ -161,14 +161,13 @@ impl App {
 
             terminal.draw(|f| ui::draw(f, self))?;
 
-            if event::poll(tick_rate)? {
-                if let Event::Key(key) = event::read()? {
+            if event::poll(tick_rate)?
+                && let Event::Key(key) = event::read()? {
                     if key.kind != KeyEventKind::Press {
                         continue;
                     }
                     self.handle_key(key.code, key.modifiers);
                 }
-            }
 
             if self.should_quit {
                 break;
