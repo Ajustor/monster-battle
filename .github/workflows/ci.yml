@@ -1,0 +1,179 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, master, feat/v1]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ── Check workspace Linux (crates portables) ─────────────────────
+  check-linux:
+    name: Check (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies (ALSA + udev)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            libasound2-dev \
+            libudev-dev \
+            pkg-config
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-check-
+
+      - name: Check workspace
+        run: cargo check --workspace --exclude monster-battle-ios --exclude monster-battle-android
+
+  # ── Tests unitaires ───────────────────────────────────────────────
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-test-
+
+      - name: Run tests
+        run: cargo test --workspace --exclude monster-battle-ios --exclude monster-battle-android
+
+  # ── Lint (clippy) ─────────────────────────────────────────────────
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-clippy-
+
+      - name: Clippy
+        run: cargo clippy --workspace --exclude monster-battle-ios --exclude monster-battle-android -- -D warnings
+
+  # ── Check Android (cross-compile) ────────────────────────────────
+  check-android:
+    name: Check Android (aarch64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain + Android target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-android-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-android-
+
+      - name: Check Android crate
+        run: |
+          cd crates/android
+          cargo ndk -t arm64-v8a check
+
+  # ── Build iOS (macOS) ────────────────────────────────────────────
+  build-ios:
+    name: Build iOS (aarch64-apple-ios)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,x86_64-apple-ios
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-ios-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-ios-
+
+      - name: Build iOS (arm64)
+        run: cargo build -p monster-battle-ios --target aarch64-apple-ios --release
+
+      - name: Build iOS (x86_64 simulator)
+        run: cargo build -p monster-battle-ios --target x86_64-apple-ios --release
+
+      - name: Create universal library
+        run: |
+          mkdir -p ios-out
+          lipo -create \
+            target/aarch64-apple-ios/release/libmonster_battle_ios.a \
+            target/x86_64-apple-ios/release/libmonster_battle_ios.a \
+            -output ios-out/libmonster_battle_ios.a
+          echo "✅ $(ls -lh ios-out/libmonster_battle_ios.a)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmonster-battle-ios
+          path: ios-out/libmonster_battle_ios.a
+          retention-days: 7
