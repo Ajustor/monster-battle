@@ -1,9 +1,5 @@
 //! Plugin d'animations d'effets de combat.
-//! Chaque attaque déclenche un effet visuel basé sur le type élémentaire.
-//! Les sprites viennent du Kenney Particle Pack (CC0).
-//!
-//! Les effets sont des nœuds UI root avec position absolute — ils s'affichent
-//! par-dessus tout le reste grâce à GlobalZIndex.
+//! Les effets sont des nœuds UI root avec position absolute + TargetCamera.
 
 use bevy::prelude::*;
 use monster_battle_core::types::ElementType;
@@ -31,12 +27,10 @@ pub struct AttackEffect {
     pub lifetime: Timer,
 }
 
-/// Événement : jouer un effet d'attaque.
-/// `position` est en coordonnées viewport normalisées (0.0–1.0, origin haut-gauche).
+/// Position en coordonnées viewport normalisées (0.0–1.0, origin haut-gauche).
 #[derive(Event)]
 pub struct PlayAttackEffect {
     pub element: ElementType,
-    /// Position dans le viewport : Vec2(x%, y%) ex: Vec2(0.65, 0.30) pour l'adversaire.
     pub position: Vec2,
 }
 
@@ -77,20 +71,20 @@ pub fn handle_play_attack_effect(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut events: EventReader<PlayAttackEffect>,
+    camera_query: Query<Entity, With<Camera2d>>,
 ) {
+    // On a besoin de la camera pour TargetCamera
+    let Ok(camera_entity) = camera_query.get_single() else { return; };
+
     for event in events.read() {
         let sprites = sprites_for_element(event.element);
         let frame_count = sprites.len();
         let tint = tint_for_element(event.element);
-
-        if frame_count == 0 {
-            continue;
-        }
+        if frame_count == 0 { continue; }
 
         let first_image: Handle<Image> = asset_server.load(sprites[0]);
         let size = 128.0_f32;
 
-        // Nœud UI root en position absolute, centré sur la cible via margins négatives
         commands.spawn((
             AttackEffect {
                 frame_timer: Timer::from_seconds(0.10, TimerMode::Repeating),
@@ -104,13 +98,13 @@ pub fn handle_play_attack_effect(
             Node {
                 position_type: PositionType::Absolute,
                 left: Val::Percent(event.position.x * 100.0),
-                top: Val::Percent(event.position.y * 100.0),
-                width: Val::Px(size),
+                top:  Val::Percent(event.position.y * 100.0),
+                width:  Val::Px(size),
                 height: Val::Px(size),
                 margin: UiRect {
-                    left: Val::Px(-size / 2.0),
-                    top: Val::Px(-size / 2.0),
-                    right: Val::Auto,
+                    left:   Val::Px(-size / 2.0),
+                    top:    Val::Px(-size / 2.0),
+                    right:  Val::Auto,
                     bottom: Val::Auto,
                 },
                 ..default()
@@ -121,6 +115,7 @@ pub fn handle_play_attack_effect(
                 ..default()
             },
             GlobalZIndex(50),
+            TargetCamera(camera_entity),
         ));
     }
 }
