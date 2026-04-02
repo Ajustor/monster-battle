@@ -347,11 +347,10 @@ fn spawn_monster_detail_inner(
             }
 
             // ── Popup confirmation relâche ────────────────────────
-            if confirm_open {
-                if let Some(monster) = monster_opt {
+            if confirm_open
+                && let Some(monster) = monster_opt {
                     spawn_release_confirm_popup(parent, &monster.name);
                 }
-            }
         });
 }
 
@@ -891,13 +890,12 @@ fn spawn_devour_select_inner(
             }
 
             // Popup confirmation dévoration
-            if confirm_open {
-                if let (Some(pred), Some((_, prey))) =
+            if confirm_open
+                && let (Some(pred), Some((_, prey))) =
                     (predator, prey_list.get(prey_filtered_index))
                 {
                     spawn_devour_confirm_popup(parent, &pred.name, &prey.name);
                 }
-            }
         });
 }
 
