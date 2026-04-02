@@ -240,7 +240,8 @@ impl Plugin for GamePlugin {
             .add_systems(OnEnter(GameScreen::MinigamePlay), on_enter_minigame_play)
             .add_systems(OnEnter(GameScreen::MemoryPlay), on_enter_memory_play)
             .add_systems(OnEnter(GameScreen::ReflexPlay), on_enter_reflex_play)
-            .add_systems(OnEnter(GameScreen::RpsPlay), on_enter_rps_play);
+            .add_systems(OnEnter(GameScreen::RpsPlay), on_enter_rps_play)
+            .add_plugins(crate::battle_effects::BattleEffectsPlugin);
     }
 }
 
