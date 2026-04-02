@@ -4,7 +4,7 @@ on:
   push:
     branches: [master]
     tags:
-      - 'v*' # Déclenche aussi sur les tags (ex: v1.0.0)
+      - "v*" # Déclenche aussi sur les tags (ex: v1.0.0)
 
 permissions:
   contents: write
@@ -46,7 +46,7 @@ jobs:
     uses: Ajustor/workflows/.github/workflows/bevy-ios-release.yml@master
     with:
       package_name: monster-battle-ios
-      package_path: crates/ios
+      package_path: ios-app
       app_name: Monster Battle
       bundle_id: com.ajustor.monsterbattle
       version: ${{ needs.version-check.outputs.new_version }}
@@ -63,10 +63,10 @@ jobs:
       app_name: Monster Battle
       version: ${{ needs.version-check.outputs.new_version }}
       build_system: xbuild
-      target_sdk: '36'
-      min_sdk: '24'
-      ndk_version: '29.0.14206865'
-      build_tools_version: '36.0.0'
+      target_sdk: "36"
+      min_sdk: "24"
+      ndk_version: "29.0.14206865"
+      build_tools_version: "36.0.0"
       manifest_path: crates/android/AndroidManifest.xml
       res_dir: crates/android/res
       inject_resources_script: scripts/inject_resources.py

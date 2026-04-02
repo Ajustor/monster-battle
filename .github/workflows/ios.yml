@@ -2,9 +2,7 @@ name: iOS Build
 
 on:
   push:
-    branches: [feat/v1, main]
-  pull_request:
-    branches: [main]
+    branches: [master]
 
 env:
   CARGO_TERM_COLOR: always
