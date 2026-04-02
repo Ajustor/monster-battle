@@ -1,33 +1,26 @@
 //! Mise à jour automatique de l'application.
 //!
 //! Utilise le `DownloadManager` Android pour télécharger le nouvel APK
-//! en arrière-plan. Une notification système affiche la progression,
-//! et l'utilisateur peut installer la mise à jour en appuyant dessus.
+//! en arrière-plan. Une notification système affiche la progression.
+//! Quand le téléchargement est terminé, l'installation est proposée
+//! automatiquement via un Intent.
 
 /// URL de téléchargement de l'APK.
 const APK_URL: &str = "https://ajustor.github.io/monster-battle/monster-battle-android.apk";
 
-/// Lance le téléchargement de la mise à jour via le DownloadManager Android.
-///
-/// Le téléchargement s'effectue en arrière-plan par le système.
-/// Une notification apparaît pour suivre la progression.
-/// Une fois terminé, l'utilisateur peut installer la mise à jour
-/// en appuyant sur la notification.
-///
-/// Retourne `true` si le téléchargement a été lancé avec succès.
-pub fn download_update(server_version: &str) -> bool {
+/// Résultat du poll de l'état d'un téléchargement.
+pub enum DownloadPollResult {
+    InProgress,
+    Complete(String), // chemin local de l'APK
+    Failed(String),
+}
+
+/// Lance le téléchargement de la mise à jour.
+/// Retourne l'identifiant du téléchargement (pour polling) ou une erreur.
+pub fn start_download(server_version: &str) -> Result<i64, String> {
     #[cfg(target_os = "android")]
     {
-        match android_download_update(server_version) {
-            Ok(id) => {
-                log::info!("📥 Téléchargement lancé (download_id={})", id);
-                true
-            }
-            Err(e) => {
-                log::error!("❌ Impossible de lancer le téléchargement : {}", e);
-                false
-            }
-        }
+        android_start_download(server_version)
     }
 
     #[cfg(not(target_os = "android"))]
@@ -35,13 +28,46 @@ pub fn download_update(server_version: &str) -> bool {
         let _ = server_version;
         log::info!("📦 Mise à jour : ouverture dans le navigateur (desktop)");
         let _ = std::process::Command::new("xdg-open").arg(APK_URL).spawn();
-        true
+        Ok(0) // ID fictif sur desktop
     }
 }
 
-/// Implémentation Android via JNI → DownloadManager.
+/// Vérifie si un téléchargement est terminé via DownloadManager.
+pub fn check_download_complete(download_id: i64) -> DownloadPollResult {
+    #[cfg(target_os = "android")]
+    {
+        android_check_download(download_id)
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = download_id;
+        DownloadPollResult::InProgress
+    }
+}
+
+/// Déclenche l'installation de l'APK via un Intent Android.
+pub fn trigger_install(apk_path: &str) {
+    #[cfg(target_os = "android")]
+    {
+        if let Err(e) = android_trigger_install(apk_path) {
+            log::error!("❌ Impossible de lancer l'installation : {}", e);
+        }
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = apk_path;
+        log::info!("📦 Installation non supportée sur desktop");
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Implémentations Android JNI
+// ════════════════════════════════════════════════════════════════════
+
 #[cfg(target_os = "android")]
-fn android_download_update(server_version: &str) -> Result<i64, String> {
+fn android_start_download(server_version: &str) -> Result<i64, String> {
     use jni::objects::{JObject, JValue};
 
     let app = bevy::window::ANDROID_APP
@@ -49,8 +75,8 @@ fn android_download_update(server_version: &str) -> Result<i64, String> {
         .ok_or("Impossible d'obtenir l'AndroidApp")?;
 
     let vm_ptr = app.vm_as_ptr() as *mut jni::sys::JavaVM;
-    let vm =
-        unsafe { jni::JavaVM::from_raw(vm_ptr) }.map_err(|e| format!("JavaVM::from_raw: {}", e))?;
+    let vm = unsafe { jni::JavaVM::from_raw(vm_ptr) }
+        .map_err(|e| format!("JavaVM::from_raw: {}", e))?;
 
     let result = (|| -> Result<i64, jni::errors::Error> {
         let mut env = vm.attach_current_thread_as_daemon()?;
@@ -58,7 +84,7 @@ fn android_download_update(server_version: &str) -> Result<i64, String> {
         let activity_ptr = app.activity_as_ptr() as jni::sys::jobject;
         let activity = unsafe { JObject::from_raw(activity_ptr) };
 
-        // ── Obtenir le DownloadManager ──────────────────────────
+        // ── DownloadManager ─────────────────────────────────────
         let service_name = env.new_string("download")?;
         let dm = env
             .call_method(
@@ -69,7 +95,7 @@ fn android_download_update(server_version: &str) -> Result<i64, String> {
             )?
             .l()?;
 
-        // ── Créer l'URI de téléchargement ───────────────────────
+        // ── URI ─────────────────────────────────────────────────
         let url = env.new_string(APK_URL)?;
         let uri = env
             .call_static_method(
@@ -80,15 +106,14 @@ fn android_download_update(server_version: &str) -> Result<i64, String> {
             )?
             .l()?;
 
-        // ── Créer la requête DownloadManager.Request ────────────
+        // ── Request ─────────────────────────────────────────────
         let request = env.new_object(
             "android/app/DownloadManager$Request",
             "(Landroid/net/Uri;)V",
             &[JValue::Object(&uri)],
         )?;
 
-        // Titre de la notification
-        let title = env.new_string("Monster Battle — Mise a jour")?;
+        let title = env.new_string("Monster Battle - Mise a jour")?;
         env.call_method(
             &request,
             "setTitle",
@@ -96,7 +121,6 @@ fn android_download_update(server_version: &str) -> Result<i64, String> {
             &[JValue::Object(&title)],
         )?;
 
-        // Description
         let desc = env.new_string(format!("Version {}", server_version))?;
         env.call_method(
             &request,
@@ -105,7 +129,6 @@ fn android_download_update(server_version: &str) -> Result<i64, String> {
             &[JValue::Object(&desc)],
         )?;
 
-        // Notification visible pendant et après le téléchargement
         // VISIBILITY_VISIBLE_NOTIFY_COMPLETED = 1
         env.call_method(
             &request,
@@ -114,7 +137,6 @@ fn android_download_update(server_version: &str) -> Result<i64, String> {
             &[JValue::Int(1)],
         )?;
 
-        // Type MIME pour que Android propose l'installation
         let mime = env.new_string("application/vnd.android.package-archive")?;
         env.call_method(
             &request,
@@ -123,8 +145,7 @@ fn android_download_update(server_version: &str) -> Result<i64, String> {
             &[JValue::Object(&mime)],
         )?;
 
-        // Destination : dossier Downloads (accessible sans permission spéciale
-        // via le DownloadManager qui dispose de privilèges système)
+        // Destination dans Downloads (DownloadManager a les droits sans permission)
         let downloads_dir = env
             .get_static_field(
                 "android/os/Environment",
@@ -140,7 +161,6 @@ fn android_download_update(server_version: &str) -> Result<i64, String> {
             &[JValue::Object(&downloads_dir), JValue::Object(&filename)],
         )?;
 
-        // ── Lancer le téléchargement ────────────────────────────
         let download_id = env
             .call_method(
                 &dm,
@@ -150,14 +170,188 @@ fn android_download_update(server_version: &str) -> Result<i64, String> {
             )?
             .j()?;
 
-        // Ne pas libérer activity — c'est un ptr emprunté
         std::mem::forget(activity);
-
         Ok(download_id)
     })();
 
-    // Empêcher le wrapper JavaVM d'appeler DestroyJavaVM
     std::mem::forget(vm);
+    result.map_err(|e| format!("JNI error: {}", e))
+}
 
+#[cfg(target_os = "android")]
+fn android_check_download(download_id: i64) -> DownloadPollResult {
+    use jni::objects::{JObject, JValue};
+
+    let app = match bevy::window::ANDROID_APP.get() {
+        Some(a) => a,
+        None => return DownloadPollResult::Failed("AndroidApp indisponible".to_string()),
+    };
+
+    let vm_ptr = app.vm_as_ptr() as *mut jni::sys::JavaVM;
+    let vm = match unsafe { jni::JavaVM::from_raw(vm_ptr) } {
+        Ok(v) => v,
+        Err(e) => return DownloadPollResult::Failed(e.to_string()),
+    };
+
+    let result = (|| -> Result<DownloadPollResult, jni::errors::Error> {
+        let mut env = vm.attach_current_thread_as_daemon()?;
+
+        let activity_ptr = app.activity_as_ptr() as jni::sys::jobject;
+        let activity = unsafe { JObject::from_raw(activity_ptr) };
+
+        let service_name = env.new_string("download")?;
+        let dm = env
+            .call_method(
+                &activity,
+                "getSystemService",
+                "(Ljava/lang/String;)Ljava/lang/Object;",
+                &[JValue::Object(&service_name)],
+            )?
+            .l()?;
+
+        // Créer la query pour cet ID
+        let query = env.new_object(
+            "android/app/DownloadManager$Query",
+            "()V",
+            &[],
+        )?;
+
+        let ids_arr = env.new_long_array(1)?;
+        env.set_long_array_region(&ids_arr, 0, &[download_id])?;
+        env.call_method(
+            &query,
+            "setFilterById",
+            "([J)Landroid/app/DownloadManager$Query;",
+            &[JValue::Object(&ids_arr)],
+        )?;
+
+        let cursor = env
+            .call_method(
+                &dm,
+                "query",
+                "(Landroid/app/DownloadManager$Query;)Landroid/database/Cursor;",
+                &[JValue::Object(&query)],
+            )?
+            .l()?;
+
+        let has_row = env
+            .call_method(&cursor, "moveToFirst", "()Z", &[])?.z()?;
+
+        if !has_row {
+            env.call_method(&cursor, "close", "()V", &[])?;
+            std::mem::forget(activity);
+            return Ok(DownloadPollResult::InProgress);
+        }
+
+        // Colonnes STATUS et LOCAL_URI
+        let status_col_name = env.new_string("status")?;
+        let status_col = env
+            .call_method(
+                &cursor,
+                "getColumnIndex",
+                "(Ljava/lang/String;)I",
+                &[JValue::Object(&status_col_name)],
+            )?
+            .i()?;
+        let status = env
+            .call_method(&cursor, "getInt", "(I)I", &[JValue::Int(status_col)])?
+            .i()?;
+
+        // STATUS_SUCCESSFUL = 8, STATUS_FAILED = 16
+        let poll_result = if status == 8 {
+            let uri_col_name = env.new_string("local_uri")?;
+            let uri_col = env
+                .call_method(
+                    &cursor,
+                    "getColumnIndex",
+                    "(Ljava/lang/String;)I",
+                    &[JValue::Object(&uri_col_name)],
+                )?
+                .i()?;
+            let uri_obj = env
+                .call_method(&cursor, "getString", "(I)Ljava/lang/String;", &[JValue::Int(uri_col)])?
+                .l()?;
+            let path: String = env.get_string(&uri_obj.into())?.into();
+            DownloadPollResult::Complete(path)
+        } else if status == 16 {
+            DownloadPollResult::Failed("DownloadManager STATUS_FAILED".to_string())
+        } else {
+            DownloadPollResult::InProgress
+        };
+
+        env.call_method(&cursor, "close", "()V", &[])?;
+        std::mem::forget(activity);
+        Ok(poll_result)
+    })();
+
+    std::mem::forget(vm);
+    result.unwrap_or_else(|e| DownloadPollResult::Failed(e.to_string()))
+}
+
+#[cfg(target_os = "android")]
+fn android_trigger_install(apk_path: &str) -> Result<(), String> {
+    use jni::objects::{JObject, JValue};
+
+    let app = bevy::window::ANDROID_APP
+        .get()
+        .ok_or("Impossible d'obtenir l'AndroidApp")?;
+
+    let vm_ptr = app.vm_as_ptr() as *mut jni::sys::JavaVM;
+    let vm = unsafe { jni::JavaVM::from_raw(vm_ptr) }
+        .map_err(|e| format!("JavaVM::from_raw: {}", e))?;
+
+    let result = (|| -> Result<(), jni::errors::Error> {
+        let mut env = vm.attach_current_thread_as_daemon()?;
+
+        let activity_ptr = app.activity_as_ptr() as jni::sys::jobject;
+        let activity = unsafe { JObject::from_raw(activity_ptr) };
+
+        // Convertir le chemin file:// en Uri
+        let path_str = env.new_string(apk_path)?;
+        let uri = env
+            .call_static_method(
+                "android/net/Uri",
+                "parse",
+                "(Ljava/lang/String;)Landroid/net/Uri;",
+                &[JValue::Object(&path_str)],
+            )?
+            .l()?;
+
+        // Intent ACTION_VIEW pour installer l'APK
+        let action = env.new_string("android.intent.action.VIEW")?;
+        let intent = env.new_object(
+            "android/content/Intent",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&action)],
+        )?;
+
+        let mime = env.new_string("application/vnd.android.package-archive")?;
+        env.call_method(
+            &intent,
+            "setDataAndType",
+            "(Landroid/net/Uri;Ljava/lang/String;)Landroid/content/Intent;",
+            &[JValue::Object(&uri), JValue::Object(&mime)],
+        )?;
+
+        // FLAG_ACTIVITY_NEW_TASK = 0x10000000
+        env.call_method(
+            &intent,
+            "addFlags",
+            "(I)Landroid/content/Intent;",
+            &[JValue::Int(0x10000000)],
+        )?;
+
+        env.call_method(
+            &activity,
+            "startActivity",
+            "(Landroid/content/Intent;)V",
+            &[JValue::Object(&intent)],
+        )?;
+
+        std::mem::forget(activity);
+        Ok(())
+    })();
+
+    std::mem::forget(vm);
     result.map_err(|e| format!("JNI error: {}", e))
 }

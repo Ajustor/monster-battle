@@ -186,18 +186,23 @@ enum DownloadStatus {
     Downloading,
     /// Le lancement du téléchargement a échoué.
     Failed,
+    /// Téléchargement terminé, APK prêt à installer.
+    Ready,
 }
 
 /// Ressource de suivi du téléchargement.
 #[derive(Resource)]
 struct UpdateDownloadState {
     status: DownloadStatus,
+    /// Identifiant retourné par DownloadManager.enqueue() — utilisé pour le polling.
+    download_id: Option<i64>,
 }
 
 impl Default for UpdateDownloadState {
     fn default() -> Self {
         Self {
             status: DownloadStatus::Idle,
+            download_id: None,
         }
     }
 }
@@ -241,6 +246,7 @@ impl Plugin for ConnectionPlugin {
                     handle_update_button,
                     show_update_modal,
                     handle_modal_dismiss,
+                    poll_download_complete,
                 ),
             );
     }
@@ -474,17 +480,21 @@ fn handle_update_button(
                 _ => "?".to_string(),
             };
 
-            let success = crate::updater::download_update(&sv);
-            download_state.status = if success {
-                DownloadStatus::Downloading
-            } else {
-                DownloadStatus::Failed
-            };
-
-            // Fermer la modale après le lancement du téléchargement
-            if success {
-                for entity in &modal_query {
-                    commands.entity(entity).despawn_recursive();
+            let result = crate::updater::start_download(&sv);
+            match result {
+                Ok(id) => {
+                    log::info!("📥 Téléchargement lancé (id={})", id);
+                    download_state.status = DownloadStatus::Downloading;
+                    download_state.download_id = Some(id);
+                    // Fermer la modale
+                    for entity in &modal_query {
+                        commands.entity(entity).despawn_recursive();
+                    }
+                }
+                Err(e) => {
+                    log::error!("❌ Échec lancement téléchargement : {}", e);
+                    download_state.status = DownloadStatus::Failed;
+                    download_state.download_id = None;
                 }
             }
         }
@@ -770,6 +780,33 @@ fn handle_modal_dismiss(
             for entity in &modal_query {
                 commands.entity(entity).despawn_recursive();
             }
+        }
+    }
+}
+
+/// Poll le statut du téléchargement en cours et déclenche l'installation si terminé.
+fn poll_download_complete(mut download_state: ResMut<UpdateDownloadState>) {
+    let DownloadStatus::Downloading = download_state.status else {
+        return;
+    };
+    let Some(id) = download_state.download_id else {
+        return;
+    };
+
+    match crate::updater::check_download_complete(id) {
+        crate::updater::DownloadPollResult::Complete(path) => {
+            log::info!("✅ Téléchargement terminé : {}", path);
+            download_state.status = DownloadStatus::Ready;
+            download_state.download_id = None;
+            crate::updater::trigger_install(&path);
+        }
+        crate::updater::DownloadPollResult::Failed(reason) => {
+            log::error!("❌ Téléchargement échoué : {}", reason);
+            download_state.status = DownloadStatus::Failed;
+            download_state.download_id = None;
+        }
+        crate::updater::DownloadPollResult::InProgress => {
+            // Toujours en cours, rien à faire
         }
     }
 }
