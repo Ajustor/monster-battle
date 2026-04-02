@@ -7,7 +7,7 @@ use monster_battle_core::attack::Attack;
 use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_BOTTOM_DEFAULT, SAFE_TOP_DEFAULT, ScrollableContent, colors, fonts};
+use crate::ui::common::{ScrollableContent, colors, fonts};
 
 /// Marqueur pour un bouton d'attaque (toggle sélection).
 #[derive(Component)]
@@ -36,8 +36,9 @@ pub(crate) fn spawn_select_attacks(
     mut commands: Commands,
     data: Res<GameData>,
     selection: Res<AttackSelectionState>,
+    metrics: Res<crate::ui::common::ScreenMetrics>,
 ) {
-    spawn_select_attacks_ui(&mut commands, &data, &selection);
+    spawn_select_attacks_ui(&mut commands, &data, &selection, metrics.safe_top, metrics.safe_bottom);
 }
 
 /// Logique interne réutilisable pour construire l'UI.
@@ -45,6 +46,8 @@ fn spawn_select_attacks_ui(
     commands: &mut Commands,
     data: &GameData,
     selection: &AttackSelectionState,
+    safe_top: f32,
+    safe_bottom: f32,
 ) {
     let monsters = data.storage.list_alive().unwrap_or_default();
     let idx = data
@@ -67,8 +70,8 @@ fn spawn_select_attacks_ui(
                 padding: UiRect::new(
                     Val::Px(12.0),
                     Val::Px(12.0),
-                    Val::Px(SAFE_TOP_DEFAULT),
-                    Val::Px(SAFE_BOTTOM_DEFAULT),
+                    Val::Px(safe_top),
+                    Val::Px(safe_bottom),
                 ),
                 ..default()
             },
@@ -280,6 +283,7 @@ pub(crate) fn refresh_select_attacks_ui(
     data: Res<GameData>,
     mut selection: ResMut<AttackSelectionState>,
     screen_entities: Query<Entity, With<ScreenEntity>>,
+    metrics: Res<crate::ui::common::ScreenMetrics>,
 ) {
     if !selection.dirty {
         return;
@@ -289,7 +293,7 @@ pub(crate) fn refresh_select_attacks_ui(
     for entity in &screen_entities {
         commands.entity(entity).despawn_recursive();
     }
-    spawn_select_attacks_ui(&mut commands, &data, &selection);
+    spawn_select_attacks_ui(&mut commands, &data, &selection, metrics.safe_top, metrics.safe_bottom);
 }
 
 /// Gestion des interactions de l'écran de sélection d'attaques.
