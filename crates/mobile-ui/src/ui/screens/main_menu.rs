@@ -15,14 +15,14 @@ pub struct MenuButton {
 }
 
 /// Construit l'UI du menu principal.
-pub(crate) fn spawn_menu(mut commands: Commands, data: Res<GameData>, version: Res<VersionState>) {
+pub(crate) fn spawn_menu(mut commands: Commands, data: Res<GameData>, version: Res<VersionState>, metrics: Res<common::ScreenMetrics>) {
     let has_monster = data.has_living_monster();
     log::info!("🖥️ spawn_menu — has_monster={}", has_monster);
 
     // Nœud racine
     commands
         .spawn((
-            common::screen_root(),
+            common::screen_root_with_metrics(metrics.safe_top, metrics.safe_bottom),
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
             bevy::state::state_scoped::StateScoped(GameScreen::MainMenu),

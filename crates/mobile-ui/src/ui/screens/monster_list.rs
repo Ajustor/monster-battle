@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
-use crate::game::{GameData, GameScreen, ScreenEntity, SelectedMonsterIndex};
+use crate::game::{GameData, GameScreen, ScreenEntity, SelectedMonsterIndex, ScrollGuard};
 use crate::sprites;
 use crate::ui::common::{ScrollableContent, colors, fonts, ScreenMetrics};
 use monster_battle_core::FoodType;
@@ -638,13 +638,10 @@ pub(crate) fn handle_monster_list_input(
     feed_query: Query<&Interaction, (Changed<Interaction>, With<FeedButton>)>,
     food_item_query: Query<(&Interaction, &FoodItemButton), Changed<Interaction>>,
     food_cancel_query: Query<&Interaction, (Changed<Interaction>, With<FoodCancelButton>)>,
-    scroll_query: Query<&ScrollPosition, With<ScrollableContent>>,
+    guard: Res<ScrollGuard>,
     metrics: Res<ScreenMetrics>,
 ) {
-    // Détecter si le scroll a bougé depuis le dernier frame (évite tap accidentel pendant scroll)
-    let current_scroll = scroll_query.get_single().map(|s| s.offset_y).unwrap_or(0.0);
-    let scroll_delta = (current_scroll - data.scroll_offset as f32).abs();
-    let is_scrolling = scroll_delta > 4.0;
+    let is_scrolling = guard.is_scrolling();
 
     let monster_count = data.storage.list_alive().map(|v| v.len()).unwrap_or(0);
     let mut needs_rebuild = false;
@@ -856,13 +853,25 @@ fn feed_monster_with(data: &mut ResMut<GameData>, food: FoodType) {
     }
 }
 
-/// Sauvegarde la position de scroll actuelle dans GameData.
-/// Fonctionne seulement quand un ScrollPosition est présent (un seul ScrollableContent dans l'écran).
+/// Sauvegarde la position de scroll et met à jour le ScrollGuard.
 pub(crate) fn save_scroll_offset(
+    time: Res<Time>,
     mut data: ResMut<GameData>,
+    mut guard: ResMut<ScrollGuard>,
     query: Query<&ScrollPosition, With<ScrollableContent>>,
 ) {
+    // Décrémenter le cooldown
+    if guard.cooldown > 0.0 {
+        guard.cooldown = (guard.cooldown - time.delta_secs()).max(0.0);
+    }
+
     if let Ok(scroll) = query.get_single() {
-        data.scroll_offset = scroll.offset_y as usize;
+        let new_offset = scroll.offset_y;
+        // Si le scroll a bougé de plus de 2px, activer le guard (300ms de cooldown)
+        if (new_offset - guard.last_offset).abs() > 2.0 {
+            guard.cooldown = 0.30;
+            guard.last_offset = new_offset;
+        }
+        data.scroll_offset = new_offset as usize;
     }
 }

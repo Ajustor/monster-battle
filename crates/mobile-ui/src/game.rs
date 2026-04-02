@@ -87,6 +87,23 @@ pub enum SelectMonsterTarget {
 #[derive(Resource, Default)]
 pub struct SelectedMonsterIndex(pub usize);
 
+/// Protège contre les taps accidentels juste après un scroll.
+/// Mis à jour par le système de scroll, lu par les handlers de tap.
+#[derive(Resource, Default)]
+pub struct ScrollGuard {
+    /// Temps restant avant d'autoriser un tap (secondes).
+    pub cooldown: f32,
+    /// Dernière position de scroll observée.
+    pub last_offset: f32,
+}
+
+impl ScrollGuard {
+    /// Retourne true si on est en train de scroller (tap doit être ignoré).
+    pub fn is_scrolling(&self) -> bool {
+        self.cooldown > 0.0
+    }
+}
+
 /// Index du monstre cible de la dévoration.
 #[derive(Resource, Default)]
 pub struct DevourTargetIndex(pub usize);
@@ -215,6 +232,7 @@ impl Plugin for GamePlugin {
             .insert_resource(metrics)
             .insert_resource(crate::ui::screens::training::TrainingWild(false))
             .init_resource::<SelectedMonsterIndex>()
+            .init_resource::<ScrollGuard>()
             .init_resource::<DevourTargetIndex>()
             .init_resource::<crate::ui::screens::select_attacks::AttackSelectionState>()
             .enable_state_scoped_entities::<GameScreen>()
