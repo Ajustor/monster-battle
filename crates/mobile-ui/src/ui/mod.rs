@@ -32,7 +32,11 @@ impl Plugin for UiPlugin {
             )
             .add_systems(
                 Update,
-                monster_list::handle_monster_list_input.run_if(in_state(GameScreen::MonsterList)),
+                (
+                    monster_list::handle_monster_list_input,
+                    monster_list::save_scroll_offset,
+                )
+                    .run_if(in_state(GameScreen::MonsterList)),
             )
             // ── Nouveau monstre (choix du type) ─────────────────
             .add_systems(
