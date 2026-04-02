@@ -66,9 +66,13 @@ pub(crate) struct BattleAnimTimer {
 }
 
 /// Marqueur pour le flash d'impact (overlay plein écran temporaire).
+/// Uniquement pour les coups critiques, déclenché après les particules.
 #[derive(Component)]
 pub(crate) struct AttackFlashOverlay {
     pub timer: Timer,
+    /// Délai avant apparition du flash (laisse le temps aux particules de jouer).
+    pub delay: Timer,
+    pub started: bool,
 }
 
 /// Construit l'UI de combat.
@@ -807,9 +811,11 @@ pub(crate) fn handle_battle_input(
                             timer: Timer::from_seconds(duration, TimerMode::Once),
                             anim: anim.clone(),
                         });
-                        // Flash d'impact pour les attaques (style Pokémon)
+                        // Flash blanc uniquement sur coup critique, après les particules
                         match anim {
-                            AnimationType::PlayerHit | AnimationType::OpponentHit => {
+                            AnimationType::PlayerHitCritical | AnimationType::OpponentHitCritical => {
+                                // Durée des particules ≈ 0.36s (3 frames × 0.12s × 2 loops)
+                                // On déclenche le flash après ce délai
                                 commands.spawn((
                                     Node {
                                         width: Val::Percent(100.0),
@@ -817,10 +823,12 @@ pub(crate) fn handle_battle_input(
                                         position_type: PositionType::Absolute,
                                         ..default()
                                     },
-                                    BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.6)),
+                                    BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.0)),
                                     GlobalZIndex(100),
                                     AttackFlashOverlay {
-                                        timer: Timer::from_seconds(0.12, TimerMode::Once),
+                                        timer: Timer::from_seconds(0.18, TimerMode::Once),
+                                        delay: Timer::from_seconds(0.36, TimerMode::Once),
+                                        started: false,
                                     },
                                 ));
                             }
@@ -1239,6 +1247,26 @@ pub(crate) fn animate_battle_sprites(
                 };
             }
         }
+        AnimationType::PlayerHitCritical => {
+            // Coup critique : même tremblement que PlayerHit mais plus fort
+            if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
+                let shake_amp = 14.0 * (1.0 - progress);
+                let shake = (progress * 35.0 * std::f32::consts::PI).sin() * shake_amp;
+                node.left = Val::Px(shake);
+                let blink_cycle = (progress * 24.0) as u32;
+                *vis = if blink_cycle % 2 == 0 { Visibility::Visible } else { Visibility::Hidden };
+            }
+        }
+        AnimationType::OpponentHitCritical => {
+            // Coup critique sur l'adversaire : tremblement amplifié
+            if let Ok((mut node, mut vis)) = opponent_sprite.get_single_mut() {
+                let shake_amp = 14.0 * (1.0 - progress);
+                let shake = (progress * 35.0 * std::f32::consts::PI).sin() * shake_amp;
+                node.left = Val::Px(shake);
+                let blink_cycle = (progress * 24.0) as u32;
+                *vis = if blink_cycle % 2 == 0 { Visibility::Visible } else { Visibility::Hidden };
+            }
+        }
         AnimationType::PlayerFaint => {
             // K.O. style Pokémon : le sprite rétrécit vers le bas et disparaît
             if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
@@ -1300,20 +1328,29 @@ pub(crate) fn animate_battle_sprites(
     }
 }
 
-/// Anime le flash d'impact (overlay blanc qui disparaît rapidement, style Pokémon).
+/// Anime le flash d'impact critique (overlay blanc, déclenché après les particules).
 pub(crate) fn animate_attack_flash(
     mut commands: Commands,
     time: Res<Time>,
     mut flash_query: Query<(Entity, &mut AttackFlashOverlay, &mut BackgroundColor)>,
 ) {
     for (entity, mut flash, mut bg) in &mut flash_query {
-        flash.timer.tick(time.delta());
-        let progress = flash.timer.fraction();
-        // Fade out rapide
-        let alpha = 0.6 * (1.0 - progress);
-        *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, alpha));
-        if flash.timer.just_finished() {
-            commands.entity(entity).despawn_recursive();
+        if !flash.started {
+            // Phase délai : attendre la fin des particules
+            flash.delay.tick(time.delta());
+            if flash.delay.just_finished() {
+                flash.started = true;
+                // Apparition immédiate du flash
+                *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.7));
+            }
+        } else {
+            // Phase flash : fade out
+            flash.timer.tick(time.delta());
+            let alpha = 0.7 * (1.0 - flash.timer.fraction());
+            *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, alpha));
+            if flash.timer.just_finished() {
+                commands.entity(entity).despawn_recursive();
+            }
         }
     }
 }

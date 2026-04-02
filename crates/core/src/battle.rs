@@ -119,6 +119,9 @@ pub enum AnimationType {
     OpponentAttack,
     PlayerHit,
     OpponentHit,
+    /// Coup critique : flash blanc + tremblement après les particules.
+    PlayerHitCritical,
+    OpponentHitCritical,
     PlayerFaint,
     OpponentFaint,
 }
@@ -627,10 +630,11 @@ impl BattleState {
         let (actual, tenacity_saved) = self.apply_damage(!is_player, total_damage, rng);
 
         // Animation de dégâts attachée au message → se déclenche à l'affichage
+        // Coup critique → animation spéciale (flash après particules)
         let hit_anim = Some(if is_player {
-            AnimationType::OpponentHit
+            if is_critical { AnimationType::OpponentHitCritical } else { AnimationType::OpponentHit }
         } else {
-            AnimationType::PlayerHit
+            if is_critical { AnimationType::PlayerHitCritical } else { AnimationType::PlayerHit }
         });
 
         // Snapshot HP après dégâts → la barre se mettra à jour à l'affichage de CE message
@@ -848,6 +852,8 @@ impl AnimationType {
             Self::OpponentAttack => Self::PlayerAttack,
             Self::PlayerHit => Self::OpponentHit,
             Self::OpponentHit => Self::PlayerHit,
+            Self::PlayerHitCritical => Self::OpponentHitCritical,
+            Self::OpponentHitCritical => Self::PlayerHitCritical,
             Self::PlayerFaint => Self::OpponentFaint,
             Self::OpponentFaint => Self::PlayerFaint,
         }
@@ -858,6 +864,8 @@ impl AnimationType {
         match self {
             Self::PlayerAttack | Self::OpponentAttack => 0.45,
             Self::PlayerHit | Self::OpponentHit => 0.5,
+            // Critique : particules (0.36s) + flash (0.18s) + marge
+            Self::PlayerHitCritical | Self::OpponentHitCritical => 0.65,
             Self::PlayerFaint | Self::OpponentFaint => 0.8,
         }
     }
