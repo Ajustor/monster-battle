@@ -45,7 +45,7 @@ jobs:
     if: needs.version-check.outputs.version_changed == 'true'
     uses: Ajustor/workflows/.github/workflows/bevy-ios-release.yml@master
     with:
-      package_name: MonsterBattle
+      package_name: monster-battle-ios
       package_path: ios-app
       app_name: Monster Battle
       bundle_id: com.ajustor.monsterbattle
