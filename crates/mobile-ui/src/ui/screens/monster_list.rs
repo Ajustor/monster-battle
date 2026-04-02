@@ -638,8 +638,14 @@ pub(crate) fn handle_monster_list_input(
     feed_query: Query<&Interaction, (Changed<Interaction>, With<FeedButton>)>,
     food_item_query: Query<(&Interaction, &FoodItemButton), Changed<Interaction>>,
     food_cancel_query: Query<&Interaction, (Changed<Interaction>, With<FoodCancelButton>)>,
+    scroll_query: Query<&ScrollPosition, With<ScrollableContent>>,
     metrics: Res<ScreenMetrics>,
 ) {
+    // Détecter si le scroll a bougé depuis le dernier frame (évite tap accidentel pendant scroll)
+    let current_scroll = scroll_query.get_single().map(|s| s.offset_y).unwrap_or(0.0);
+    let scroll_delta = (current_scroll - data.scroll_offset as f32).abs();
+    let is_scrolling = scroll_delta > 4.0;
+
     let monster_count = data.storage.list_alive().map(|v| v.len()).unwrap_or(0);
     let mut needs_rebuild = false;
 
@@ -723,8 +729,8 @@ pub(crate) fn handle_monster_list_input(
         }
     }
 
-    // Toucher carte monstre → naviguer vers MonsterDetail
-    if !needs_rebuild {
+    // Toucher carte monstre → naviguer vers MonsterDetail (ignoré si scroll en cours)
+    if !needs_rebuild && !is_scrolling {
         for (interaction, card) in &card_query {
             if *interaction == Interaction::Pressed {
                 data.monster_select_index = card.index;
