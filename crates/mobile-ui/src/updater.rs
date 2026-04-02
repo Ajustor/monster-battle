@@ -300,7 +300,17 @@ fn android_check_download(download_id: i64) -> DownloadPollResult {
 
 #[cfg(target_os = "android")]
 fn android_trigger_install(apk_path: &str) -> Result<(), String> {
-    use jni::objects::{JObject, JValue};
+    use jni::objects::{JByteArray, JObject, JValue};
+    use std::io::Read;
+
+    let local_path = apk_path.trim_start_matches("file://");
+
+    // Lire le contenu de l'APK
+    let mut apk_bytes = Vec::new();
+    std::fs::File::open(local_path)
+        .map_err(|e| format!("Impossible d'ouvrir l'APK : {}", e))?
+        .read_to_end(&mut apk_bytes)
+        .map_err(|e| format!("Impossible de lire l'APK : {}", e))?;
 
     let app = bevy::window::ANDROID_APP
         .get()
@@ -316,73 +326,82 @@ fn android_trigger_install(apk_path: &str) -> Result<(), String> {
         let activity_ptr = app.activity_as_ptr() as jni::sys::jobject;
         let activity = unsafe { JObject::from_raw(activity_ptr) };
 
-        // Utiliser le chemin local (strip prefix file://)
-        let local_path = apk_path.trim_start_matches("file://");
-        let file_class = env.find_class("java/io/File")?;
-        let path_str = env.new_string(local_path)?;
-        let file_obj = env.new_object(file_class, "(Ljava/lang/String;)V", &[JValue::Object(&path_str)])?;
+        // Obtenir PackageInstaller via PackageManager
+        let pm = env
+            .call_method(&activity, "getPackageManager", "()Landroid/content/pm/PackageManager;", &[])?
+            .l()?;
+        let installer = env
+            .call_method(&pm, "getPackageInstaller", "()Landroid/content/pm/PackageInstaller;", &[])?
+            .l()?;
 
-        // Obtenir l'Uri via FileProvider pour Android 7+
-        let package_name = env
+        // Créer les paramètres de session
+        let params_class = env.find_class("android/content/pm/PackageInstaller$SessionParams")?;
+        // MODE_FULL_INSTALL = 1
+        let params = env.new_object(params_class, "(I)V", &[JValue::Int(1)])?;
+
+        // Créer la session
+        let session_id = env
+            .call_method(&installer, "createSession",
+                "(Landroid/content/pm/PackageInstaller$SessionParams;)I",
+                &[JValue::Object(&params)])?
+            .i()?;
+
+        // Ouvrir la session
+        let session = env
+            .call_method(&installer, "openSession",
+                "(I)Landroid/content/pm/PackageInstaller$Session;",
+                &[JValue::Int(session_id)])?
+            .l()?;
+
+        // Écrire l'APK dans le stream de la session
+        let apk_name = env.new_string("monster-battle.apk")?;
+        // FLAG_TRUNCATE = 1
+        let out_stream = env
+            .call_method(&session, "openWrite",
+                "(Ljava/lang/String;JJ)Ljava/io/OutputStream;",
+                &[JValue::Object(&apk_name), JValue::Long(0), JValue::Long(apk_bytes.len() as i64)])?
+            .l()?;
+
+        // Écrire par chunks de 64 Ko
+        let chunk_size = 65536usize;
+        for chunk in apk_bytes.chunks(chunk_size) {
+            let jbytes: JByteArray = env.byte_array_from_slice(chunk)?;
+            env.call_method(&out_stream, "write", "([B)V", &[JValue::Object(&jbytes)])?;
+        }
+        env.call_method(&out_stream, "flush", "()V", &[])?;
+        env.call_method(&out_stream, "close", "()V", &[])?;
+
+        // Créer un PendingIntent pour le callback (obligatoire)
+        let pkg_name = env
             .call_method(&activity, "getPackageName", "()Ljava/lang/String;", &[])?
             .l()?;
-        let pkg_str: String = env.get_string(&package_name.into())?.into();
-        let authority = env.new_string(format!("{}.fileprovider", pkg_str))?;
-
-        let uri = env.call_static_method(
-            "androidx/core/content/FileProvider",
-            "getUriForFile",
-            "(Landroid/content/Context;Ljava/lang/String;Ljava/io/File;)Landroid/net/Uri;",
-            &[
-                JValue::Object(&activity),
-                JValue::Object(&authority),
-                JValue::Object(&file_obj),
-            ],
-        ).unwrap_or_else(|_| {
-            // Fallback si FileProvider non disponible : Uri.fromFile()
-            env.call_static_method(
-                "android/net/Uri",
-                "fromFile",
-                "(Ljava/io/File;)Landroid/net/Uri;",
-                &[JValue::Object(&file_obj)],
-            ).unwrap()
-        }).l()?;
-
-        // Intent ACTION_VIEW pour installer l'APK
-        let action = env.new_string("android.intent.action.VIEW")?;
+        let pkg_str: String = env.get_string(&pkg_name.into())?.into();
+        let action_str = env.new_string(format!("{}.INSTALL_COMPLETE", pkg_str))?;
         let intent = env.new_object(
             "android/content/Intent",
             "(Ljava/lang/String;)V",
-            &[JValue::Object(&action)],
+            &[JValue::Object(&action_str)],
         )?;
+        // FLAG_MUTABLE = 0x02000000 (requis API 31+)
+        let pending = env.call_static_method(
+            "android/app/PendingIntent",
+            "getBroadcast",
+            "(Landroid/content/Context;ILandroid/content/Intent;I)Landroid/app/PendingIntent;",
+            &[JValue::Object(&activity), JValue::Int(0), JValue::Object(&intent), JValue::Int(0x02000000)],
+        )?.l()?;
+        let intent_sender = env
+            .call_method(&pending, "getIntentSender", "()Landroid/content/IntentSender;", &[])?
+            .l()?;
 
-        let mime = env.new_string("application/vnd.android.package-archive")?;
-        env.call_method(
-            &intent,
-            "setDataAndType",
-            "(Landroid/net/Uri;Ljava/lang/String;)Landroid/content/Intent;",
-            &[JValue::Object(&uri), JValue::Object(&mime)],
-        )?;
-
-        // FLAG_ACTIVITY_NEW_TASK | FLAG_GRANT_READ_URI_PERMISSION
-        env.call_method(
-            &intent,
-            "addFlags",
-            "(I)Landroid/content/Intent;",
-            &[JValue::Int(0x10000001i32)],
-        )?;
-
-        env.call_method(
-            &activity,
-            "startActivity",
-            "(Landroid/content/Intent;)V",
-            &[JValue::Object(&intent)],
-        )?;
+        // Commit (lance l'installation)
+        env.call_method(&session, "commit",
+            "(Landroid/content/IntentSender;)V",
+            &[JValue::Object(&intent_sender)])?;
 
         std::mem::forget(activity);
         Ok(())
     })();
 
     std::mem::forget(vm);
-    result.map_err(|e| format!("JNI error: {}", e))
+    result.map_err(|e| format!("JNI PackageInstaller error: {}", e))
 }
