@@ -41,7 +41,7 @@ pub struct PlayAttackEffect {
 }
 
 #[derive(Component)]
-pub(crate) struct AttackFrames {
+pub struct AttackFrames {
     pub paths: Vec<String>,
 }
 
