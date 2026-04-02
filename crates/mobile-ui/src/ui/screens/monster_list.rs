@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
-use crate::game::{GameData, GameScreen, ScreenEntity};
+use crate::game::{GameData, GameScreen, ScreenEntity, SelectedMonsterIndex};
 use crate::sprites;
 use crate::ui::common::{ScrollableContent, colors, fonts, ScreenMetrics};
 use monster_battle_core::FoodType;
@@ -629,6 +629,7 @@ pub(crate) fn handle_monster_list_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
+    mut selected_index: ResMut<SelectedMonsterIndex>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
     screen_entities: Query<Entity, With<ScreenEntity>>,
@@ -722,15 +723,16 @@ pub(crate) fn handle_monster_list_input(
         }
     }
 
-    // Toucher carte monstre (sélection visuelle)
+    // Toucher carte monstre → naviguer vers MonsterDetail
     if !needs_rebuild {
         for (interaction, card) in &card_query {
             if *interaction == Interaction::Pressed {
                 data.monster_select_index = card.index;
-                needs_rebuild = true;
+                selected_index.0 = card.index;
                 // Vérifier événement aléatoire au changement de monstre
                 check_random_event(&mut data);
-                break;
+                next_state.set(GameScreen::MonsterDetail);
+                return;
             }
         }
     }

@@ -202,6 +202,28 @@ impl Plugin for UiPlugin {
                 Update,
                 minigame::handle_rps_play_input.run_if(in_state(GameScreen::RpsPlay)),
             )
+            // ── Détail d'un monstre ─────────────────────────────
+            .init_resource::<monster_detail::ReleaseConfirmOpen>()
+            .add_systems(
+                OnEnter(GameScreen::MonsterDetail),
+                monster_detail::spawn_monster_detail,
+            )
+            .add_systems(
+                Update,
+                monster_detail::handle_monster_detail_input
+                    .run_if(in_state(GameScreen::MonsterDetail)),
+            )
+            // ── DevourSelect ────────────────────────────────────
+            .init_resource::<monster_detail::DevourConfirmState>()
+            .add_systems(
+                OnEnter(GameScreen::DevourSelect),
+                monster_detail::spawn_devour_select,
+            )
+            .add_systems(
+                Update,
+                monster_detail::handle_devour_select_input
+                    .run_if(in_state(GameScreen::DevourSelect)),
+            )
             // ── Réseau (polling global) ─────────────────────────
             .add_systems(Update, crate::net_task::poll_network_events)
             // ── Scroll tactile (global) ─────────────────────────
