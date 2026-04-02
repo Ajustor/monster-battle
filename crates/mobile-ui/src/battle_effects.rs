@@ -73,8 +73,7 @@ pub fn handle_play_attack_effect(
     mut events: EventReader<PlayAttackEffect>,
     camera_query: Query<Entity, With<Camera2d>>,
 ) {
-    // On a besoin de la camera pour TargetCamera
-    let Ok(camera_entity) = camera_query.get_single() else { return; };
+    let camera_entity = camera_query.get_single().ok();
 
     for event in events.read() {
         let sprites = sprites_for_element(event.element);
@@ -85,7 +84,7 @@ pub fn handle_play_attack_effect(
         let first_image: Handle<Image> = asset_server.load(sprites[0]);
         let size = 128.0_f32;
 
-        commands.spawn((
+        let mut entity_cmds = commands.spawn((
             AttackEffect {
                 frame_timer: Timer::from_seconds(0.10, TimerMode::Repeating),
                 frame_count,
@@ -115,8 +114,10 @@ pub fn handle_play_attack_effect(
                 ..default()
             },
             GlobalZIndex(50),
-            TargetCamera(camera_entity),
         ));
+        if let Some(cam) = camera_entity {
+            entity_cmds.insert(TargetCamera(cam));
+        }
     }
 }
 
