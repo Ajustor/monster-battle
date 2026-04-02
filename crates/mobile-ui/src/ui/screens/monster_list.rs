@@ -726,16 +726,25 @@ pub(crate) fn handle_monster_list_input(
         }
     }
 
-    // Toucher carte monstre → naviguer vers MonsterDetail (ignoré si scroll en cours)
+    // Toucher carte monstre :
+    // - 1er tap → sélectionner (highlight), rebuild UI
+    // - 2e tap sur le même monstre → naviguer vers MonsterDetail
+    // Ignoré si scroll en cours
     if !needs_rebuild && !is_scrolling {
         for (interaction, card) in &card_query {
             if *interaction == Interaction::Pressed {
-                data.monster_select_index = card.index;
-                selected_index.0 = card.index;
-                // Vérifier événement aléatoire au changement de monstre
-                check_random_event(&mut data);
-                next_state.set(GameScreen::MonsterDetail);
-                return;
+                if card.index == data.monster_select_index {
+                    // Déjà sélectionné → naviguer
+                    selected_index.0 = card.index;
+                    check_random_event(&mut data);
+                    next_state.set(GameScreen::MonsterDetail);
+                    return;
+                } else {
+                    // Nouveau monstre → sélectionner seulement
+                    data.monster_select_index = card.index;
+                    needs_rebuild = true;
+                }
+                break;
             }
         }
     }
