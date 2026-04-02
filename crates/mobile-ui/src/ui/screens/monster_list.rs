@@ -5,7 +5,7 @@ use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::sprites;
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts};
+use crate::ui::common::{ScrollableContent, colors, fonts, ScreenMetrics};
 use monster_battle_core::FoodType;
 use monster_battle_storage::MonsterStorage;
 
@@ -39,8 +39,8 @@ pub(crate) fn spawn_monster_list(
     data: Res<GameData>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
-) {
-    spawn_monster_list_inner(&mut commands, &data, &mut images, &mut atlas);
+    metrics: Res<ScreenMetrics>) {
+    spawn_monster_list_inner(&mut commands, &data, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
 }
 
 /// Logique interne de création de l'UI (réutilisable pour les rebuilds).
@@ -49,6 +49,8 @@ fn spawn_monster_list_inner(
     data: &GameData,
     images: &mut Assets<Image>,
     atlas: &mut sprites::MonsterSpriteAtlas,
+    safe_top: f32,
+    safe_bottom: f32,
 ) {
     let monsters = data.storage.list_alive().unwrap_or_default();
 
@@ -71,8 +73,8 @@ fn spawn_monster_list_inner(
                 padding: UiRect::new(
                     Val::Px(12.0),
                     Val::Px(12.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(safe_top),
+                    Val::Px(safe_bottom),
                 ),
                 ..default()
             },
@@ -634,6 +636,7 @@ pub(crate) fn handle_monster_list_input(
     feed_query: Query<&Interaction, (Changed<Interaction>, With<FeedButton>)>,
     food_item_query: Query<(&Interaction, &FoodItemButton), Changed<Interaction>>,
     food_cancel_query: Query<&Interaction, (Changed<Interaction>, With<FoodCancelButton>)>,
+    metrics: Res<ScreenMetrics>,
 ) {
     let monster_count = data.storage.list_alive().map(|v| v.len()).unwrap_or(0);
     let mut needs_rebuild = false;
@@ -690,7 +693,7 @@ pub(crate) fn handle_monster_list_input(
             for entity in &screen_entities {
                 commands.entity(entity).despawn_recursive();
             }
-            spawn_monster_list_inner(&mut commands, &data, &mut images, &mut atlas);
+            spawn_monster_list_inner(&mut commands, &data, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
         }
         return;
     }
@@ -762,7 +765,7 @@ pub(crate) fn handle_monster_list_input(
         for entity in &screen_entities {
             commands.entity(entity).despawn_recursive();
         }
-        spawn_monster_list_inner(&mut commands, &data, &mut images, &mut atlas);
+        spawn_monster_list_inner(&mut commands, &data, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
     }
 }
 

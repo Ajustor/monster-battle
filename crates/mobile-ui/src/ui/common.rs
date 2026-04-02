@@ -44,17 +44,25 @@ pub fn setup_custom_font(
 //  Marge de sécurité pour l'encoche caméra (safe area)
 // ═══════════════════════════════════════════════════════════════════
 
-/// Marge haute pour éviter l'encoche caméra sur Android.
-#[cfg(target_os = "android")]
-pub const SAFE_TOP: f32 = 48.0;
-#[cfg(not(target_os = "android"))]
-pub const SAFE_TOP: f32 = 16.0;
+/// Valeurs par défaut (desktop/fallback).
+pub const SAFE_TOP_DEFAULT: f32 = 16.0;
+pub const SAFE_BOTTOM_DEFAULT: f32 = 16.0;
 
-/// Marge basse pour éviter de masquer les boutons derrière la barre de statut.
-#[cfg(target_os = "android")]
-pub const SAFE_BOTTOM: f32 = 52.0;
-#[cfg(not(target_os = "android"))]
-pub const SAFE_BOTTOM: f32 = 16.0;
+/// Resource injectée par PlatformConfig — utilisée par tous les écrans.
+#[derive(Resource)]
+pub struct ScreenMetrics {
+    pub safe_top: f32,
+    pub safe_bottom: f32,
+}
+
+impl Default for ScreenMetrics {
+    fn default() -> Self {
+        Self {
+            safe_top: SAFE_TOP_DEFAULT,
+            safe_bottom: SAFE_BOTTOM_DEFAULT,
+        }
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  Constantes de style
@@ -95,6 +103,11 @@ pub mod fonts {
 /// Crée un nœud racine plein écran pour un écran.
 /// Inclut une marge haute pour éviter l'encoche caméra sur Android.
 pub fn screen_root() -> Node {
+    screen_root_with_metrics(SAFE_TOP_DEFAULT, SAFE_BOTTOM_DEFAULT)
+}
+
+/// Variante avec marges dynamiques depuis ScreenMetrics.
+pub fn screen_root_with_metrics(safe_top: f32, safe_bottom: f32) -> Node {
     Node {
         width: Val::Percent(100.0),
         height: Val::Percent(100.0),
@@ -104,8 +117,8 @@ pub fn screen_root() -> Node {
         padding: UiRect::new(
             Val::Px(16.0),
             Val::Px(16.0),
-            Val::Px(SAFE_TOP),
-            Val::Px(SAFE_BOTTOM),
+            Val::Px(safe_top),
+            Val::Px(safe_bottom),
         ),
         ..default()
     }

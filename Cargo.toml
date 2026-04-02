@@ -11,6 +11,7 @@ members = [
   "crates/android",
   "crates/composer",
   "crates/ios",
+  "crates/mobile-ui",
 ]
 
 [workspace.package]
@@ -72,4 +73,5 @@ monster-battle-server = { path = "crates/server" }
 monster-battle-audio = { path = "crates/audio" }
 monster-battle-android = { path = "crates/android" }
 monster-battle-ios = { path = "crates/ios" }
+monster-battle-mobile-ui = { path = "crates/mobile-ui" }
 monster-battle-composer = { path = "crates/composer" }

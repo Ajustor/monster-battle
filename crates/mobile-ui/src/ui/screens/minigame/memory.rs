@@ -6,7 +6,7 @@ use bevy::state::state::NextState;
 use monster_battle_core::minigame::memory::{CardState, MemoryGame};
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, colors, fonts};
+use crate::ui::common::{colors, fonts, ScreenMetrics};
 
 use super::{
     ContinueButton, MinigameBackButton, StatusText, apply_minigame_reward, clear_minigame_state,
@@ -32,7 +32,8 @@ pub struct CardText {
 //  Spawn
 // ═══════════════════════════════════════════════════════════════════
 
-pub fn spawn_memory_play(mut commands: Commands, data: Res<GameData>) {
+pub fn spawn_memory_play(mut commands: Commands, data: Res<GameData>,
+    metrics: Res<ScreenMetrics>) {
     let monster_name = data
         .minigame_monster_name
         .as_deref()
@@ -57,8 +58,8 @@ pub fn spawn_memory_play(mut commands: Commands, data: Res<GameData>) {
                 padding: UiRect::new(
                     Val::Px(12.0),
                     Val::Px(12.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },

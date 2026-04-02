@@ -7,7 +7,7 @@ use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity, SelectMonsterTarget};
 use crate::sprites;
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts};
+use crate::ui::common::{ScrollableContent, colors, fonts, ScreenMetrics};
 
 /// Marqueur pour les cartes de monstre cliquables.
 #[derive(Component)]
@@ -26,7 +26,7 @@ pub(crate) fn spawn_select_monster(
     target: Option<Res<SelectMonsterTarget>>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
-) {
+    metrics: Res<ScreenMetrics>) {
     let monsters = data.storage.list_alive().unwrap_or_default();
 
     let title = match target.as_deref() {
@@ -46,8 +46,8 @@ pub(crate) fn spawn_select_monster(
                 padding: UiRect::new(
                     Val::Px(12.0),
                     Val::Px(12.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },

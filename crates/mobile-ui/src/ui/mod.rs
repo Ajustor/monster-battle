@@ -202,6 +202,7 @@ impl Plugin for UiPlugin {
             .add_systems(Update, crate::net_task::poll_network_events)
             // ── Scroll tactile (global) ─────────────────────────
             .init_resource::<common::TouchScrollState>()
+            .init_resource::<common::ScreenMetrics>()
             .add_systems(Update, common::handle_touch_scroll)
             // ── Caméra 2D + Police ─────────────────────────────
             .add_systems(Startup, (spawn_camera, common::setup_custom_font));

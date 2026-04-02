@@ -12,7 +12,7 @@ use monster_battle_core::types::ElementType;
 use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{InputDisplayText, SAFE_BOTTOM, SAFE_TOP, TextInputField, colors, fonts};
+use crate::ui::common::{InputDisplayText, TextInputField, colors, fonts, ScreenMetrics};
 
 /// Marqueur pour le bouton « Confirmer ».
 #[derive(Component)]
@@ -23,7 +23,8 @@ pub(crate) struct ConfirmButton;
 pub(crate) struct NamingBackButton;
 
 /// Construit l'UI de saisie du nom.
-pub(crate) fn spawn_naming(mut commands: Commands, data: Res<GameData>) {
+pub(crate) fn spawn_naming(mut commands: Commands, data: Res<GameData>,
+    metrics: Res<ScreenMetrics>) {
     let types = ElementType::all();
     let chosen = types[data.type_choice_index % types.len()];
 
@@ -36,8 +37,8 @@ pub(crate) fn spawn_naming(mut commands: Commands, data: Res<GameData>) {
                 padding: UiRect::new(
                     Val::Px(16.0),
                     Val::Px(16.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 align_items: AlignItems::Center,
                 ..default()

@@ -1,0 +1,68 @@
+[package]
+name = "monster-battle-mobile-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "monster_battle_mobile_ui"
+
+[dependencies]
+monster-battle-core.workspace = true
+monster-battle-sprites.workspace = true
+monster-battle-storage.workspace = true
+monster-battle-network.workspace = true
+monster-battle-audio.workspace = true
+
+bevy = { version = "0.15", default-features = false, features = [
+  "bevy_asset",
+  "bevy_color",
+  "bevy_core_pipeline",
+  "bevy_render",
+  "bevy_sprite",
+  "bevy_state",
+  "bevy_text",
+  "bevy_ui",
+  "bevy_winit",
+  "default_font",
+  "multi_threaded",
+  "png",
+] }
+
+log = "0.4"
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+rustls.workspace = true
+futures-util.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+bevy = { version = "0.15", default-features = false, features = ["x11"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.15"
+jni = "0.21"
+rodio = { version = "0.19", default-features = false, features = [
+  "cpal-shared-stdcxx",
+] }
+bevy = { version = "0.15", default-features = false, features = [
+  "android-native-activity",
+  "android_shared_stdcxx",
+  "bevy_asset",
+  "bevy_color",
+  "bevy_core_pipeline",
+  "bevy_render",
+  "bevy_sprite",
+  "bevy_state",
+  "bevy_text",
+  "bevy_ui",
+  "bevy_winit",
+  "default_font",
+  "multi_threaded",
+  "png",
+] }

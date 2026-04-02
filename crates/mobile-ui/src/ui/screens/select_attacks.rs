@@ -7,7 +7,7 @@ use monster_battle_core::attack::Attack;
 use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts};
+use crate::ui::common::{SAFE_BOTTOM_DEFAULT, SAFE_TOP_DEFAULT, ScrollableContent, colors, fonts};
 
 /// Marqueur pour un bouton d'attaque (toggle sélection).
 #[derive(Component)]
@@ -67,8 +67,8 @@ fn spawn_select_attacks_ui(
                 padding: UiRect::new(
                     Val::Px(12.0),
                     Val::Px(12.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(SAFE_TOP_DEFAULT),
+                    Val::Px(SAFE_BOTTOM_DEFAULT),
                 ),
                 ..default()
             },

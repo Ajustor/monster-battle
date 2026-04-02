@@ -9,9 +9,8 @@ use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::ui::common::{
-    InputDisplayText, KEYBOARD_SCROLL_STEP, SAFE_BOTTOM, SAFE_TOP, ScrollableContent,
-    TextInputField, colors, fonts,
-};
+    InputDisplayText, KEYBOARD_SCROLL_STEP, ScrollableContent,
+    TextInputField, colors, fonts, ScreenMetrics};
 
 // ═══════════════════════════════════════════════════════════════════
 //  Breeding Searching
@@ -22,7 +21,8 @@ use crate::ui::common::{
 pub(crate) struct CancelButton;
 
 /// Construit l'UI de recherche de partenaire.
-pub(crate) fn spawn_breeding_searching(mut commands: Commands) {
+pub(crate) fn spawn_breeding_searching(mut commands: Commands,
+    metrics: Res<ScreenMetrics>) {
     commands
         .spawn((
             Node {
@@ -34,8 +34,8 @@ pub(crate) fn spawn_breeding_searching(mut commands: Commands) {
                 padding: UiRect::new(
                     Val::Px(24.0),
                     Val::Px(24.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },
@@ -152,7 +152,8 @@ pub(crate) struct ConfirmButton;
 pub(crate) struct BreedingNamingBackButton;
 
 /// Construit l'UI de nommage du bébé.
-pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>) {
+pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>,
+    metrics: Res<ScreenMetrics>) {
     // Récupérer le monstre local et le partenaire distant pour afficher leurs infos
     let local_monster = data.storage.list_alive().ok().and_then(|m| {
         let idx = data.monster_select_index.min(m.len().saturating_sub(1));
@@ -170,8 +171,8 @@ pub(crate) fn spawn_breeding_naming(mut commands: Commands, data: Res<GameData>)
                 padding: UiRect::new(
                     Val::Px(16.0),
                     Val::Px(16.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },
@@ -549,7 +550,8 @@ fn try_confirm_breeding_name(
 pub(crate) struct BackButton;
 
 /// Construit l'UI du résultat de reproduction.
-pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>) {
+pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>,
+    metrics: Res<ScreenMetrics>) {
     commands
         .spawn((
             Node {
@@ -559,8 +561,8 @@ pub(crate) fn spawn_breeding_result(mut commands: Commands, data: Res<GameData>)
                 padding: UiRect::new(
                     Val::Px(16.0),
                     Val::Px(16.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },

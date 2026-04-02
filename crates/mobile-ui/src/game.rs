@@ -6,6 +6,8 @@ use bevy::prelude::*;
 use bevy::state::state::{OnEnter, OnExit, States};
 
 use monster_battle_core::Monster;
+use crate::platform::PlatformConfig;
+use crate::ui::common::ScreenMetrics;
 use monster_battle_core::battle::BattleState;
 use monster_battle_core::minigame::MinigameType;
 use monster_battle_core::minigame::memory::MemoryGame;
@@ -44,8 +46,6 @@ pub enum GameScreen {
     BreedingNaming,
     /// Résultat de la reproduction.
     BreedingResult,
-    /// Sélection des attaques actives.
-    SelectAttacks,
     /// Cimetière (monstres morts).
     Cemetery,
     /// Écran d'aide.
@@ -62,6 +62,8 @@ pub enum GameScreen {
     ReflexPlay,
     /// Partie de PPC élémentaire en cours.
     RpsPlay,
+    /// Sélection des attaques actives du monstre.
+    SelectAttacks,
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -180,43 +182,35 @@ pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        // Initialiser GameData avec le répertoire de données approprié
-        let data_dir = dirs_data_dir();
+        // PlatformConfig doit être injectée AVANT GamePlugin.
+        // Le default est utilisé si personne ne l'a injectée.
+        let config = app
+            .world()
+            .get_resource::<PlatformConfig>()
+            .cloned()
+            .unwrap_or_default();
+
+        let metrics = ScreenMetrics {
+            safe_top: config.safe_top,
+            safe_bottom: config.safe_bottom,
+        };
+
         // Le nettoyage des entités d'écran est géré automatiquement par
         // `StateScoped` + `enable_state_scoped_entities` (despawn_recursive).
         // Ne PAS utiliser de cleanup_screen manuel avec despawn() non-récursif
         // car l'ordre d'exécution avec StateScoped est ambigu dans ExitSchedules.
-        app.add_plugins(crate::battle_effects::BattleEffectsPlugin)
-            .insert_resource(GameData::new(data_dir))
+        app.insert_resource(GameData::new(config.data_dir))
+            .insert_resource(metrics)
             .insert_resource(crate::ui::screens::training::TrainingWild(false))
             .enable_state_scoped_entities::<GameScreen>()
             .add_systems(OnEnter(GameScreen::MainMenu), on_enter_main_menu)
             .add_systems(OnEnter(GameScreen::MonsterList), on_enter_monster_list)
-            .add_systems(
-                Update,
-                crate::ui::common::sync_scroll_position.run_if(in_state(GameScreen::MonsterList)),
-            )
             .add_systems(OnEnter(GameScreen::NewMonster), on_enter_new_monster)
             .add_systems(OnEnter(GameScreen::NamingMonster), on_enter_naming)
             .add_systems(OnEnter(GameScreen::NamingMonster), enable_ime)
             .add_systems(OnExit(GameScreen::NamingMonster), disable_ime)
             .add_systems(OnEnter(GameScreen::SelectMonster), on_enter_select_monster)
             .add_systems(OnEnter(GameScreen::Training), on_enter_training)
-            .add_systems(
-                OnEnter(GameScreen::SelectAttacks),
-                (
-                    on_enter_select_attacks,
-                    crate::ui::screens::select_attacks::spawn_select_attacks,
-                ),
-            )
-            .add_systems(
-                Update,
-                (
-                    crate::ui::screens::select_attacks::handle_select_attacks_input,
-                    crate::ui::screens::select_attacks::refresh_select_attacks_ui,
-                )
-                    .run_if(in_state(GameScreen::SelectAttacks)),
-            )
             .add_systems(OnEnter(GameScreen::Cemetery), on_enter_cemetery)
             .add_systems(OnEnter(GameScreen::Help), on_enter_help)
             .add_systems(OnEnter(GameScreen::Battle), on_enter_battle)
@@ -247,22 +241,6 @@ impl Plugin for GamePlugin {
             .add_systems(OnEnter(GameScreen::MemoryPlay), on_enter_memory_play)
             .add_systems(OnEnter(GameScreen::ReflexPlay), on_enter_reflex_play)
             .add_systems(OnEnter(GameScreen::RpsPlay), on_enter_rps_play);
-    }
-}
-
-/// Répertoire de données selon la plateforme.
-fn dirs_data_dir() -> std::path::PathBuf {
-    // Sur Android : utiliser le dossier interne de l'app.
-    // Le chemin est /data/data/<package>/files
-    #[cfg(target_os = "android")]
-    {
-        // Utiliser le vrai chemin interne de l'app (correspond au package dans le manifest)
-        std::path::PathBuf::from("/data/data/com.ajustor.monsterbattle/files")
-    }
-    #[cfg(not(target_os = "android"))]
-    {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        std::path::PathBuf::from(format!("{}/.local/share/monster-battle", home))
     }
 }
 
@@ -320,29 +298,6 @@ fn on_enter_monster_list(mut data: ResMut<GameData>) {
 
 fn on_enter_new_monster(mut data: ResMut<GameData>) {
     data.type_choice_index = 0;
-}
-
-fn on_enter_select_attacks(mut commands: Commands, data: Res<GameData>) {
-    // Initialiser la ressource de sélection avec les indices actuels du monstre
-    let monsters = data.storage.list_alive().unwrap_or_default();
-    let idx = data
-        .monster_select_index
-        .min(monsters.len().saturating_sub(1));
-    let selected = if let Some(monster) = monsters.get(idx) {
-        if monster.active_attack_indices.is_empty() {
-            // Par défaut : sélectionner les 4 premières attaques connues
-            let known = monster.known_attacks();
-            (0..4.min(known.len())).collect()
-        } else {
-            monster.active_attack_indices.clone()
-        }
-    } else {
-        Vec::new()
-    };
-    commands.insert_resource(crate::ui::screens::select_attacks::AttackSelectionState {
-        selected,
-        dirty: false,
-    });
 }
 
 fn on_enter_cemetery(mut data: ResMut<GameData>) {

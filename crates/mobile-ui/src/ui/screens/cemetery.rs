@@ -8,8 +8,7 @@ use monster_battle_storage::MonsterStorage;
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::sprites;
 use crate::ui::common::{
-    KEYBOARD_SCROLL_STEP, SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts,
-};
+    KEYBOARD_SCROLL_STEP, ScrollableContent, colors, fonts, ScreenMetrics};
 
 /// Marqueur pour le bouton retour.
 #[derive(Component)]
@@ -21,7 +20,7 @@ pub(crate) fn spawn_cemetery(
     data: Res<GameData>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
-) {
+    metrics: Res<ScreenMetrics>) {
     let dead = data.storage.list_dead().unwrap_or_default();
 
     commands
@@ -33,8 +32,8 @@ pub(crate) fn spawn_cemetery(
                 padding: UiRect::new(
                     Val::Px(12.0),
                     Val::Px(12.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },

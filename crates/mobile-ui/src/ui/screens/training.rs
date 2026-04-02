@@ -9,7 +9,7 @@ use monster_battle_core::types::ElementType;
 use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts};
+use crate::ui::common::{ScrollableContent, colors, fonts, ScreenMetrics};
 
 /// Ressource indiquant si le mode sauvage est actif.
 #[derive(Resource)]
@@ -30,12 +30,13 @@ pub(crate) struct ModeToggleButton;
 pub(crate) struct TrainingBackButton;
 
 /// Construit l'UI d'entraînement.
-pub(crate) fn spawn_training(mut commands: Commands, data: Res<GameData>, wild: Res<TrainingWild>) {
-    spawn_training_inner(&mut commands, &data, wild.0);
+pub(crate) fn spawn_training(mut commands: Commands, data: Res<GameData>, wild: Res<TrainingWild>,
+    metrics: Res<ScreenMetrics>) {
+    spawn_training_inner(&mut commands, &data, wild.0, metrics.safe_top, metrics.safe_bottom);
 }
 
 /// Logique interne de création de l'UI d'entraînement (réutilisable).
-fn spawn_training_inner(commands: &mut Commands, data: &GameData, wild: bool) {
+fn spawn_training_inner(commands: &mut Commands, data: &GameData, wild: bool, safe_top: f32, safe_bottom: f32) {
     let monsters = data.storage.list_alive().unwrap_or_default();
     let selected_idx = data.monster_select_index;
     let monster = monsters.get(selected_idx).or(monsters.first());
@@ -51,8 +52,8 @@ fn spawn_training_inner(commands: &mut Commands, data: &GameData, wild: bool) {
                 padding: UiRect::new(
                     Val::Px(12.0),
                     Val::Px(12.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(safe_top),
+                    Val::Px(safe_bottom),
                 ),
                 ..default()
             },
@@ -284,6 +285,7 @@ pub(crate) fn handle_training_input(
     >,
     back_query: Query<&Interaction, (Changed<Interaction>, With<TrainingBackButton>)>,
     screen_entities: Query<Entity, With<ScreenEntity>>,
+    metrics: Res<ScreenMetrics>,
 ) {
     let types = ElementType::all();
     let type_count = types.len();
@@ -348,7 +350,7 @@ pub(crate) fn handle_training_input(
         for entity in &screen_entities {
             commands.entity(entity).despawn_recursive();
         }
-        spawn_training_inner(&mut commands, &data, wild.0);
+        spawn_training_inner(&mut commands, &data, wild.0, metrics.safe_top, metrics.safe_bottom);
     }
 }
 

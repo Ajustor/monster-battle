@@ -6,7 +6,7 @@ use bevy::state::state::NextState;
 use monster_battle_core::minigame::rps::{RoundOutcome, RpsGame};
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, colors, fonts};
+use crate::ui::common::{colors, fonts, ScreenMetrics};
 
 use super::{
     ContinueButton, MinigameBackButton, StatusText, apply_minigame_reward, clear_minigame_state,
@@ -30,7 +30,8 @@ pub struct ConfirmButton;
 //  Spawn
 // ═══════════════════════════════════════════════════════════════════
 
-pub fn spawn_rps_play(mut commands: Commands, data: Res<GameData>) {
+pub fn spawn_rps_play(mut commands: Commands, data: Res<GameData>,
+    metrics: Res<ScreenMetrics>) {
     let monster_name = data
         .minigame_monster_name
         .as_deref()
@@ -52,8 +53,8 @@ pub fn spawn_rps_play(mut commands: Commands, data: Res<GameData>) {
                 padding: UiRect::new(
                     Val::Px(16.0),
                     Val::Px(16.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },
@@ -318,6 +319,7 @@ pub fn handle_rps_play_input(
     back_query: Query<&Interaction, (Changed<Interaction>, With<MinigameBackButton>)>,
     continue_query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
     screen_entities: Query<Entity, With<ScreenEntity>>,
+    metrics: Res<ScreenMetrics>,
 ) {
     let is_over = data.rps_game.as_ref().map(|g| g.is_over()).unwrap_or(true);
     let waiting_confirm = data
@@ -417,6 +419,6 @@ pub fn handle_rps_play_input(
         for entity in &screen_entities {
             commands.entity(entity).despawn_recursive();
         }
-        spawn_rps_play(commands, data.into());
+        spawn_rps_play(commands, data.into(), metrics);
     }
 }

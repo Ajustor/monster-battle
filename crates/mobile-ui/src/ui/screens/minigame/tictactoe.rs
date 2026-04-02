@@ -8,7 +8,7 @@ use monster_battle_core::minigame::tictactoe::{Cell, Difficulty, TicTacToe};
 use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, colors, fonts};
+use crate::ui::common::{colors, fonts, ScreenMetrics};
 
 use super::{
     ContinueButton, MinigameBackButton, StatusText, apply_minigame_reward, clear_minigame_state,
@@ -40,7 +40,8 @@ pub(crate) struct CellText {
 //  Sélection de la difficulté
 // ═══════════════════════════════════════════════════════════════════
 
-pub fn spawn_minigame_select(mut commands: Commands, data: Res<GameData>) {
+pub fn spawn_minigame_select(mut commands: Commands, data: Res<GameData>,
+    metrics: Res<ScreenMetrics>) {
     let monster_name = data
         .minigame_monster_name
         .as_deref()
@@ -59,8 +60,8 @@ pub fn spawn_minigame_select(mut commands: Commands, data: Res<GameData>) {
                 padding: UiRect::new(
                     Val::Px(16.0),
                     Val::Px(16.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },
@@ -298,7 +299,8 @@ fn start_game(
 //  Plateau de jeu morpion
 // ═══════════════════════════════════════════════════════════════════
 
-pub fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>) {
+pub fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>,
+    metrics: Res<ScreenMetrics>) {
     let monster_name = data
         .minigame_monster_name
         .as_deref()
@@ -320,8 +322,8 @@ pub fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>) {
                 padding: UiRect::new(
                     Val::Px(16.0),
                     Val::Px(16.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },

@@ -5,15 +5,15 @@ use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::ui::common::{
-    KEYBOARD_SCROLL_STEP, SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts,
-};
+    KEYBOARD_SCROLL_STEP, ScrollableContent, colors, fonts, ScreenMetrics};
 
 /// Marqueur pour le bouton retour.
 #[derive(Component)]
 pub(crate) struct HelpBackButton;
 
 /// Construit l'UI d'aide.
-pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>) {
+pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>,
+    metrics: Res<ScreenMetrics>) {
     let _ = &data; // on utilise data pour scroll_offset au rebuild
 
     commands
@@ -25,8 +25,8 @@ pub(crate) fn spawn_help(mut commands: Commands, data: Res<GameData>) {
                 padding: UiRect::new(
                     Val::Px(12.0),
                     Val::Px(12.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },

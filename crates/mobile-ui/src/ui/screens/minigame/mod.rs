@@ -13,7 +13,7 @@ use monster_battle_core::minigame::apply_reward;
 use monster_battle_storage::MonsterStorage;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, colors, fonts};
+use crate::ui::common::{colors, fonts, ScreenMetrics};
 
 // Re-exports pour ui/mod.rs (pub car le crate est une lib)
 pub use memory::handle_memory_play_input;
@@ -53,7 +53,8 @@ pub(crate) struct GameTypeButton {
 //  Sélection du type de mini-jeu
 // ═══════════════════════════════════════════════════════════════════
 
-pub fn spawn_minigame_type_select(mut commands: Commands, data: Res<GameData>) {
+pub fn spawn_minigame_type_select(mut commands: Commands, data: Res<GameData>,
+    metrics: Res<ScreenMetrics>) {
     let monster_name = data
         .minigame_monster_name
         .as_deref()
@@ -70,8 +71,8 @@ pub fn spawn_minigame_type_select(mut commands: Commands, data: Res<GameData>) {
                 padding: UiRect::new(
                     Val::Px(16.0),
                     Val::Px(16.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },

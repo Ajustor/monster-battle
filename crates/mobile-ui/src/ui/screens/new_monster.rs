@@ -6,7 +6,7 @@ use bevy::state::state::NextState;
 use monster_battle_core::types::ElementType;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, ScrollableContent, colors, fonts};
+use crate::ui::common::{ScrollableContent, colors, fonts, ScreenMetrics};
 
 /// Marqueur pour les boutons de type.
 #[derive(Component)]
@@ -19,7 +19,8 @@ pub(crate) struct TypeButton {
 pub(crate) struct NewMonsterBackButton;
 
 /// Construit l'UI de sélection du type de starter.
-pub(crate) fn spawn_new_monster(mut commands: Commands, data: Res<GameData>) {
+pub(crate) fn spawn_new_monster(mut commands: Commands, data: Res<GameData>,
+    metrics: Res<ScreenMetrics>) {
     let types = ElementType::all();
 
     commands
@@ -31,8 +32,8 @@ pub(crate) fn spawn_new_monster(mut commands: Commands, data: Res<GameData>) {
                 padding: UiRect::new(
                     Val::Px(16.0),
                     Val::Px(16.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },

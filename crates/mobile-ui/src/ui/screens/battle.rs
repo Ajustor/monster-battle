@@ -7,7 +7,7 @@ use crate::battle_effects::PlayAttackEffect;
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::net_task::{NetTask, NetTaskAction};
 use crate::sprites;
-use crate::ui::common::{self, SAFE_BOTTOM, SAFE_TOP, colors, fonts};
+use crate::ui::common::{self, colors, fonts, ScreenMetrics};
 use monster_battle_core::battle::{AnimationType, BattlePhase, BattleState, MessageStyle};
 use monster_battle_storage::MonsterStorage;
 
@@ -77,12 +77,12 @@ pub(crate) fn spawn_battle_ui(
     data: Res<GameData>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
-) {
+    metrics: Res<ScreenMetrics>) {
     let battle = match &data.battle_state {
         Some(b) => b,
         None => return,
     };
-    spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas);
+    spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
 }
 
 /// Logique interne de création de l'UI de combat (réutilisable).
@@ -91,6 +91,8 @@ fn spawn_battle_ui_inner(
     battle: &BattleState,
     mut images: &mut Assets<Image>,
     atlas: &mut sprites::MonsterSpriteAtlas,
+    safe_top: f32,
+    safe_bottom: f32,
 ) {
     let is_waiting = matches!(
         battle.phase,
@@ -108,8 +110,8 @@ fn spawn_battle_ui_inner(
                 padding: UiRect::new(
                     Val::Px(12.0),
                     Val::Px(12.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(safe_top),
+                    Val::Px(safe_bottom),
                 ),
                 ..default()
             },
@@ -593,6 +595,7 @@ pub(crate) fn handle_battle_input(
     flee_query: Query<&Interaction, (Changed<Interaction>, With<FleeButton>)>,
     continue_query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
     screen_entities: Query<Entity, With<ScreenEntity>>,
+    metrics: Res<ScreenMetrics>,
 ) {
     let is_pvp = net_task
         .as_ref()
@@ -832,7 +835,7 @@ pub(crate) fn handle_battle_input(
             }
             // Reconstruire avec l'état mis à jour
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
             }
         }
         Action::EndBattle => {
@@ -863,7 +866,7 @@ pub(crate) fn handle_battle_input(
                 commands.entity(entity).despawn_recursive();
             }
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
             }
         }
         Action::PvpSendReady => {
@@ -882,7 +885,7 @@ pub(crate) fn handle_battle_input(
                 commands.entity(entity).despawn_recursive();
             }
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
             }
         }
         Action::PvpForfeit => {
@@ -992,6 +995,7 @@ pub(crate) fn refresh_battle_ui(
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
     screen_entities: Query<Entity, With<ScreenEntity>>,
+    metrics: Res<ScreenMetrics>,
 ) {
     if !data.battle_ui_dirty {
         return;
@@ -1005,7 +1009,7 @@ pub(crate) fn refresh_battle_ui(
 
     // Reconstruire
     if let Some(ref battle) = data.battle_state {
-        spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas);
+        spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
     }
 }
 

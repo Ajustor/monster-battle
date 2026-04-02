@@ -4,14 +4,15 @@ use bevy::prelude::*;
 use bevy::state::state::NextState;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
-use crate::ui::common::{SAFE_BOTTOM, SAFE_TOP, colors, fonts};
+use crate::ui::common::{colors, fonts, ScreenMetrics};
 
 // ═══════════════════════════════════════════════════════════════════
 //  PvP Searching
 // ═══════════════════════════════════════════════════════════════════
 
 /// Construit l'UI de recherche PvP.
-pub(crate) fn spawn_pvp_searching(mut commands: Commands) {
+pub(crate) fn spawn_pvp_searching(mut commands: Commands,
+    metrics: Res<ScreenMetrics>) {
     commands
         .spawn((
             Node {
@@ -23,8 +24,8 @@ pub(crate) fn spawn_pvp_searching(mut commands: Commands) {
                 padding: UiRect::new(
                     Val::Px(24.0),
                     Val::Px(24.0),
-                    Val::Px(SAFE_TOP),
-                    Val::Px(SAFE_BOTTOM),
+                    Val::Px(metrics.safe_top),
+                    Val::Px(metrics.safe_bottom),
                 ),
                 ..default()
             },
