@@ -658,7 +658,7 @@ pub(crate) fn handle_battle_input(
                                 // Émettre l'effet de combat (particules)
                                 attack_effects.send(PlayAttackEffect {
                                     element: attack_element,
-                                    position: Vec2::new(250.0, 150.0), // Position approximative de l'adversaire
+                                    position: Vec2::new(0.65, 0.30), // Position adversaire (viewport %)
                                 });
                                 act = Action::Rebuild;
                             }
@@ -702,7 +702,7 @@ pub(crate) fn handle_battle_input(
                                 battle.player_attack(idx);
                                 attack_effects.send(PlayAttackEffect {
                                     element: attack_element,
-                                    position: Vec2::new(250.0, 150.0),
+                                    position: Vec2::new(0.65, 0.30), // Position adversaire (viewport %)
                                 });
                                 act = Action::Rebuild;
                             }
