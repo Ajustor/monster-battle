@@ -14,6 +14,7 @@
 
 /* Begin PBXFileReference section */
 		AA100002 /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		AA100006 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA100003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA100004 /* libmonster_battle_ios.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libmonster_battle_ios.a; path = "../target/aarch64-apple-ios/release/libmonster_battle_ios.a"; sourceTree = "<group>"; };
 		AA100005 /* monster-battle-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "monster-battle-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -45,6 +46,7 @@
 				AA100002 /* main.m */,
 				AA100003 /* Assets.xcassets */,
 				AA100004 /* libmonster_battle_ios.a */,
+				AA100006 /* Info.plist */,
 				AA300001 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -197,6 +199,7 @@
 					"-framework", CoreAudio,
 					"-lz",
 				);
+				INFOPLIST_FILE = Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.ajustor.monsterbattle";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -232,6 +235,7 @@
 					"-framework", CoreAudio,
 					"-lz",
 				);
+				INFOPLIST_FILE = Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.ajustor.monsterbattle";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
