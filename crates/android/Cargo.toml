@@ -88,6 +88,7 @@ desktop = []
 # ── Métadonnées Android (utilisées par xbuild) ──────────────────
 [package.metadata.android]
 runtime_libs = "game_activity"
+assets = "../mobile-ui/assets"
 
 [package.metadata.android.manifest]
 package = "com.ajustor.monsterbattle"
