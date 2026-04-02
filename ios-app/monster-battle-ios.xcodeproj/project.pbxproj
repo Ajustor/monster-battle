@@ -192,6 +192,9 @@
 					"-framework", CoreFoundation,
 					"-framework", Security,
 					"-framework", UIKit,
+					"-framework", AudioToolbox,
+					"-framework", AVFoundation,
+					"-framework", CoreAudio,
 					"-lz",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.ajustor.monsterbattle";
@@ -224,6 +227,9 @@
 					"-framework", CoreFoundation,
 					"-framework", Security,
 					"-framework", UIKit,
+					"-framework", AudioToolbox,
+					"-framework", AVFoundation,
+					"-framework", CoreAudio,
 					"-lz",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.ajustor.monsterbattle";
