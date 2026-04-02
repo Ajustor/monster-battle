@@ -145,20 +145,30 @@ fn android_start_download(server_version: &str) -> Result<i64, String> {
             &[JValue::Object(&mime)],
         )?;
 
-        // Destination dans Downloads (DownloadManager a les droits sans permission)
-        let downloads_dir = env
-            .get_static_field(
-                "android/os/Environment",
-                "DIRECTORY_DOWNLOADS",
-                "Ljava/lang/String;",
+        // Destination dans le cache interne de l'app (pas de permission requise)
+        // getFilesDir() retourne /data/data/<package>/files/
+        let files_dir = env
+            .call_method(&activity, "getFilesDir", "()Ljava/io/File;", &[])?
+            .l()?;
+        let files_path = env
+            .call_method(&files_dir, "getAbsolutePath", "()Ljava/lang/String;", &[])?
+            .l()?;
+        let files_path_str: String = env.get_string(&files_path.into())?.into();
+        let dest_path = format!("{}/monster-battle.apk", files_path_str);
+        let dest_uri_str = env.new_string(format!("file://{}", dest_path))?;
+        let dest_uri = env
+            .call_static_method(
+                "android/net/Uri",
+                "parse",
+                "(Ljava/lang/String;)Landroid/net/Uri;",
+                &[JValue::Object(&dest_uri_str)],
             )?
             .l()?;
-        let filename = env.new_string("monster-battle.apk")?;
         env.call_method(
             &request,
-            "setDestinationInExternalPublicDir",
-            "(Ljava/lang/String;Ljava/lang/String;)Landroid/app/DownloadManager$Request;",
-            &[JValue::Object(&downloads_dir), JValue::Object(&filename)],
+            "setDestinationUri",
+            "(Landroid/net/Uri;)Landroid/app/DownloadManager$Request;",
+            &[JValue::Object(&dest_uri)],
         )?;
 
         let download_id = env
@@ -306,16 +316,37 @@ fn android_trigger_install(apk_path: &str) -> Result<(), String> {
         let activity_ptr = app.activity_as_ptr() as jni::sys::jobject;
         let activity = unsafe { JObject::from_raw(activity_ptr) };
 
-        // Convertir le chemin file:// en Uri
-        let path_str = env.new_string(apk_path)?;
-        let uri = env
-            .call_static_method(
-                "android/net/Uri",
-                "parse",
-                "(Ljava/lang/String;)Landroid/net/Uri;",
-                &[JValue::Object(&path_str)],
-            )?
+        // Utiliser le chemin local (strip prefix file://)
+        let local_path = apk_path.trim_start_matches("file://");
+        let file_class = env.find_class("java/io/File")?;
+        let path_str = env.new_string(local_path)?;
+        let file_obj = env.new_object(file_class, "(Ljava/lang/String;)V", &[JValue::Object(&path_str)])?;
+
+        // Obtenir l'Uri via FileProvider pour Android 7+
+        let package_name = env
+            .call_method(&activity, "getPackageName", "()Ljava/lang/String;", &[])?
             .l()?;
+        let pkg_str: String = env.get_string(&package_name.into())?.into();
+        let authority = env.new_string(format!("{}.fileprovider", pkg_str))?;
+
+        let uri = env.call_static_method(
+            "androidx/core/content/FileProvider",
+            "getUriForFile",
+            "(Landroid/content/Context;Ljava/lang/String;Ljava/io/File;)Landroid/net/Uri;",
+            &[
+                JValue::Object(&activity),
+                JValue::Object(&authority),
+                JValue::Object(&file_obj),
+            ],
+        ).unwrap_or_else(|_| {
+            // Fallback si FileProvider non disponible : Uri.fromFile()
+            env.call_static_method(
+                "android/net/Uri",
+                "fromFile",
+                "(Ljava/io/File;)Landroid/net/Uri;",
+                &[JValue::Object(&file_obj)],
+            ).unwrap()
+        }).l()?;
 
         // Intent ACTION_VIEW pour installer l'APK
         let action = env.new_string("android.intent.action.VIEW")?;
@@ -333,12 +364,12 @@ fn android_trigger_install(apk_path: &str) -> Result<(), String> {
             &[JValue::Object(&uri), JValue::Object(&mime)],
         )?;
 
-        // FLAG_ACTIVITY_NEW_TASK = 0x10000000
+        // FLAG_ACTIVITY_NEW_TASK | FLAG_GRANT_READ_URI_PERMISSION
         env.call_method(
             &intent,
             "addFlags",
             "(I)Landroid/content/Intent;",
-            &[JValue::Int(0x10000000)],
+            &[JValue::Int(0x10000001i32)],
         )?;
 
         env.call_method(
