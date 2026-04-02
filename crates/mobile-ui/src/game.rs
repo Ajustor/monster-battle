@@ -64,6 +64,10 @@ pub enum GameScreen {
     RpsPlay,
     /// Sélection des attaques actives du monstre.
     SelectAttacks,
+    /// Gestion détaillée d'un monstre (stats, traits, actions).
+    MonsterDetail,
+    /// Sélection de la proie pour la dévoration manuelle.
+    DevourSelect,
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -78,6 +82,14 @@ pub enum SelectMonsterTarget {
     Breeding,
     Minigame,
 }
+
+/// Index du monstre sélectionné pour l'écran MonsterDetail.
+#[derive(Resource, Default)]
+pub struct SelectedMonsterIndex(pub usize);
+
+/// Index du monstre cible de la dévoration.
+#[derive(Resource, Default)]
+pub struct DevourTargetIndex(pub usize);
 
 // ═══════════════════════════════════════════════════════════════════
 //  Ressources globales du jeu
@@ -202,6 +214,8 @@ impl Plugin for GamePlugin {
         app.insert_resource(GameData::new(config.data_dir))
             .insert_resource(metrics)
             .insert_resource(crate::ui::screens::training::TrainingWild(false))
+            .init_resource::<SelectedMonsterIndex>()
+            .init_resource::<DevourTargetIndex>()
             .enable_state_scoped_entities::<GameScreen>()
             .add_systems(OnEnter(GameScreen::MainMenu), on_enter_main_menu)
             .add_systems(OnEnter(GameScreen::MonsterList), on_enter_monster_list)
@@ -241,6 +255,8 @@ impl Plugin for GamePlugin {
             .add_systems(OnEnter(GameScreen::MemoryPlay), on_enter_memory_play)
             .add_systems(OnEnter(GameScreen::ReflexPlay), on_enter_reflex_play)
             .add_systems(OnEnter(GameScreen::RpsPlay), on_enter_rps_play)
+            .add_systems(OnEnter(GameScreen::MonsterDetail), on_enter_monster_detail)
+            .add_systems(OnEnter(GameScreen::DevourSelect), on_enter_devour_select)
             .add_plugins(crate::battle_effects::BattleEffectsPlugin);
     }
 }
@@ -395,6 +411,14 @@ fn on_enter_reflex_play(_data: ResMut<GameData>) {
 
 fn on_enter_rps_play(_data: ResMut<GameData>) {
     // Le rps_game est déjà configuré avant la transition.
+}
+
+fn on_enter_monster_detail(_data: ResMut<GameData>) {
+    // SelectedMonsterIndex est positionné par monster_list avant la transition.
+}
+
+fn on_enter_devour_select(_data: ResMut<GameData>) {
+    // DevourTargetIndex et DevourConfirmState sont gérés par monster_detail.
 }
 
 /// Active le clavier système pour les écrans de saisie de texte.
