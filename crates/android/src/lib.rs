@@ -29,7 +29,7 @@ fn main() {
 
     #[cfg(target_os = "android")]
     let config = PlatformConfig {
-        safe_top: 48.0,
+        safe_top: 72.0,
         safe_bottom: 52.0,
         data_dir: std::path::PathBuf::from("/data/data/com.ajustor.monsterbattle/files"),
     };
