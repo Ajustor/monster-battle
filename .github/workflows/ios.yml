@@ -3,13 +3,15 @@ name: iOS Build
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build-ios:
-    name: Build iOS (aarch64-apple-ios)
+    name: Build iOS app
     runs-on: macos-latest
 
     steps:
@@ -31,12 +33,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-ios-
 
-      - name: Build iOS (arm64 device)
+      # 1. Compiler la lib Rust pour arm64 (device)
+      - name: Build Rust lib (arm64-apple-ios)
         run: cargo build -p monster-battle-ios --target aarch64-apple-ios --release
 
-      - name: Build iOS (x86_64 simulator)
+      # 2. Compiler la lib Rust pour x86_64 (simulator)
+      - name: Build Rust lib (x86_64-apple-ios)
         run: cargo build -p monster-battle-ios --target x86_64-apple-ios --release
 
+      # 3. Build du projet Xcode (lib déjà présente dans target/)
+      - name: Build Xcode project
+        run: |
+          xcodebuild build \
+            -project ios-app/monster-battle-ios.xcodeproj \
+            -scheme monster-battle-ios \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            CONFIGURATION_BUILD_DIR=../build/app
+
+      # 4. Créer la lib universelle (device + simulator)
       - name: Create universal library (lipo)
         run: |
           mkdir -p ios-out
@@ -44,7 +62,7 @@ jobs:
             target/aarch64-apple-ios/release/libmonster_battle_ios.a \
             target/x86_64-apple-ios/release/libmonster_battle_ios.a \
             -output ios-out/libmonster_battle_ios.a
-          echo "✅ Universal lib créée : $(ls -lh ios-out/libmonster_battle_ios.a)"
+          echo "✅ Universal lib : $(ls -lh ios-out/libmonster_battle_ios.a)"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
