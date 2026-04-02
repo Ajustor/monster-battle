@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "1498D2311E8E89230040F4C"
+               BlueprintIdentifier = "AA400001"
                BuildableName = "monster-battle-ios.app"
                BlueprintName = "monster-battle-ios"
                ReferencedContainer = "container:MonsterBattle.xcodeproj">
@@ -44,7 +44,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "1498D2311E8E89230040F4C"
+            BlueprintIdentifier = "AA400001"
             BuildableName = "monster-battle-ios.app"
             BlueprintName = "monster-battle-ios"
             ReferencedContainer = "container:MonsterBattle.xcodeproj">
@@ -61,7 +61,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "1498D2311E8E89230040F4C"
+            BlueprintIdentifier = "AA400001"
             BuildableName = "monster-battle-ios.app"
             BlueprintName = "monster-battle-ios"
             ReferencedContainer = "container:MonsterBattle.xcodeproj">
