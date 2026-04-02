@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
-use monster_battle_core::minigame::rps::{RoundOutcome, RpsGame};
+use monster_battle_core::minigame::rps::RoundOutcome;
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::ui::common::{colors, fonts, ScreenMetrics};
@@ -309,7 +309,8 @@ pub fn spawn_rps_play(mut commands: Commands, data: Res<GameData>,
 //  Input
 // ═══════════════════════════════════════════════════════════════════
 
-pub fn handle_rps_play_input(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn handle_rps_play_input(
     mut commands: Commands,
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -382,12 +383,11 @@ pub fn handle_rps_play_input(
             return;
         }
     } else if waiting_confirm && !needs_rebuild {
-        if keyboard.just_pressed(KeyCode::Enter) {
-            if let Some(ref mut game) = data.rps_game {
+        if keyboard.just_pressed(KeyCode::Enter)
+            && let Some(ref mut game) = data.rps_game {
                 game.confirm();
                 needs_rebuild = true;
             }
-        }
     } else if !needs_rebuild {
         // Sélection avec touches numériques
         let choice = if keyboard.just_pressed(KeyCode::Digit1) {
@@ -400,12 +400,11 @@ pub fn handle_rps_play_input(
             None
         };
 
-        if let Some(idx) = choice {
-            if let Some(ref mut game) = data.rps_game {
+        if let Some(idx) = choice
+            && let Some(ref mut game) = data.rps_game {
                 game.play(idx);
                 needs_rebuild = true;
             }
-        }
     }
 
     if keyboard.just_pressed(KeyCode::Escape) {

@@ -208,7 +208,7 @@ fn idx_to_difficulty(idx: usize) -> Difficulty {
     }
 }
 
-pub fn handle_minigame_select_input(
+pub(crate) fn handle_minigame_select_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
@@ -475,7 +475,8 @@ pub fn spawn_minigame_play(mut commands: Commands, data: Res<GameData>,
         });
 }
 
-pub fn handle_minigame_play_input(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn handle_minigame_play_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
@@ -510,12 +511,11 @@ pub fn handle_minigame_play_input(
     // Toucher une case (mobile)
     if !is_over {
         for (interaction, cell) in &cell_query {
-            if *interaction == Interaction::Pressed {
-                if let Some(ref mut game) = data.tictactoe {
+            if *interaction == Interaction::Pressed
+                && let Some(ref mut game) = data.tictactoe {
                     game.cursor = cell.index;
                     game.play();
                 }
-            }
         }
     }
 
@@ -556,7 +556,7 @@ pub fn handle_minigame_play_input(
         let status_msg = if game.is_over() {
             let reward = game.reward();
             if reward.is_empty() {
-                format!("{}", game.result_label())
+                game.result_label().to_string()
             } else {
                 format!("{} -- {}", game.result_label(), reward.summary())
             }

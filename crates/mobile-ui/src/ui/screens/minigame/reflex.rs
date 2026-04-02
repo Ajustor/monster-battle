@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use bevy::state::state::NextState;
 
-use monster_battle_core::minigame::reflex::{Arrow, ReflexGame, RoundResult};
+use monster_battle_core::minigame::reflex::{Arrow, RoundResult};
 
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::ui::common::{colors, fonts, ScreenMetrics};
@@ -99,8 +99,8 @@ pub fn spawn_reflex_play(mut commands: Commands, data: Res<GameData>,
             ));
 
             // Flèche à deviner (grande)
-            if !game.is_over() {
-                if let Some(arrow) = game.current_arrow() {
+            if !game.is_over()
+                && let Some(arrow) = game.current_arrow() {
                     parent.spawn((
                         Text::new(arrow.symbol().to_string()),
                         TextFont {
@@ -114,7 +114,6 @@ pub fn spawn_reflex_play(mut commands: Commands, data: Res<GameData>,
                         },
                     ));
                 }
-            }
 
             // Historique dernier résultat
             if let Some(last) = game.results.last() {
@@ -286,7 +285,8 @@ fn spawn_arrow_btn(parent: &mut ChildBuilder, arrow: Arrow) {
 //  Input
 // ═══════════════════════════════════════════════════════════════════
 
-pub fn handle_reflex_play_input(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn handle_reflex_play_input(
     mut commands: Commands,
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -327,12 +327,11 @@ pub fn handle_reflex_play_input(
     // Toucher une flèche
     if !is_over {
         for (interaction, arrow_btn) in &arrow_query {
-            if *interaction == Interaction::Pressed {
-                if let Some(ref mut game) = data.reflex_game {
+            if *interaction == Interaction::Pressed
+                && let Some(ref mut game) = data.reflex_game {
                     game.submit(arrow_btn.arrow);
                     needs_rebuild = true;
                 }
-            }
         }
     }
 
@@ -350,12 +349,11 @@ pub fn handle_reflex_play_input(
             None
         };
 
-        if let Some(a) = arrow {
-            if let Some(ref mut game) = data.reflex_game {
+        if let Some(a) = arrow
+            && let Some(ref mut game) = data.reflex_game {
                 game.submit(a);
                 needs_rebuild = true;
             }
-        }
     } else if keyboard.just_pressed(KeyCode::Enter) {
         apply_minigame_reward(&mut data);
         clear_minigame_state(&mut data);

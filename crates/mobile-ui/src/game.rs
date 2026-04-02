@@ -287,13 +287,12 @@ fn on_enter_monster_list(mut data: ResMut<GameData>) {
         let idx = data
             .monster_select_index
             .min(monsters.len().saturating_sub(1));
-        if let Some(monster) = monsters.get_mut(idx) {
-            if let Some(event) = monster.try_random_event() {
+        if let Some(monster) = monsters.get_mut(idx)
+            && let Some(event) = monster.try_random_event() {
                 let msg = monster.apply_event(&event);
                 let _ = data.storage.save(monster);
                 data.event_message = Some(msg);
             }
-        }
     }
 }
 

@@ -104,7 +104,7 @@ pub fn pixel_grid_to_image(
 ) -> Image {
     let palette = type_palette(element);
     let sec_palette = secondary
-        .map(|e| type_palette(e))
+        .map(type_palette)
         .unwrap_or_else(|| type_palette(element));
     let resolver: fn(u8, &TypePalette, &TypePalette) -> [u8; 4] = if matches!(age, AgeStage::Old) {
         resolve_pixel_old
@@ -115,8 +115,7 @@ pub fn pixel_grid_to_image(
     let mut data = Vec::with_capacity(size * size * 4);
 
     for row in grid.iter() {
-        for col in 0..size {
-            let ch = row[col];
+        for &ch in row.iter().take(size) {
             let rgba = resolver(ch, &palette, &sec_palette);
             data.extend_from_slice(&rgba);
         }
@@ -146,8 +145,7 @@ pub fn pixel_grid_to_image_hit(grid: &BlendedGrid) -> Image {
     let mut data = Vec::with_capacity(size * size * 4);
 
     for row in grid.iter() {
-        for col in 0..size {
-            let ch = row[col];
+        for &ch in row.iter().take(size) {
             let rgba = resolve_pixel(ch, &red_palette, &red_palette);
             data.extend_from_slice(&rgba);
         }

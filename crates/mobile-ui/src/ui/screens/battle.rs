@@ -93,7 +93,7 @@ pub(crate) fn spawn_battle_ui(
 fn spawn_battle_ui_inner(
     commands: &mut Commands,
     battle: &BattleState,
-    mut images: &mut Assets<Image>,
+    images: &mut Assets<Image>,
     atlas: &mut sprites::MonsterSpriteAtlas,
     safe_top: f32,
     safe_bottom: f32,
@@ -220,13 +220,13 @@ fn spawn_battle_ui_inner(
                     battle.opponent.secondary_element,
                     battle.opponent.age_stage,
                     &grid,
-                    &mut images,
+                    images,
                 );
 
                 // Le sprite reste visible tant que l'animation de K.O. n'a pas été
                 // déclenchée (message courant ou encore dans la file).
                 let faint_still_pending = battle.opponent.current_hp == 0
-                    && (battle.current_message.as_ref().map_or(false, |m| {
+                    && (battle.current_message.as_ref().is_some_and(|m| {
                         matches!(m.anim_type, Some(AnimationType::OpponentFaint))
                     }) || battle
                         .message_queue
@@ -273,13 +273,13 @@ fn spawn_battle_ui_inner(
                     battle.player.secondary_element,
                     battle.player.age_stage,
                     &grid,
-                    &mut images,
+                    images,
                 );
 
                 // Même logique : garder le sprite visible jusqu'à ce que
                 // l'animation de K.O. ait été consommée.
                 let faint_still_pending = battle.player.current_hp == 0
-                    && (battle.current_message.as_ref().map_or(false, |m| {
+                    && (battle.current_message.as_ref().is_some_and(|m| {
                         matches!(m.anim_type, Some(AnimationType::PlayerFaint))
                     }) || battle
                         .message_queue
@@ -586,6 +586,7 @@ fn spawn_battle_ui_inner(
 }
 
 /// Gestion des entrées en combat.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_battle_input(
     mut commands: Commands,
     mut data: ResMut<GameData>,
@@ -803,9 +804,9 @@ pub(crate) fn handle_battle_input(
         Action::None => {}
         Action::Rebuild => {
             // Déclencher une animation si le message courant en contient une
-            if let Some(ref battle) = data.battle_state {
-                if let Some(ref msg) = battle.current_message {
-                    if let Some(ref anim) = msg.anim_type {
+            if let Some(ref battle) = data.battle_state
+                && let Some(ref msg) = battle.current_message
+                    && let Some(ref anim) = msg.anim_type {
                         let duration = anim.duration();
                         commands.insert_resource(BattleAnimTimer {
                             timer: Timer::from_seconds(duration, TimerMode::Once),
@@ -835,8 +836,6 @@ pub(crate) fn handle_battle_input(
                             _ => {}
                         }
                     }
-                }
-            }
             // Supprimer l'ancienne UI
             for entity in &screen_entities {
                 commands.entity(entity).despawn_recursive();
@@ -858,11 +857,10 @@ pub(crate) fn handle_battle_input(
         }
         Action::PvpSendAttack(idx) => {
             // Envoyer le choix au serveur via le canal
-            if let Some(ref net) = net_task {
-                if let Some(ref tx) = net.attack_tx {
+            if let Some(ref net) = net_task
+                && let Some(ref tx) = net.attack_tx {
                     let _ = tx.try_send(idx);
                 }
-            }
             // Passer en mode "attente du serveur"
             if let Some(ref mut battle) = data.battle_state {
                 battle.phase = BattlePhase::Executing;
@@ -879,11 +877,10 @@ pub(crate) fn handle_battle_input(
         }
         Action::PvpSendReady => {
             // Envoyer PvpReady au serveur (sentinel usize::MAX - 1)
-            if let Some(ref net) = net_task {
-                if let Some(ref tx) = net.attack_tx {
+            if let Some(ref net) = net_task
+                && let Some(ref tx) = net.attack_tx {
                     let _ = tx.try_send(usize::MAX - 1);
                 }
-            }
             // Nettoyer le message et attendre PvpNextTurn
             if let Some(ref mut battle) = data.battle_state {
                 battle.current_message = None;
@@ -898,11 +895,10 @@ pub(crate) fn handle_battle_input(
         }
         Action::PvpForfeit => {
             // Envoyer le forfait au serveur (sentinel usize::MAX)
-            if let Some(ref net) = net_task {
-                if let Some(ref tx) = net.attack_tx {
+            if let Some(ref net) = net_task
+                && let Some(ref tx) = net.attack_tx {
                     let _ = tx.try_send(usize::MAX);
                 }
-            }
             commands.remove_resource::<NetTask>();
             data.battle_state = None;
             data.message = Some("Vous avez abandonné le combat PvP.".to_string());
@@ -1022,6 +1018,7 @@ pub(crate) fn refresh_battle_ui(
 }
 
 /// Anime les barres de PV et le texte associé (transition fluide vers la valeur cible).
+#[allow(clippy::type_complexity)]
 pub(crate) fn animate_hp_bars(
     mut data: ResMut<GameData>,
     time: Res<Time>,
@@ -1147,6 +1144,7 @@ pub(crate) fn animate_waiting_dots(
 }
 
 /// Anime les sprites en cas d'attaque ou de hit (style Pokémon).
+#[allow(clippy::type_complexity)]
 pub(crate) fn animate_battle_sprites(
     mut commands: Commands,
     time: Res<Time>,
@@ -1225,7 +1223,7 @@ pub(crate) fn animate_battle_sprites(
 
                 // Clignotement rapide (toggle visible/invisible)
                 let blink_cycle = (progress * 20.0) as u32;
-                *vis = if blink_cycle % 2 == 0 {
+                *vis = if blink_cycle.is_multiple_of(2) {
                     Visibility::Visible
                 } else {
                     Visibility::Hidden
@@ -1240,7 +1238,7 @@ pub(crate) fn animate_battle_sprites(
                 node.left = Val::Px(shake);
 
                 let blink_cycle = (progress * 20.0) as u32;
-                *vis = if blink_cycle % 2 == 0 {
+                *vis = if blink_cycle.is_multiple_of(2) {
                     Visibility::Visible
                 } else {
                     Visibility::Hidden
@@ -1254,7 +1252,7 @@ pub(crate) fn animate_battle_sprites(
                 let shake = (progress * 35.0 * std::f32::consts::PI).sin() * shake_amp;
                 node.left = Val::Px(shake);
                 let blink_cycle = (progress * 24.0) as u32;
-                *vis = if blink_cycle % 2 == 0 { Visibility::Visible } else { Visibility::Hidden };
+                *vis = if blink_cycle.is_multiple_of(2) { Visibility::Visible } else { Visibility::Hidden };
             }
         }
         AnimationType::OpponentHitCritical => {
@@ -1264,7 +1262,7 @@ pub(crate) fn animate_battle_sprites(
                 let shake = (progress * 35.0 * std::f32::consts::PI).sin() * shake_amp;
                 node.left = Val::Px(shake);
                 let blink_cycle = (progress * 24.0) as u32;
-                *vis = if blink_cycle % 2 == 0 { Visibility::Visible } else { Visibility::Hidden };
+                *vis = if blink_cycle.is_multiple_of(2) { Visibility::Visible } else { Visibility::Hidden };
             }
         }
         AnimationType::PlayerFaint => {

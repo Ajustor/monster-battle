@@ -623,6 +623,7 @@ fn spawn_food_overlay(commands: &mut Commands, data: &GameData) {
 }
 
 /// Gestion des entrées de la liste des monstres.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_monster_list_input(
     mut commands: Commands,
     mut data: ResMut<GameData>,
@@ -779,13 +780,12 @@ fn check_random_event(data: &mut ResMut<GameData>) {
     let idx = data
         .monster_select_index
         .min(monsters.len().saturating_sub(1));
-    if let Some(monster) = monsters.get_mut(idx) {
-        if let Some(event) = monster.try_random_event() {
+    if let Some(monster) = monsters.get_mut(idx)
+        && let Some(event) = monster.try_random_event() {
             let msg = monster.apply_event(&event);
             let _ = data.storage.save(monster);
             data.event_message = Some(msg);
         }
-    }
 }
 
 /// Nourrit le monstre sélectionné avec un type de nourriture spécifique.

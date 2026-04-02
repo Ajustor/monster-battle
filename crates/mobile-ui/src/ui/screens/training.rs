@@ -272,6 +272,7 @@ fn spawn_training_inner(commands: &mut Commands, data: &GameData, wild: bool, sa
 }
 
 /// Gestion des entrées sur l'écran d'entraînement.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn handle_training_input(
     mut commands: Commands,
     mut data: ResMut<GameData>,

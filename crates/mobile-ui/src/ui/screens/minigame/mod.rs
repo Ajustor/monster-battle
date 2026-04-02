@@ -15,17 +15,17 @@ use monster_battle_storage::MonsterStorage;
 use crate::game::{GameData, GameScreen, ScreenEntity};
 use crate::ui::common::{colors, fonts, ScreenMetrics};
 
-// Re-exports pour ui/mod.rs (pub car le crate est une lib)
-pub use memory::handle_memory_play_input;
-pub use memory::spawn_memory_play;
-pub use reflex::handle_reflex_play_input;
-pub use reflex::spawn_reflex_play;
-pub use rps::handle_rps_play_input;
-pub use rps::spawn_rps_play;
-pub use tictactoe::handle_minigame_play_input;
-pub use tictactoe::handle_minigame_select_input;
-pub use tictactoe::spawn_minigame_play;
-pub use tictactoe::spawn_minigame_select;
+// Re-exports pour ui/mod.rs
+pub(crate) use memory::handle_memory_play_input;
+pub(crate) use memory::spawn_memory_play;
+pub(crate) use reflex::handle_reflex_play_input;
+pub(crate) use reflex::spawn_reflex_play;
+pub(crate) use rps::handle_rps_play_input;
+pub(crate) use rps::spawn_rps_play;
+pub(crate) use tictactoe::handle_minigame_play_input;
+pub(crate) use tictactoe::handle_minigame_select_input;
+pub(crate) use tictactoe::spawn_minigame_play;
+pub(crate) use tictactoe::spawn_minigame_select;
 
 // ═══════════════════════════════════════════════════════════════════
 //  Composants partagés
@@ -178,7 +178,7 @@ pub fn spawn_minigame_type_select(mut commands: Commands, data: Res<GameData>,
         });
 }
 
-pub fn handle_minigame_type_select_input(
+pub(crate) fn handle_minigame_type_select_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
@@ -253,8 +253,8 @@ pub(crate) fn apply_minigame_reward(data: &mut ResMut<GameData>) {
         return;
     };
 
-    if let Ok(mut monsters) = data.storage.list_alive() {
-        if let Some(m) = monsters.iter_mut().find(|m| m.id == monster_id) {
+    if let Ok(mut monsters) = data.storage.list_alive()
+        && let Some(m) = monsters.iter_mut().find(|m| m.id == monster_id) {
             apply_reward(&mut m.base_stats, &reward);
             let levels = m.gain_xp(reward.xp);
             m.adjust_happiness(10);
@@ -271,7 +271,6 @@ pub(crate) fn apply_minigame_reward(data: &mut ResMut<GameData>) {
             data.message = Some(msg);
             let _ = data.storage.save(m);
         }
-    }
 }
 
 /// Nettoie tous les états de mini-jeu.

@@ -81,7 +81,7 @@ fn tint_for_element(element: ElementType) -> Color {
 
 /// Composant interne : liste des chemins de frames.
 #[derive(Component)]
-struct AttackFrames {
+pub(crate) struct AttackFrames {
     paths: Vec<String>,
 }
 
@@ -150,7 +150,7 @@ pub fn handle_play_attack_effect(
 }
 
 /// Avance les frames de chaque effet d'attaque.
-pub fn animate_attack_effects(
+pub(crate) fn animate_attack_effects(
     time: Res<Time>,
     asset_server: Res<AssetServer>,
     mut query: Query<(&mut AttackEffect, &AttackFrames, &mut ImageNode)>,

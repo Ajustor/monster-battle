@@ -218,7 +218,8 @@ pub fn spawn_memory_play(mut commands: Commands, data: Res<GameData>,
 //  Input
 // ═══════════════════════════════════════════════════════════════════
 
-pub fn handle_memory_play_input(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn handle_memory_play_input(
     mut data: ResMut<GameData>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameScreen>>,
@@ -257,8 +258,8 @@ pub fn handle_memory_play_input(
     // Toucher une carte
     if !is_over {
         for (interaction, card) in &card_query {
-            if *interaction == Interaction::Pressed {
-                if let Some(ref mut game) = data.memory_game {
+            if *interaction == Interaction::Pressed
+                && let Some(ref mut game) = data.memory_game {
                     if game.needs_dismiss {
                         game.dismiss();
                     } else {
@@ -266,7 +267,6 @@ pub fn handle_memory_play_input(
                         game.reveal();
                     }
                 }
-            }
         }
     }
 
@@ -311,7 +311,7 @@ pub fn handle_memory_play_input(
         let status_msg = if game.is_over() {
             let reward = game.reward();
             if reward.is_empty() {
-                format!("{}", game.result_label())
+                game.result_label().to_string()
             } else {
                 format!("{} -- {}", game.result_label(), reward.summary())
             }

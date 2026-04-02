@@ -216,16 +216,14 @@ pub(crate) fn handle_menu_input(
     }
 
     // ── Clavier (desktop dev) ────────────────────────────────────
-    if keyboard.just_pressed(KeyCode::ArrowUp) {
-        if data.menu_index > 0 {
+    if keyboard.just_pressed(KeyCode::ArrowUp)
+        && data.menu_index > 0 {
             data.menu_index -= 1;
         }
-    }
-    if keyboard.just_pressed(KeyCode::ArrowDown) {
-        if data.menu_index < entry_count - 1 {
+    if keyboard.just_pressed(KeyCode::ArrowDown)
+        && data.menu_index < entry_count - 1 {
             data.menu_index += 1;
         }
-    }
     if keyboard.just_pressed(KeyCode::Enter) {
         activate_menu_entry(
             &mut commands,

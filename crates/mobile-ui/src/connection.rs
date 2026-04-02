@@ -502,6 +502,7 @@ fn handle_update_button(
 }
 
 /// Ouvre l'URL de mise à jour dans le navigateur.
+#[allow(dead_code)]
 fn open_update_url() {
     #[cfg(target_os = "android")]
     {

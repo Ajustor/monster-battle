@@ -293,6 +293,7 @@ pub(crate) fn refresh_select_attacks_ui(
 }
 
 /// Gestion des interactions de l'écran de sélection d'attaques.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_select_attacks_input(
     mut commands: Commands,
     mut data: ResMut<GameData>,
