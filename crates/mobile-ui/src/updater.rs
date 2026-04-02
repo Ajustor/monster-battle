@@ -145,30 +145,15 @@ fn android_start_download(server_version: &str) -> Result<i64, String> {
             &[JValue::Object(&mime)],
         )?;
 
-        // Destination dans le cache interne de l'app (pas de permission requise)
-        // getFilesDir() retourne /data/data/<package>/files/
-        let files_dir = env
-            .call_method(&activity, "getFilesDir", "()Ljava/io/File;", &[])?
-            .l()?;
-        let files_path = env
-            .call_method(&files_dir, "getAbsolutePath", "()Ljava/lang/String;", &[])?
-            .l()?;
-        let files_path_str: String = env.get_string(&files_path.into())?.into();
-        let dest_path = format!("{}/monster-battle.apk", files_path_str);
-        let dest_uri_str = env.new_string(format!("file://{}", dest_path))?;
-        let dest_uri = env
-            .call_static_method(
-                "android/net/Uri",
-                "parse",
-                "(Ljava/lang/String;)Landroid/net/Uri;",
-                &[JValue::Object(&dest_uri_str)],
-            )?
-            .l()?;
+        // Destination dans le dossier externe de l'app (pas de permission requise API 29+)
+        // Environment.DIRECTORY_DOWNLOADS = "Downloads"
+        let dir_type = env.new_string("Downloads")?;
+        let subpath = env.new_string("monster-battle.apk")?;
         env.call_method(
             &request,
-            "setDestinationUri",
-            "(Landroid/net/Uri;)Landroid/app/DownloadManager$Request;",
-            &[JValue::Object(&dest_uri)],
+            "setDestinationInExternalFilesDir",
+            "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Landroid/app/DownloadManager$Request;",
+            &[JValue::Object(&activity), JValue::Object(&dir_type), JValue::Object(&subpath)],
         )?;
 
         let download_id = env
@@ -303,14 +288,23 @@ fn android_trigger_install(apk_path: &str) -> Result<(), String> {
     use jni::objects::{JByteArray, JObject, JValue};
     use std::io::Read;
 
-    let local_path = apk_path.trim_start_matches("file://");
+    // Nettoyer le chemin (local_uri peut commencer par file:// ou être un chemin direct)
+    let local_path = if apk_path.starts_with("file://") {
+        apk_path.trim_start_matches("file://").to_string()
+    } else {
+        apk_path.to_string()
+    };
+
+    log::info!("📦 Installation APK depuis : {}", local_path);
 
     // Lire le contenu de l'APK
     let mut apk_bytes = Vec::new();
-    std::fs::File::open(local_path)
-        .map_err(|e| format!("Impossible d'ouvrir l'APK : {}", e))?
+    std::fs::File::open(&local_path)
+        .map_err(|e| format!("Impossible d'ouvrir l'APK '{}': {}", local_path, e))?
         .read_to_end(&mut apk_bytes)
         .map_err(|e| format!("Impossible de lire l'APK : {}", e))?;
+
+    log::info!("📦 APK lu : {} octets", apk_bytes.len());
 
     let app = bevy::window::ANDROID_APP
         .get()
