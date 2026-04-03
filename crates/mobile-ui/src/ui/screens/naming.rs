@@ -288,13 +288,32 @@ fn handle_text_input(
     }
 }
 
-/// Tente de créer le monstre starter.
+/// Tente de créer le monstre starter ou de renommer un existant.
 fn try_create_monster(data: &mut ResMut<GameData>, next_state: &mut ResMut<NextState<GameScreen>>) {
     if data.name_input.trim().is_empty() {
         data.message = Some("Le nom ne peut pas être vide !".to_string());
         return;
     }
 
+    // Mode renommage : on met à jour le nom du monstre existant
+    if data.is_renaming {
+        let monsters = data.storage.list_alive().unwrap_or_default();
+        let idx = data.monster_select_index.min(monsters.len().saturating_sub(1));
+        if let Some(mut monster) = monsters.into_iter().nth(idx) {
+            let new_name = data.name_input.trim().to_string();
+            monster.name = new_name.clone();
+            match data.storage.save(&monster) {
+                Ok(()) => data.message = Some(format!("{} a été renommé !", new_name)),
+                Err(e) => data.message = Some(format!("Erreur : {}", e)),
+            }
+        }
+        data.is_renaming = false;
+        data.name_input.clear();
+        next_state.set(GameScreen::MonsterDetail);
+        return;
+    }
+
+    // Mode création
     if data.has_living_monster() {
         data.message = Some("Vous avez déjà un monstre vivant !".to_string());
         next_state.set(GameScreen::MainMenu);

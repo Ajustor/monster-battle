@@ -116,6 +116,7 @@ pub fn handle_play_attack_effect(
                 ..default()
             },
             GlobalZIndex(50),
+            Visibility::Visible,
         );
 
         if let Some(parent) = container {

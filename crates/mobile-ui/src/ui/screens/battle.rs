@@ -60,15 +60,23 @@ pub(crate) struct WaitingDots {
 #[derive(Component)]
 pub(crate) struct BattleRootNode;
 
-/// Ressource pour l'effet de zoom lors d'une attaque (style Pokémon).
+/// Phase du zoom séquentiel style Pokémon.
+#[derive(Default, PartialEq, Clone)]
+pub(crate) enum ZoomPhase {
+    #[default]
+    Idle,
+    AttackerZoom,
+    DefenderZoom,
+    ReturnGlobal,
+}
+
+/// Ressource pour le zoom séquentiel : attaquant → défenseur → global.
 #[derive(Resource, Default)]
 pub(crate) struct BattleZoomAnim {
-    /// 0.0 = pas de zoom, 1.0 = zoom max
+    pub phase: ZoomPhase,
     pub progress: f32,
-    /// 1.0 = zoom in, -1.0 = zoom out
-    pub direction: f32,
-    /// true si actif
-    pub active: bool,
+    /// true = joueur attaque, false = adversaire attaque
+    pub is_player_attack: bool,
 }
 
 /// Ressource qui gère l'état global de l'animation de combat.
@@ -118,6 +126,8 @@ pub(crate) fn spawn_battle_ui(
             height: Val::Percent(100.0),
             ..default()
         },
+        BackgroundColor(Color::NONE),
+        Visibility::Visible,
         GlobalZIndex(50),
         BattleEffectsContainer,
         bevy::state::state_scoped::StateScoped(GameScreen::Battle),
@@ -1402,47 +1412,71 @@ pub(crate) fn animate_idle_sprites(
     }
 }
 
-/// Zoom rapide sur le nœud racine lors d'une attaque (style Pokémon).
+/// Zoom séquentiel : attaquant → défenseur → retour global (style Pokémon).
 pub(crate) fn animate_attack_zoom(
     time: Res<Time>,
     anim_timer: Option<Res<BattleAnimTimer>>,
     mut zoom: ResMut<BattleZoomAnim>,
-    mut root_query: Query<&mut Transform, With<BattleRootNode>>,
+    mut player_node: Query<&mut Node, (With<PlayerSprite>, Without<OpponentSprite>)>,
+    mut opponent_node: Query<&mut Node, (With<OpponentSprite>, Without<PlayerSprite>)>,
 ) {
-    // Déclencher le zoom si une animation d'attaque démarre
-    if let Some(ref anim) = anim_timer {
-        match &anim.anim {
-            AnimationType::PlayerAttack | AnimationType::OpponentAttack => {
-                if !zoom.active {
-                    zoom.active = true;
+    // Détecter le début d'une attaque
+    if zoom.phase == ZoomPhase::Idle {
+        if let Some(ref anim) = anim_timer {
+            match &anim.anim {
+                AnimationType::PlayerAttack => {
+                    zoom.phase = ZoomPhase::AttackerZoom;
                     zoom.progress = 0.0;
-                    zoom.direction = 1.0;
+                    zoom.is_player_attack = true;
                 }
+                AnimationType::OpponentAttack => {
+                    zoom.phase = ZoomPhase::AttackerZoom;
+                    zoom.progress = 0.0;
+                    zoom.is_player_attack = false;
+                }
+                _ => {}
             }
-            _ => {}
         }
-    } else if zoom.active {
-        zoom.active = false;
-    }
-
-    if !zoom.active && zoom.progress == 0.0 {
         return;
     }
 
-    // Animer le zoom
-    zoom.progress += time.delta_secs() * zoom.direction * 8.0;
+    let speed = match zoom.phase {
+        ZoomPhase::AttackerZoom => 4.0,
+        ZoomPhase::DefenderZoom => 4.0,
+        ZoomPhase::ReturnGlobal => 5.0,
+        ZoomPhase::Idle => return,
+    };
+    zoom.progress += time.delta_secs() * speed;
+
     if zoom.progress >= 1.0 {
-        zoom.progress = 1.0;
-        zoom.direction = -1.0; // retour
-    } else if zoom.progress <= 0.0 {
         zoom.progress = 0.0;
-        zoom.direction = 1.0;
+        zoom.phase = match zoom.phase {
+            ZoomPhase::AttackerZoom => ZoomPhase::DefenderZoom,
+            ZoomPhase::DefenderZoom => ZoomPhase::ReturnGlobal,
+            ZoomPhase::ReturnGlobal | ZoomPhase::Idle => ZoomPhase::Idle,
+        };
     }
 
-    // Appliquer : scale de 1.0 à 1.12
-    let scale = 1.0 + 0.12 * (zoom.progress * std::f32::consts::PI).sin();
-    for mut transform in &mut root_query {
-        transform.scale = Vec3::splat(scale);
+    let t = (zoom.progress * std::f32::consts::PI).sin();
+    let (attacker_scale, defender_scale) = match zoom.phase {
+        ZoomPhase::AttackerZoom => (1.0 + 0.20 * t, 1.0),
+        ZoomPhase::DefenderZoom => (1.0, 1.0 + 0.15 * t),
+        _ => (1.0, 1.0),
+    };
+    let (player_scale, opp_scale) = if zoom.is_player_attack {
+        (attacker_scale, defender_scale)
+    } else {
+        (defender_scale, attacker_scale)
+    };
+
+    let base = 80.0_f32;
+    if let Ok(mut node) = player_node.get_single_mut() {
+        node.width  = Val::Px(base * player_scale);
+        node.height = Val::Px(base * player_scale);
+    }
+    if let Ok(mut node) = opponent_node.get_single_mut() {
+        node.width  = Val::Px(base * opp_scale);
+        node.height = Val::Px(base * opp_scale);
     }
 }
 
