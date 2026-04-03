@@ -115,23 +115,8 @@ pub(crate) fn spawn_battle_ui(
         None => return,
     };
 
-    // Conteneur persistent pour les effets d'attaque — séparé de l'UI principale
-    // pour survivre aux rebuilds. StateScoped le supprime quand on quitte Battle.
-    commands.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(0.0),
-            top: Val::Px(0.0),
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            ..default()
-        },
-        BackgroundColor(Color::NONE),
-        Visibility::Visible,
-        GlobalZIndex(50),
-        BattleEffectsContainer,
-        bevy::state::state_scoped::StateScoped(GameScreen::Battle),
-    ));
+    // Le BattleEffectsContainer est créé dans spawn_battle_ui_inner
+    // comme enfant du nœud racine — garanti dans la hiérarchie UI.
 
     spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
 }
@@ -635,6 +620,23 @@ fn spawn_battle_ui_inner(
                 }
             });
 
+            // Overlay pour les effets d'attaque — spawné à chaque rebuild,
+            // mais les effets durent < 1s donc la perte lors du rebuild est imperceptible.
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    top: Val::Px(0.0),
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    overflow: Overflow::visible(),
+                    ..default()
+                },
+                BackgroundColor(Color::NONE),
+                Visibility::Visible,
+                GlobalZIndex(50),
+                BattleEffectsContainer,
+            ));
         });
 }
 
