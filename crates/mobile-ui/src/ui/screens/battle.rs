@@ -1417,15 +1417,22 @@ pub(crate) fn animate_idle_sprites(
 /// Zoom caméra séquentiel style Pokémon N&B.
 /// Simule un travelling caméra en scalant + translatant le nœud racine :
 ///   Phase 1 (AttackerZoom) : zoom vers l'attaquant
-///   Phase 2 (DefenderZoom) : pan vers le défenseur (zoom maintenu)
-///   Phase 3 (ReturnGlobal) : retour vue globale
+///   Phase 1 (AttackerZoom) : le sprite attaquant grossit, s'approche du centre
+///   Phase 2 (DefenderZoom) : l'attaquant revient, le défenseur grossit
+///   Phase 3 (ReturnGlobal) : retour tailles normales
+///
+/// On manipule directement width/height des sprites — pas de Transform global.
 pub(crate) fn animate_attack_zoom(
     time: Res<Time>,
     anim_timer: Option<Res<BattleAnimTimer>>,
     mut zoom: ResMut<BattleZoomAnim>,
-    mut root_query: Query<&mut Transform, With<BattleRootNode>>,
-    windows: Query<&Window>,
+    mut player_node: Query<&mut Node, (With<PlayerSprite>, Without<OpponentSprite>)>,
+    mut opponent_node: Query<&mut Node, (With<OpponentSprite>, Without<PlayerSprite>)>,
 ) {
+    // Tailles de base des sprites
+    let player_base = 112.0_f32;
+    let opp_base = 80.0_f32;
+
     // Détecter le début d'une attaque
     if zoom.phase == ZoomPhase::Idle {
         if let Some(ref anim) = anim_timer {
@@ -1447,9 +1454,9 @@ pub(crate) fn animate_attack_zoom(
     }
 
     let speed = match zoom.phase {
-        ZoomPhase::AttackerZoom => 5.0,  // 0.2s
-        ZoomPhase::DefenderZoom => 5.0,  // 0.2s
-        ZoomPhase::ReturnGlobal => 4.0,  // 0.25s
+        ZoomPhase::AttackerZoom => 5.0,
+        ZoomPhase::DefenderZoom => 5.0,
+        ZoomPhase::ReturnGlobal => 4.0,
         ZoomPhase::Idle => return,
     };
     zoom.progress += time.delta_secs() * speed;
@@ -1459,63 +1466,73 @@ pub(crate) fn animate_attack_zoom(
         zoom.phase = match zoom.phase {
             ZoomPhase::AttackerZoom => ZoomPhase::DefenderZoom,
             ZoomPhase::DefenderZoom => ZoomPhase::ReturnGlobal,
-            ZoomPhase::ReturnGlobal | ZoomPhase::Idle => ZoomPhase::Idle,
+            ZoomPhase::ReturnGlobal | ZoomPhase::Idle => {
+                // Remettre les tailles de base
+                if let Ok(mut node) = player_node.get_single_mut() {
+                    node.width  = Val::Px(player_base);
+                    node.height = Val::Px(player_base);
+                }
+                if let Ok(mut node) = opponent_node.get_single_mut() {
+                    node.width  = Val::Px(opp_base);
+                    node.height = Val::Px(opp_base);
+                }
+                ZoomPhase::Idle
+            }
         };
+        return;
     }
 
     // ease in-out
     let t = zoom.progress;
     let ease = t * t * (3.0 - 2.0 * t);
 
-    // Taille de l'écran pour calculer les offsets de pivot
-    let (w, h) = windows
-        .get_single()
-        .map(|win| (win.width(), win.height()))
-        .unwrap_or((480.0, 854.0));
+    // Facteur de zoom max sur le sprite ciblé
+    let zoom_factor = 2.0_f32;
 
-    // Position des monstres relative au centre de l'écran :
-    //   Joueur  : bas-gauche  → (-25% W, +30% H)
-    //   Adversaire : haut-droite → (+20% W, -25% H)
-    let player_pivot  = Vec2::new(-w * 0.25, h * 0.30);
-    let opp_pivot     = Vec2::new( w * 0.20, -h * 0.25);
-
-    let (attacker_pivot, defender_pivot) = if zoom.is_player_attack {
-        (player_pivot, opp_pivot)
-    } else {
-        (opp_pivot, player_pivot)
-    };
-
-    // Zoom vers un pivot : translation = -pivot * (scale - 1)
-    // Cela compense exactement le déplacement dû au scale et centre le zoom sur le pivot.
-    let zoom_scale = 1.6_f32;
-
-    let (target_scale, target_tx, target_ty) = match zoom.phase {
+    // Calculer les tailles selon la phase
+    let (player_size, opp_size) = match zoom.phase {
         ZoomPhase::AttackerZoom => {
-            let s = 1.0 + (zoom_scale - 1.0) * ease;
-            let tx = -attacker_pivot.x * (s - 1.0);
-            let ty = -attacker_pivot.y * (s - 1.0);
-            (s, tx, ty)
+            // L'attaquant grossit, le défenseur reste normal
+            if zoom.is_player_attack {
+                let s = 1.0 + (zoom_factor - 1.0) * ease;
+                (player_base * s, opp_base)
+            } else {
+                let s = 1.0 + (zoom_factor - 1.0) * ease;
+                (player_base, opp_base * s)
+            }
         }
         ZoomPhase::DefenderZoom => {
-            // Pan : glissement du pivot attaquant → défenseur, scale maintenu
-            let pivot = attacker_pivot.lerp(defender_pivot, ease);
-            let tx = -pivot.x * (zoom_scale - 1.0);
-            let ty = -pivot.y * (zoom_scale - 1.0);
-            (zoom_scale, tx, ty)
+            // L'attaquant revient, le défenseur grossit
+            if zoom.is_player_attack {
+                let atk = 1.0 + (zoom_factor - 1.0) * (1.0 - ease);
+                let def = 1.0 + (zoom_factor - 1.0) * ease;
+                (player_base * atk, opp_base * def)
+            } else {
+                let atk = 1.0 + (zoom_factor - 1.0) * (1.0 - ease);
+                let def = 1.0 + (zoom_factor - 1.0) * ease;
+                (player_base * def, opp_base * atk)
+            }
         }
         ZoomPhase::ReturnGlobal => {
-            // Retour : scale → 1.0, translation → 0
-            let s = zoom_scale + (1.0 - zoom_scale) * ease;
-            let tx = -defender_pivot.x * (s - 1.0);
-            let ty = -defender_pivot.y * (s - 1.0);
-            (s, tx, ty)
+            // Retour progressif à la taille normale
+            if zoom.is_player_attack {
+                let def = 1.0 + (zoom_factor - 1.0) * (1.0 - ease);
+                (player_base, opp_base * def)
+            } else {
+                let def = 1.0 + (zoom_factor - 1.0) * (1.0 - ease);
+                (player_base * def, opp_base)
+            }
         }
-        ZoomPhase::Idle => (1.0, 0.0, 0.0),
+        ZoomPhase::Idle => (player_base, opp_base),
     };
 
-    for mut transform in &mut root_query {
-        transform.scale = Vec3::splat(target_scale);
-        transform.translation = Vec3::new(target_tx, target_ty, 0.0);
+    if let Ok(mut node) = player_node.get_single_mut() {
+        node.width  = Val::Px(player_size);
+        node.height = Val::Px(player_size);
+    }
+    if let Ok(mut node) = opponent_node.get_single_mut() {
+        node.width  = Val::Px(opp_size);
+        node.height = Val::Px(opp_size);
     }
 }
 
