@@ -482,31 +482,21 @@ fn handle_update_button(
 
             log::info!("🔽 Bouton MAJ pressé - version cible: {}", sv);
 
-            // Sur Android, vérifier qu'on peut écrire dans le storage externe
-            #[cfg(target_os = "android")]
-            log::info!("📂 Lancement téléchargement APK...");
-
             let result = crate::updater::start_download(&sv);
             match result {
-                Ok(id) => {
-                    log::info!("📥 Téléchargement lancé avec succès (id={})", id);
+                Ok(_) => {
+                    log::info!("📦 Navigateur ouvert pour téléchargement");
                     download_state.status = DownloadStatus::Downloading;
-                    download_state.download_id = Some(id);
+                    download_state.download_id = None;
                     // Fermer la modale
                     for entity in &modal_query {
                         commands.entity(entity).despawn_recursive();
                     }
                 }
                 Err(ref e) => {
-                    log::error!("❌ Échec lancement téléchargement : {}", e);
+                    log::error!("❌ Échec ouverture navigateur : {}", e);
                     download_state.status = DownloadStatus::Failed;
                     download_state.download_id = None;
-                    // Afficher l'erreur dans la modale si elle existe encore
-                    // ou ouvrir le navigateur en fallback
-                    #[cfg(not(target_os = "android"))]
-                    {
-                        log::info!("📦 Fallback desktop : ouverture navigateur");
-                    }
                 }
             }
         }
@@ -658,6 +648,8 @@ fn show_update_modal(
             },
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
             GlobalZIndex(200), // Au-dessus de la barre de statut
+            // Capture les events tactiles pour bloquer le passage vers les éléments dessous
+            Interaction::default(),
             UpdateModal,
         ))
         .with_children(|overlay| {
