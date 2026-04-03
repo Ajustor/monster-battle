@@ -323,7 +323,20 @@ fn spawn_monster_detail_inner(
                                 });
                         }
 
-                        // ── 5. Boutons d'action ───────────────────
+                        // ── 5. Avertissement faim ─────────────────
+                        if monster.hunger_level() == monster_battle_core::HungerLevel::Starving {
+                            scroll.spawn((
+                                Text::new("⚠️ Ce monstre est affamé et pourrait dévorer ses alliés !"),
+                                TextFont { font_size: fonts::SMALL, ..default() },
+                                TextColor(colors::ACCENT_RED),
+                                Node {
+                                    margin: UiRect::vertical(Val::Px(4.0)),
+                                    ..default()
+                                },
+                            ));
+                        }
+
+                        // ── 6. Boutons d'action ───────────────────
                         scroll
                             .spawn(Node {
                                 width: Val::Percent(100.0),
@@ -1046,18 +1059,30 @@ pub(crate) fn handle_devour_select_input(
                 let prey_clone = all_monsters[prey_real_idx].clone();
                 let prey_id = prey_clone.id;
 
-                // Appel devour (modifie le prédateur in-place)
-                let result = all_monsters[real_pred_idx].devour(&prey_clone);
+                // Tenter la dévoration (refusée si rassasié sans Gluttony)
+                match all_monsters[real_pred_idx].try_devour(&prey_clone) {
+                    None => {
+                        let pred_name = all_monsters[real_pred_idx].name.clone();
+                        data.message = Some(format!(
+                            "{} est rassasié et refuse de dévorer !",
+                            pred_name
+                        ));
+                        confirm.open = false;
+                        next_state.set(GameScreen::MonsterDetail);
+                        return;
+                    }
+                    Some(result) => {
+                        // Sauvegarder le prédateur modifié
+                        let predator_clone = all_monsters[real_pred_idx].clone();
+                        let _ = data.storage.save(&predator_clone);
 
-                // Sauvegarder le prédateur modifié
-                let predator_clone = all_monsters[real_pred_idx].clone();
-                let _ = data.storage.save(&predator_clone);
+                        // Supprimer la proie du storage
+                        let _ = data.storage.delete(prey_id);
 
-                // Supprimer la proie du storage
-                let _ = data.storage.delete(prey_id);
-
-                // Afficher le résultat
-                data.message = Some(result.description);
+                        // Afficher le résultat
+                        data.message = Some(result.description);
+                    }
+                }
             }
 
             confirm.open = false;

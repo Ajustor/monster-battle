@@ -443,6 +443,7 @@ impl Monster {
                 Trait::Thorns,
                 Trait::Berserk,
                 Trait::Tenacity,
+                Trait::Gluttony,
             ];
             // 50% chance de prendre un trait du prey, 50% trait aléatoire global
             let new_trait = if !prey.traits.is_empty() && rng.gen_bool(0.5) {
@@ -467,6 +468,14 @@ impl Monster {
         };
 
         self.record_interaction();
+
+        // Rassasier le prédateur après dévoration
+        let now = Utc::now();
+        if self.meals_window_start.is_none() {
+            self.meals_window_start = Some(now);
+        }
+        self.last_fed = Some(now);
+        self.meals_today += 1;
 
         // Description
         let mut desc_parts = vec![format!(
@@ -493,6 +502,19 @@ impl Monster {
             new_secondary_type,
             description: desc_parts.join("\n"),
         }
+    }
+
+    /// Tente de dévorer une proie. Retourne `None` si le prédateur est rassasié
+    /// et ne possède pas le trait `Gluttony`. Retourne `Some(DevourResult)` sinon.
+    pub fn try_devour(&mut self, prey: &Monster) -> Option<DevourResult> {
+        let is_satisfied = matches!(
+            self.hunger_level(),
+            HungerLevel::Satisfied | HungerLevel::Overfed
+        );
+        if is_satisfied && !self.traits.contains(&Trait::Gluttony) {
+            return None;
+        }
+        Some(self.devour(prey))
     }
 
     /// Nourrit le monstre avec un type de nourriture. Retourne le nouveau niveau de faim.

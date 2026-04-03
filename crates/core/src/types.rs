@@ -464,6 +464,8 @@ pub enum Trait {
     Berserk,
     /// Le monstre a une petite chance de survivre un coup fatal avec 1 PV.
     Tenacity,
+    /// Glouton : ignore l'état rassasié pour la dévoration.
+    Gluttony,
 }
 
 impl fmt::Display for Trait {
@@ -477,6 +479,7 @@ impl fmt::Display for Trait {
             Trait::Thorns => "Épines",
             Trait::Berserk => "Berserk",
             Trait::Tenacity => "Ténacité",
+            Trait::Gluttony => "Glouton",
         };
         write!(f, "{}", name)
     }

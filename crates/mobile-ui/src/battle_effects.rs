@@ -3,6 +3,7 @@
 
 use bevy::prelude::*;
 use monster_battle_core::types::ElementType;
+use crate::ui::screens::battle::BattleEffectsContainer;
 
 pub struct BattleEffectsPlugin;
 
@@ -71,9 +72,10 @@ pub fn handle_play_attack_effect(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut events: EventReader<PlayAttackEffect>,
-    camera_query: Query<Entity, With<Camera2d>>,
+    container_query: Query<Entity, With<BattleEffectsContainer>>,
 ) {
-    let camera_entity = camera_query.get_single().ok();
+    // Cherche le conteneur dans l'UI de combat pour y attacher les effets
+    let container = container_query.get_single().ok();
 
     for event in events.read() {
         let sprites = sprites_for_element(event.element);
@@ -84,7 +86,7 @@ pub fn handle_play_attack_effect(
         let first_image: Handle<Image> = asset_server.load(sprites[0]);
         let size = 128.0_f32;
 
-        let mut entity_cmds = commands.spawn((
+        let bundle = (
             AttackEffect {
                 frame_timer: Timer::from_seconds(0.10, TimerMode::Repeating),
                 frame_count,
@@ -114,9 +116,14 @@ pub fn handle_play_attack_effect(
                 ..default()
             },
             GlobalZIndex(50),
-        ));
-        if let Some(cam) = camera_entity {
-            entity_cmds.insert(TargetCamera(cam));
+        );
+
+        if let Some(parent) = container {
+            // Attaché comme enfant du conteneur → garanti visible dans la hiérarchie UI
+            commands.entity(parent).with_children(|p| { p.spawn(bundle); });
+        } else {
+            // Fallback : spawn orphelin (hors combat)
+            commands.spawn(bundle);
         }
     }
 }
