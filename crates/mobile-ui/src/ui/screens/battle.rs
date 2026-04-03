@@ -151,7 +151,7 @@ fn spawn_battle_ui_inner(
                 ),
                 ..default()
             },
-            Transform::default(),
+
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
             BattleRootNode,
@@ -1429,9 +1429,8 @@ pub(crate) fn animate_attack_zoom(
     time: Res<Time>,
     anim_timer: Option<Res<BattleAnimTimer>>,
     mut zoom: ResMut<BattleZoomAnim>,
-    mut root_query: Query<&mut Transform, With<BattleRootNode>>,
-    player_query: Query<&GlobalTransform, (With<PlayerSprite>, Without<OpponentSprite>)>,
-    opponent_query: Query<&GlobalTransform, (With<OpponentSprite>, Without<PlayerSprite>)>,
+    mut ui_scale: ResMut<UiScale>,
+    mut root_query: Query<&mut Node, With<BattleRootNode>>,
     windows: Query<&Window>,
 ) {
     // Détecter le début d'une attaque
@@ -1468,10 +1467,10 @@ pub(crate) fn animate_attack_zoom(
             ZoomPhase::AttackerZoom => ZoomPhase::DefenderZoom,
             ZoomPhase::DefenderZoom => ZoomPhase::ReturnGlobal,
             ZoomPhase::ReturnGlobal | ZoomPhase::Idle => {
-                // Reset complet
-                for mut t in &mut root_query {
-                    t.scale = Vec3::ONE;
-                    t.translation = Vec3::ZERO;
+                // Reset UiScale et padding
+                ui_scale.0 = 1.0;
+                for mut node in &mut root_query {
+                    node.margin = UiRect::ZERO;
                 }
                 ZoomPhase::Idle
             }
@@ -1485,58 +1484,60 @@ pub(crate) fn animate_attack_zoom(
         t * t * (3.0 - 2.0 * t)
     };
 
-    // Lire la taille de la fenêtre pour convertir coords monde → coords écran
-    let win_size = windows
-        .get_single()
-        .map(|w| Vec2::new(w.width(), w.height()))
-        .unwrap_or(Vec2::new(480.0, 854.0));
+    let win = windows.get_single().map(|w| Vec2::new(w.width(), w.height())).unwrap_or(Vec2::new(480.0, 854.0));
 
-    // Position des sprites en coords monde (GlobalTransform.translation)
-    // Bevy UI place l'origine en haut-gauche, mais GlobalTransform est en coords monde Bevy
-    // (origine au centre, Y vers le haut).
-    let player_world = player_query
-        .get_single()
-        .map(|gt| gt.translation().truncate())
-        .unwrap_or(Vec2::new(-win_size.x * 0.2, -win_size.y * 0.25));
-    let opp_world = opponent_query
-        .get_single()
-        .map(|gt| gt.translation().truncate())
-        .unwrap_or(Vec2::new(win_size.x * 0.15, win_size.y * 0.2));
+    // Position des monstres en % de la fenêtre (haut-gauche = 0,0)
+    // Joueur : bas-droite  → 70% x, 70% y
+    // Adversaire : haut-gauche → 30% x, 25% y
+    let player_pct  = Vec2::new(0.70, 0.70);
+    let opp_pct     = Vec2::new(0.30, 0.25);
 
-    let (attacker_pivot, defender_pivot) = if zoom.is_player_attack {
-        (player_world, opp_world)
+    let (attacker_pct, defender_pct) = if zoom.is_player_attack {
+        (player_pct, opp_pct)
     } else {
-        (opp_world, player_world)
+        (opp_pct, player_pct)
     };
 
-    let zoom_scale = 1.8_f32;
+    let zoom_scale = 1.6_f32;
 
-    // Pivot-based zoom : translation = -pivot * (scale - 1)
-    // → le point `pivot` reste fixe à l'écran pendant le scale
-    let (target_scale, target_t) = match zoom.phase {
+    // UiScale grossit tout l'UI.
+    // Pour que le point (px, py) reste au centre visible après zoom :
+    //   margin_left = -(px - 0.5) * win.x * (scale - 1)  * 2
+    //   margin_top  = -(py - 0.5) * win.y * (scale - 1)  * 2
+    // (le facteur 2 vient du fait que margin déplace depuis l'origine haut-gauche)
+    let compute_margin = |pct: Vec2, scale: f32| -> (f32, f32) {
+        let offset_x = -(pct.x - 0.5) * win.x * (scale - 1.0);
+        let offset_y = -(pct.y - 0.5) * win.y * (scale - 1.0);
+        (offset_x, offset_y)
+    };
+
+    let (target_scale, margin_x, margin_y) = match zoom.phase {
         ZoomPhase::AttackerZoom => {
             let s = 1.0 + (zoom_scale - 1.0) * ease;
-            let t = -attacker_pivot * (s - 1.0);
-            (s, t)
+            let (mx, my) = compute_margin(attacker_pct, s);
+            (s, mx, my)
         }
         ZoomPhase::DefenderZoom => {
-            // Pan : lerp du pivot attaquant → défenseur, scale maintenu
-            let pivot = attacker_pivot.lerp(defender_pivot, ease);
-            let t = -pivot * (zoom_scale - 1.0);
-            (zoom_scale, t)
+            let pct = attacker_pct.lerp(defender_pct, ease);
+            let (mx, my) = compute_margin(pct, zoom_scale);
+            (zoom_scale, mx, my)
         }
         ZoomPhase::ReturnGlobal => {
-            // Dézoom depuis le pivot défenseur vers taille normale
             let s = zoom_scale + (1.0 - zoom_scale) * ease;
-            let t = -defender_pivot * (s - 1.0);
-            (s, t)
+            let (mx, my) = compute_margin(defender_pct, s);
+            (s, mx, my)
         }
-        ZoomPhase::Idle => (1.0, Vec2::ZERO),
+        ZoomPhase::Idle => (1.0, 0.0, 0.0),
     };
 
-    for mut transform in &mut root_query {
-        transform.scale = Vec3::splat(target_scale);
-        transform.translation = Vec3::new(target_t.x, target_t.y, 0.0);
+    ui_scale.0 = target_scale;
+    for mut node in &mut root_query {
+        node.margin = UiRect {
+            left:   Val::Px(margin_x),
+            top:    Val::Px(margin_y),
+            right:  Val::Auto,
+            bottom: Val::Auto,
+        };
     }
 }
 
