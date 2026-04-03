@@ -1424,6 +1424,7 @@ pub(crate) fn animate_attack_zoom(
     anim_timer: Option<Res<BattleAnimTimer>>,
     mut zoom: ResMut<BattleZoomAnim>,
     mut root_query: Query<&mut Transform, With<BattleRootNode>>,
+    windows: Query<&Window>,
 ) {
     // Détecter le début d'une attaque
     if zoom.phase == ZoomPhase::Idle {
@@ -1466,40 +1467,47 @@ pub(crate) fn animate_attack_zoom(
     let t = zoom.progress;
     let ease = t * t * (3.0 - 2.0 * t);
 
-    // Positions cible du travelling (en pixels) :
-    //   joueur = bas-gauche → translate positif X, négatif Y
-    //   adversaire = haut-droite → translate négatif X, positif Y
-    let (player_tx, player_ty) = (80.0_f32, -120.0_f32);
-    let (opp_tx, opp_ty) = (-80.0_f32, 120.0_f32);
+    // Taille de l'écran pour calculer les offsets de pivot
+    let (w, h) = windows
+        .get_single()
+        .map(|win| (win.width(), win.height()))
+        .unwrap_or((480.0, 854.0));
 
-    let (attacker_pos, defender_pos) = if zoom.is_player_attack {
-        ((player_tx, player_ty), (opp_tx, opp_ty))
+    // Position des monstres relative au centre de l'écran :
+    //   Joueur  : bas-gauche  → (-25% W, +30% H)
+    //   Adversaire : haut-droite → (+20% W, -25% H)
+    let player_pivot  = Vec2::new(-w * 0.25, h * 0.30);
+    let opp_pivot     = Vec2::new( w * 0.20, -h * 0.25);
+
+    let (attacker_pivot, defender_pivot) = if zoom.is_player_attack {
+        (player_pivot, opp_pivot)
     } else {
-        ((opp_tx, opp_ty), (player_tx, player_ty))
+        (opp_pivot, player_pivot)
     };
 
-    // Scale max pendant le zoom
-    let zoom_scale = 1.4_f32;
+    // Zoom vers un pivot : translation = -pivot * (scale - 1)
+    // Cela compense exactement le déplacement dû au scale et centre le zoom sur le pivot.
+    let zoom_scale = 1.6_f32;
 
     let (target_scale, target_tx, target_ty) = match zoom.phase {
         ZoomPhase::AttackerZoom => {
-            // Zoom progressif vers l'attaquant
             let s = 1.0 + (zoom_scale - 1.0) * ease;
-            let tx = attacker_pos.0 * ease;
-            let ty = attacker_pos.1 * ease;
+            let tx = -attacker_pivot.x * (s - 1.0);
+            let ty = -attacker_pivot.y * (s - 1.0);
             (s, tx, ty)
         }
         ZoomPhase::DefenderZoom => {
-            // Pan de l'attaquant vers le défenseur (scale maintenu)
-            let tx = attacker_pos.0 + (defender_pos.0 - attacker_pos.0) * ease;
-            let ty = attacker_pos.1 + (defender_pos.1 - attacker_pos.1) * ease;
+            // Pan : glissement du pivot attaquant → défenseur, scale maintenu
+            let pivot = attacker_pivot.lerp(defender_pivot, ease);
+            let tx = -pivot.x * (zoom_scale - 1.0);
+            let ty = -pivot.y * (zoom_scale - 1.0);
             (zoom_scale, tx, ty)
         }
         ZoomPhase::ReturnGlobal => {
-            // Retour progressif à scale 1.0, translation 0
+            // Retour : scale → 1.0, translation → 0
             let s = zoom_scale + (1.0 - zoom_scale) * ease;
-            let tx = defender_pos.0 * (1.0 - ease);
-            let ty = defender_pos.1 * (1.0 - ease);
+            let tx = -defender_pivot.x * (s - 1.0);
+            let ty = -defender_pivot.y * (s - 1.0);
             (s, tx, ty)
         }
         ZoomPhase::Idle => (1.0, 0.0, 0.0),
