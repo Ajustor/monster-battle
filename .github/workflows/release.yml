@@ -51,6 +51,7 @@ jobs:
       bundle_id: com.ajustor.monsterbattle
       version: ${{ needs.version-check.outputs.new_version }}
       sign_ipa: false
+      deploy_pages: true
 
   # ── Release Android APK ────────────────────────────────────────
   release-android:
