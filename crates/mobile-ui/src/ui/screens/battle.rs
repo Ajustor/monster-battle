@@ -953,8 +953,13 @@ fn apply_battle_results(data: &mut GameData) {
     // Dévoration de l'adversaire (uniquement en combat réel, pas en entraînement)
     let devour_msg = if is_victory && !battle.is_training {
         if let Some(ref prey) = battle.opponent_data {
-            let result = fighter.devour(prey);
-            Some(result.description)
+            match fighter.try_devour(prey) {
+                Some(result) => Some(result.description),
+                None => Some(format!(
+                    "{} est rassasié et refuse de dévorer le vaincu.",
+                    fighter.name
+                )),
+            }
         } else {
             None
         }
