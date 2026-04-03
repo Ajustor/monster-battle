@@ -1439,8 +1439,8 @@ pub(crate) fn animate_attack_zoom(
         zoom.direction = 1.0;
     }
 
-    // Appliquer : scale de 1.0 à 1.05 (subtil)
-    let scale = 1.0 + 0.05 * (zoom.progress * std::f32::consts::PI).sin();
+    // Appliquer : scale de 1.0 à 1.12
+    let scale = 1.0 + 0.12 * (zoom.progress * std::f32::consts::PI).sin();
     for mut transform in &mut root_query {
         transform.scale = Vec3::splat(scale);
     }
