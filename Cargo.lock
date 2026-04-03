@@ -1467,9 +1467,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.58"
+version = "1.2.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1e928d4b69e3077709075a938a05ffbedfa53a84c8f766efbf8220bb1ff60e1"
+checksum = "b7a4d3ec6524d28a329fc53654bbadc9bdd7b0431f5d65f1a56ffb28a1ee5283"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -3030,7 +3030,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3050,7 +3050,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-android"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -3073,7 +3073,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-audio"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "rand 0.8.5",
  "rodio",
@@ -3083,7 +3083,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-composer"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "anyhow",
  "crossterm",
@@ -3095,7 +3095,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-core"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "chrono",
  "rand 0.8.5",
@@ -3107,7 +3107,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-ios"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "bevy",
  "env_logger",
@@ -3117,7 +3117,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-mobile-ui"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -3143,7 +3143,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-network"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -3159,7 +3159,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-server"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -3174,14 +3174,14 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-sprites"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "monster-battle-core",
 ]
 
 [[package]]
 name = "monster-battle-storage"
-version = "1.5.2"
+version = "1.5.3"
 dependencies = [
  "aes-gcm",
  "anyhow",
