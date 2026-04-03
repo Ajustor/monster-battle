@@ -163,6 +163,9 @@ fn spawn_battle_ui_inner(
             bevy::state::state_scoped::StateScoped(GameScreen::Battle),
         ))
         .with_children(|root| {
+            // ── Fond de combat style Pokémon ─────────────────────
+            spawn_battle_background(root, battle.opponent.element);
+
             // ── Zone adversaire (haut-droite, style Pokémon) ─────
             // Info (nom + barre PV) à gauche, sprite à droite
             root.spawn(Node {
@@ -1440,6 +1443,106 @@ pub(crate) fn animate_attack_zoom(
     let scale = 1.0 + 0.05 * (zoom.progress * std::f32::consts::PI).sin();
     for mut transform in &mut root_query {
         transform.scale = Vec3::splat(scale);
+    }
+}
+
+/// Fond de combat dynamique basé sur le type du monstre adversaire.
+fn spawn_battle_background(
+    parent: &mut ChildBuilder,
+    opponent_element: monster_battle_core::types::ElementType,
+) {
+    let (bg_top, bg_bottom, accent) = battle_background_colors(opponent_element);
+
+    parent
+        .spawn(Node {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        })
+        .with_children(|bg| {
+            // Moitié haute (ciel/fond)
+            bg.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(55.0),
+                    ..default()
+                },
+                BackgroundColor(bg_top),
+            ));
+            // Moitié basse (sol/terrain)
+            bg.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(45.0),
+                    ..default()
+                },
+                BackgroundColor(bg_bottom),
+            ));
+            // Bande de séparation (ligne d'horizon style Pokémon)
+            bg.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Percent(53.0),
+                    width: Val::Percent(100.0),
+                    height: Val::Px(3.0),
+                    ..default()
+                },
+                BackgroundColor(accent),
+            ));
+        });
+}
+
+fn battle_background_colors(
+    element: monster_battle_core::types::ElementType,
+) -> (Color, Color, Color) {
+    use monster_battle_core::types::ElementType;
+    match element {
+        ElementType::Fire => (
+            Color::srgb(0.15, 0.05, 0.05),
+            Color::srgb(0.35, 0.10, 0.05),
+            Color::srgb(0.9, 0.3, 0.1),
+        ),
+        ElementType::Water => (
+            Color::srgb(0.05, 0.10, 0.25),
+            Color::srgb(0.10, 0.20, 0.40),
+            Color::srgb(0.2, 0.6, 1.0),
+        ),
+        ElementType::Electric => (
+            Color::srgb(0.10, 0.10, 0.05),
+            Color::srgb(0.15, 0.15, 0.05),
+            Color::srgb(1.0, 0.9, 0.1),
+        ),
+        ElementType::Earth => (
+            Color::srgb(0.20, 0.15, 0.05),
+            Color::srgb(0.30, 0.20, 0.08),
+            Color::srgb(0.7, 0.5, 0.2),
+        ),
+        ElementType::Wind => (
+            Color::srgb(0.15, 0.20, 0.20),
+            Color::srgb(0.20, 0.28, 0.25),
+            Color::srgb(0.6, 1.0, 0.8),
+        ),
+        ElementType::Shadow => (
+            Color::srgb(0.05, 0.02, 0.10),
+            Color::srgb(0.08, 0.04, 0.15),
+            Color::srgb(0.5, 0.1, 0.8),
+        ),
+        ElementType::Light => (
+            Color::srgb(0.20, 0.18, 0.10),
+            Color::srgb(0.25, 0.22, 0.12),
+            Color::srgb(1.0, 0.95, 0.6),
+        ),
+        ElementType::Plant => (
+            Color::srgb(0.05, 0.15, 0.05),
+            Color::srgb(0.08, 0.22, 0.06),
+            Color::srgb(0.3, 0.9, 0.2),
+        ),
+        ElementType::Normal => (
+            Color::srgb(0.15, 0.15, 0.18),
+            Color::srgb(0.20, 0.20, 0.22),
+            Color::srgb(0.7, 0.7, 0.8),
+        ),
     }
 }
 
