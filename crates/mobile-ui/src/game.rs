@@ -135,6 +135,8 @@ pub struct GameData {
     pub breed_result: Option<Monster>,
     /// Décalage de scroll pour les écrans longs.
     pub scroll_offset: usize,
+    /// true si l'écran NamingMonster est en mode renommage (vs création).
+    pub is_renaming: bool,
     /// Drapeau signalant que l'UI de combat doit être reconstruite (polling réseau).
     pub battle_ui_dirty: bool,
     /// Type de mini-jeu sélectionné.
@@ -179,6 +181,7 @@ impl GameData {
             remote_monster: None,
             breed_result: None,
             scroll_offset: 0,
+            is_renaming: false,
             battle_ui_dirty: false,
             minigame_type: None,
             tictactoe: None,

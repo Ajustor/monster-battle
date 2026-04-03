@@ -632,11 +632,12 @@ pub(crate) fn handle_monster_detail_input(
         }
     }
 
-    // Renommer → NamingMonster (flag rename implicite via monster_select_index)
+    // Renommer → NamingMonster
     for interaction in &rename_query {
         if *interaction == Interaction::Pressed {
             data.monster_select_index = idx;
             data.name_input.clear();
+            data.is_renaming = true;
             next_state.set(GameScreen::NamingMonster);
             return;
         }
