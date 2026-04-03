@@ -115,23 +115,8 @@ pub(crate) fn spawn_battle_ui(
         None => return,
     };
 
-    // Conteneur persistent pour les effets d'attaque — séparé de l'UI principale
-    // pour survivre aux rebuilds. StateScoped le supprime quand on quitte Battle.
-    commands.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(0.0),
-            top: Val::Px(0.0),
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            ..default()
-        },
-        BackgroundColor(Color::NONE),
-        Visibility::Visible,
-        GlobalZIndex(50),
-        BattleEffectsContainer,
-        bevy::state::state_scoped::StateScoped(GameScreen::Battle),
-    ));
+    // Le BattleEffectsContainer est créé dans spawn_battle_ui_inner
+    // comme enfant du nœud racine — garanti dans la hiérarchie UI.
 
     spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
 }
@@ -635,6 +620,23 @@ fn spawn_battle_ui_inner(
                 }
             });
 
+            // Overlay pour les effets d'attaque — spawné à chaque rebuild,
+            // mais les effets durent < 1s donc la perte lors du rebuild est imperceptible.
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    top: Val::Px(0.0),
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    overflow: Overflow::visible(),
+                    ..default()
+                },
+                BackgroundColor(Color::NONE),
+                Visibility::Visible,
+                GlobalZIndex(50),
+                BattleEffectsContainer,
+            ));
         });
 }
 
@@ -1412,13 +1414,16 @@ pub(crate) fn animate_idle_sprites(
     }
 }
 
-/// Zoom séquentiel : attaquant → défenseur → retour global (style Pokémon).
+/// Zoom caméra séquentiel style Pokémon N&B.
+/// Simule un travelling caméra en scalant + translatant le nœud racine :
+///   Phase 1 (AttackerZoom) : zoom vers l'attaquant
+///   Phase 2 (DefenderZoom) : pan vers le défenseur (zoom maintenu)
+///   Phase 3 (ReturnGlobal) : retour vue globale
 pub(crate) fn animate_attack_zoom(
     time: Res<Time>,
     anim_timer: Option<Res<BattleAnimTimer>>,
     mut zoom: ResMut<BattleZoomAnim>,
-    mut player_node: Query<&mut Node, (With<PlayerSprite>, Without<OpponentSprite>)>,
-    mut opponent_node: Query<&mut Node, (With<OpponentSprite>, Without<PlayerSprite>)>,
+    mut root_query: Query<&mut Transform, With<BattleRootNode>>,
 ) {
     // Détecter le début d'une attaque
     if zoom.phase == ZoomPhase::Idle {
@@ -1441,9 +1446,9 @@ pub(crate) fn animate_attack_zoom(
     }
 
     let speed = match zoom.phase {
-        ZoomPhase::AttackerZoom => 4.0,
-        ZoomPhase::DefenderZoom => 4.0,
-        ZoomPhase::ReturnGlobal => 5.0,
+        ZoomPhase::AttackerZoom => 5.0,  // 0.2s
+        ZoomPhase::DefenderZoom => 5.0,  // 0.2s
+        ZoomPhase::ReturnGlobal => 4.0,  // 0.25s
         ZoomPhase::Idle => return,
     };
     zoom.progress += time.delta_secs() * speed;
@@ -1457,26 +1462,52 @@ pub(crate) fn animate_attack_zoom(
         };
     }
 
-    let t = (zoom.progress * std::f32::consts::PI).sin();
-    let (attacker_scale, defender_scale) = match zoom.phase {
-        ZoomPhase::AttackerZoom => (1.0 + 0.20 * t, 1.0),
-        ZoomPhase::DefenderZoom => (1.0, 1.0 + 0.15 * t),
-        _ => (1.0, 1.0),
-    };
-    let (player_scale, opp_scale) = if zoom.is_player_attack {
-        (attacker_scale, defender_scale)
+    // ease in-out
+    let t = zoom.progress;
+    let ease = t * t * (3.0 - 2.0 * t);
+
+    // Positions cible du travelling (en pixels) :
+    //   joueur = bas-gauche → translate positif X, négatif Y
+    //   adversaire = haut-droite → translate négatif X, positif Y
+    let (player_tx, player_ty) = (80.0_f32, -120.0_f32);
+    let (opp_tx, opp_ty) = (-80.0_f32, 120.0_f32);
+
+    let (attacker_pos, defender_pos) = if zoom.is_player_attack {
+        ((player_tx, player_ty), (opp_tx, opp_ty))
     } else {
-        (defender_scale, attacker_scale)
+        ((opp_tx, opp_ty), (player_tx, player_ty))
     };
 
-    let base = 80.0_f32;
-    if let Ok(mut node) = player_node.get_single_mut() {
-        node.width  = Val::Px(base * player_scale);
-        node.height = Val::Px(base * player_scale);
-    }
-    if let Ok(mut node) = opponent_node.get_single_mut() {
-        node.width  = Val::Px(base * opp_scale);
-        node.height = Val::Px(base * opp_scale);
+    // Scale max pendant le zoom
+    let zoom_scale = 1.4_f32;
+
+    let (target_scale, target_tx, target_ty) = match zoom.phase {
+        ZoomPhase::AttackerZoom => {
+            // Zoom progressif vers l'attaquant
+            let s = 1.0 + (zoom_scale - 1.0) * ease;
+            let tx = attacker_pos.0 * ease;
+            let ty = attacker_pos.1 * ease;
+            (s, tx, ty)
+        }
+        ZoomPhase::DefenderZoom => {
+            // Pan de l'attaquant vers le défenseur (scale maintenu)
+            let tx = attacker_pos.0 + (defender_pos.0 - attacker_pos.0) * ease;
+            let ty = attacker_pos.1 + (defender_pos.1 - attacker_pos.1) * ease;
+            (zoom_scale, tx, ty)
+        }
+        ZoomPhase::ReturnGlobal => {
+            // Retour progressif à scale 1.0, translation 0
+            let s = zoom_scale + (1.0 - zoom_scale) * ease;
+            let tx = defender_pos.0 * (1.0 - ease);
+            let ty = defender_pos.1 * (1.0 - ease);
+            (s, tx, ty)
+        }
+        ZoomPhase::Idle => (1.0, 0.0, 0.0),
+    };
+
+    for mut transform in &mut root_query {
+        transform.scale = Vec3::splat(target_scale);
+        transform.translation = Vec3::new(target_tx, target_ty, 0.0);
     }
 }
 
