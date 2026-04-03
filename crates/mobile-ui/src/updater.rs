@@ -145,16 +145,35 @@ fn android_start_download(server_version: &str) -> Result<i64, String> {
             &[JValue::Object(&mime)],
         )?;
 
-        // Destination dans le dossier externe de l'app (pas de permission requise API 29+)
-        // Environment.DIRECTORY_DOWNLOADS = "Downloads"
-        let dir_type = env.new_string("Downloads")?;
-        let subpath = env.new_string("monster-battle.apk")?;
+        // Destination dans le dossier Downloads public (DownloadManager a les droits)
+        let downloads_dir = env
+            .get_static_field(
+                "android/os/Environment",
+                "DIRECTORY_DOWNLOADS",
+                "Ljava/lang/String;",
+            )?
+            .l()?;
+        let filename = env.new_string("monster-battle.apk")?;
+        // Vider l'exception JNI avant l'appel critique
+        let _ = env.exception_clear();
         env.call_method(
             &request,
-            "setDestinationInExternalFilesDir",
-            "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Landroid/app/DownloadManager$Request;",
-            &[JValue::Object(&activity), JValue::Object(&dir_type), JValue::Object(&subpath)],
+            "setDestinationInExternalPublicDir",
+            "(Ljava/lang/String;Ljava/lang/String;)Landroid/app/DownloadManager$Request;",
+            &[JValue::Object(&downloads_dir), JValue::Object(&filename)],
         )?;
+        if env.exception_check()? {
+            env.exception_clear()?;
+            // Fallback : dossier externe de l'app
+            let dir_type = env.new_string("Downloads")?;
+            let subpath = env.new_string("monster-battle.apk")?;
+            env.call_method(
+                &request,
+                "setDestinationInExternalFilesDir",
+                "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Landroid/app/DownloadManager$Request;",
+                &[JValue::Object(&activity), JValue::Object(&dir_type), JValue::Object(&subpath)],
+            )?;
+        }
 
         let download_id = env
             .call_method(
