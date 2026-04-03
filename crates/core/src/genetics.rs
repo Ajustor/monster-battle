@@ -191,6 +191,7 @@ fn inherit_traits(
             Trait::Thorns,
             Trait::Berserk,
             Trait::Tenacity,
+            Trait::Gluttony,
         ];
 
         let new_trait = all_traits[rng.gen_range(0..all_traits.len())].clone();
