@@ -56,6 +56,21 @@ pub(crate) struct WaitingDots {
     dots: u8,
 }
 
+/// Marqueur pour le nœud racine de l'écran de combat (utilisé pour le zoom).
+#[derive(Component)]
+pub(crate) struct BattleRootNode;
+
+/// Ressource pour l'effet de zoom lors d'une attaque (style Pokémon).
+#[derive(Resource, Default)]
+pub(crate) struct BattleZoomAnim {
+    /// 0.0 = pas de zoom, 1.0 = zoom max
+    pub progress: f32,
+    /// 1.0 = zoom in, -1.0 = zoom out
+    pub direction: f32,
+    /// true si actif
+    pub active: bool,
+}
+
 /// Ressource qui gère l'état global de l'animation de combat.
 #[derive(Resource)]
 pub(crate) struct BattleAnimTimer {
@@ -91,6 +106,23 @@ pub(crate) fn spawn_battle_ui(
         Some(b) => b,
         None => return,
     };
+
+    // Conteneur persistent pour les effets d'attaque — séparé de l'UI principale
+    // pour survivre aux rebuilds. StateScoped le supprime quand on quitte Battle.
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        },
+        GlobalZIndex(50),
+        BattleEffectsContainer,
+        bevy::state::state_scoped::StateScoped(GameScreen::Battle),
+    ));
+
     spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
 }
 
@@ -124,11 +156,16 @@ fn spawn_battle_ui_inner(
                 ),
                 ..default()
             },
+            Transform::default(),
             BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
+            BattleRootNode,
             bevy::state::state_scoped::StateScoped(GameScreen::Battle),
         ))
         .with_children(|root| {
+            // ── Fond de combat style Pokémon ─────────────────────
+            spawn_battle_background(root, battle.opponent.element);
+
             // ── Zone adversaire (haut-droite, style Pokémon) ─────
             // Info (nom + barre PV) à gauche, sprite à droite
             root.spawn(Node {
@@ -588,18 +625,6 @@ fn spawn_battle_ui_inner(
                 }
             });
 
-            // Conteneur overlay pour les effets d'attaque (position absolute, plein écran)
-            root.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(0.0),
-                    top: Val::Px(0.0),
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    ..default()
-                },
-                BattleEffectsContainer,
-            ));
         });
 }
 
@@ -1346,6 +1371,178 @@ pub(crate) fn animate_battle_sprites(
             }
         }
         commands.remove_resource::<BattleAnimTimer>();
+    }
+}
+
+/// Oscillation douce des sprites en attente d'une action (style Pokémon idle).
+pub(crate) fn animate_idle_sprites(
+    time: Res<Time>,
+    battle_state: Option<Res<BattleAnimTimer>>,
+    mut player_sprite: Query<&mut Node, With<PlayerSprite>>,
+    mut opponent_sprite: Query<&mut Node, (With<OpponentSprite>, Without<PlayerSprite>)>,
+    data: Res<GameData>,
+) {
+    // Pas d'oscillation pendant une animation en cours
+    if battle_state.is_some() {
+        return;
+    }
+    let Some(ref battle) = data.battle_state else {
+        return;
+    };
+    if battle.phase != BattlePhase::PlayerChooseAttack {
+        return;
+    }
+
+    let t = time.elapsed_secs();
+    if let Ok(mut node) = player_sprite.get_single_mut() {
+        node.top = Val::Px((t * 1.5 * std::f32::consts::TAU).sin() * 3.0);
+    }
+    if let Ok(mut node) = opponent_sprite.get_single_mut() {
+        node.top = Val::Px((t * 1.3 * std::f32::consts::TAU + 1.0).sin() * 2.0);
+    }
+}
+
+/// Zoom rapide sur le nœud racine lors d'une attaque (style Pokémon).
+pub(crate) fn animate_attack_zoom(
+    time: Res<Time>,
+    anim_timer: Option<Res<BattleAnimTimer>>,
+    mut zoom: ResMut<BattleZoomAnim>,
+    mut root_query: Query<&mut Transform, With<BattleRootNode>>,
+) {
+    // Déclencher le zoom si une animation d'attaque démarre
+    if let Some(ref anim) = anim_timer {
+        match &anim.anim {
+            AnimationType::PlayerAttack | AnimationType::OpponentAttack => {
+                if !zoom.active {
+                    zoom.active = true;
+                    zoom.progress = 0.0;
+                    zoom.direction = 1.0;
+                }
+            }
+            _ => {}
+        }
+    } else if zoom.active {
+        zoom.active = false;
+    }
+
+    if !zoom.active && zoom.progress == 0.0 {
+        return;
+    }
+
+    // Animer le zoom
+    zoom.progress += time.delta_secs() * zoom.direction * 8.0;
+    if zoom.progress >= 1.0 {
+        zoom.progress = 1.0;
+        zoom.direction = -1.0; // retour
+    } else if zoom.progress <= 0.0 {
+        zoom.progress = 0.0;
+        zoom.direction = 1.0;
+    }
+
+    // Appliquer : scale de 1.0 à 1.12
+    let scale = 1.0 + 0.12 * (zoom.progress * std::f32::consts::PI).sin();
+    for mut transform in &mut root_query {
+        transform.scale = Vec3::splat(scale);
+    }
+}
+
+/// Fond de combat dynamique basé sur le type du monstre adversaire.
+fn spawn_battle_background(
+    parent: &mut ChildBuilder,
+    opponent_element: monster_battle_core::types::ElementType,
+) {
+    let (bg_top, bg_bottom, accent) = battle_background_colors(opponent_element);
+
+    parent
+        .spawn(Node {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        })
+        .with_children(|bg| {
+            // Moitié haute (ciel/fond)
+            bg.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(55.0),
+                    ..default()
+                },
+                BackgroundColor(bg_top),
+            ));
+            // Moitié basse (sol/terrain)
+            bg.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(45.0),
+                    ..default()
+                },
+                BackgroundColor(bg_bottom),
+            ));
+            // Bande de séparation (ligne d'horizon style Pokémon)
+            bg.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Percent(53.0),
+                    width: Val::Percent(100.0),
+                    height: Val::Px(3.0),
+                    ..default()
+                },
+                BackgroundColor(accent),
+            ));
+        });
+}
+
+fn battle_background_colors(
+    element: monster_battle_core::types::ElementType,
+) -> (Color, Color, Color) {
+    use monster_battle_core::types::ElementType;
+    match element {
+        ElementType::Fire => (
+            Color::srgb(0.15, 0.05, 0.05),
+            Color::srgb(0.35, 0.10, 0.05),
+            Color::srgb(0.9, 0.3, 0.1),
+        ),
+        ElementType::Water => (
+            Color::srgb(0.05, 0.10, 0.25),
+            Color::srgb(0.10, 0.20, 0.40),
+            Color::srgb(0.2, 0.6, 1.0),
+        ),
+        ElementType::Electric => (
+            Color::srgb(0.10, 0.10, 0.05),
+            Color::srgb(0.15, 0.15, 0.05),
+            Color::srgb(1.0, 0.9, 0.1),
+        ),
+        ElementType::Earth => (
+            Color::srgb(0.20, 0.15, 0.05),
+            Color::srgb(0.30, 0.20, 0.08),
+            Color::srgb(0.7, 0.5, 0.2),
+        ),
+        ElementType::Wind => (
+            Color::srgb(0.15, 0.20, 0.20),
+            Color::srgb(0.20, 0.28, 0.25),
+            Color::srgb(0.6, 1.0, 0.8),
+        ),
+        ElementType::Shadow => (
+            Color::srgb(0.05, 0.02, 0.10),
+            Color::srgb(0.08, 0.04, 0.15),
+            Color::srgb(0.5, 0.1, 0.8),
+        ),
+        ElementType::Light => (
+            Color::srgb(0.20, 0.18, 0.10),
+            Color::srgb(0.25, 0.22, 0.12),
+            Color::srgb(1.0, 0.95, 0.6),
+        ),
+        ElementType::Plant => (
+            Color::srgb(0.05, 0.15, 0.05),
+            Color::srgb(0.08, 0.22, 0.06),
+            Color::srgb(0.3, 0.9, 0.2),
+        ),
+        ElementType::Normal => (
+            Color::srgb(0.15, 0.15, 0.18),
+            Color::srgb(0.20, 0.20, 0.22),
+            Color::srgb(0.7, 0.7, 0.8),
+        ),
     }
 }
 

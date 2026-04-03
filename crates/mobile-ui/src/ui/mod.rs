@@ -19,6 +19,7 @@ pub struct UiPlugin;
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
         app
+            .init_resource::<battle::BattleZoomAnim>()
             // ── Menu principal ───────────────────────────────────
             .add_systems(OnEnter(GameScreen::MainMenu), main_menu::spawn_menu)
             .add_systems(
@@ -100,6 +101,8 @@ impl Plugin for UiPlugin {
                     battle::animate_waiting_dots,
                     battle::animate_battle_sprites,
                     battle::animate_attack_flash,
+                    battle::animate_idle_sprites,
+                    battle::animate_attack_zoom,
                 )
                     .run_if(in_state(GameScreen::Battle)),
             )
