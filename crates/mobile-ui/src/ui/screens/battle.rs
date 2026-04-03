@@ -67,6 +67,11 @@ pub(crate) struct BattleAnimTimer {
 
 /// Marqueur pour le flash d'impact (overlay plein écran temporaire).
 /// Uniquement pour les coups critiques, déclenché après les particules.
+/// Conteneur overlay pour les effets d'attaque — spawné dans l'écran de combat.
+/// Les effets sont ajoutés comme enfants pour garantir le rendu sur Android.
+#[derive(Component)]
+pub struct BattleEffectsContainer;
+
 #[derive(Component)]
 pub(crate) struct AttackFlashOverlay {
     pub timer: Timer,
@@ -582,6 +587,19 @@ fn spawn_battle_ui_inner(
                     }
                 }
             });
+
+            // Conteneur overlay pour les effets d'attaque (position absolute, plein écran)
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    top: Val::Px(0.0),
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                BattleEffectsContainer,
+            ));
         });
 }
 
