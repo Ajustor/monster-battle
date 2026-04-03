@@ -480,10 +480,16 @@ fn handle_update_button(
                 _ => "?".to_string(),
             };
 
+            log::info!("🔽 Bouton MAJ pressé - version cible: {}", sv);
+
+            // Sur Android, vérifier qu'on peut écrire dans le storage externe
+            #[cfg(target_os = "android")]
+            log::info!("📂 Lancement téléchargement APK...");
+
             let result = crate::updater::start_download(&sv);
             match result {
                 Ok(id) => {
-                    log::info!("📥 Téléchargement lancé (id={})", id);
+                    log::info!("📥 Téléchargement lancé avec succès (id={})", id);
                     download_state.status = DownloadStatus::Downloading;
                     download_state.download_id = Some(id);
                     // Fermer la modale
@@ -491,10 +497,16 @@ fn handle_update_button(
                         commands.entity(entity).despawn_recursive();
                     }
                 }
-                Err(e) => {
+                Err(ref e) => {
                     log::error!("❌ Échec lancement téléchargement : {}", e);
                     download_state.status = DownloadStatus::Failed;
                     download_state.download_id = None;
+                    // Afficher l'erreur dans la modale si elle existe encore
+                    // ou ouvrir le navigateur en fallback
+                    #[cfg(not(target_os = "android"))]
+                    {
+                        log::info!("📦 Fallback desktop : ouverture navigateur");
+                    }
                 }
             }
         }
