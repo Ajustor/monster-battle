@@ -296,6 +296,8 @@ fn spawn_battle_ui_inner(
                         .iter()
                         .any(|m| matches!(m.anim_type, Some(AnimationType::OpponentFaint))));
                 let opponent_dead = battle.opponent.current_hp == 0 && !faint_still_pending;
+                // L'animation d'entrée ne joue qu'une seule fois, au début du combat (phase Intro).
+                let opp_entry_anim = !opponent_dead && battle.phase == BattlePhase::Intro;
                 let mut opp_entry = top.spawn((
                     ImageNode::new(handle),
                     Node {
@@ -305,8 +307,8 @@ fn spawn_battle_ui_inner(
                         } else {
                             Val::Px(80.0)
                         },
-                        // Offset initial hors écran (haut) pour l'animation d'entrée
-                        top: if opponent_dead { Val::Px(0.0) } else { Val::Px(-120.0) },
+                        // Offset initial hors écran uniquement pour l'animation d'entrée
+                        top: if opp_entry_anim { Val::Px(-120.0) } else { Val::Px(0.0) },
                         ..default()
                     },
                     if opponent_dead {
@@ -316,7 +318,7 @@ fn spawn_battle_ui_inner(
                     },
                     OpponentSprite,
                 ));
-                if !opponent_dead {
+                if opp_entry_anim {
                     opp_entry.insert(BattleEntryAnim {
                         timer: Timer::from_seconds(0.4, TimerMode::Once),
                         is_player: false,
@@ -357,6 +359,8 @@ fn spawn_battle_ui_inner(
                         .iter()
                         .any(|m| matches!(m.anim_type, Some(AnimationType::PlayerFaint))));
                 let player_dead = battle.player.current_hp == 0 && !faint_still_pending;
+                // L'animation d'entrée ne joue qu'une seule fois, au début du combat (phase Intro).
+                let player_entry_anim = !player_dead && battle.phase == BattlePhase::Intro;
                 let mut player_entry = bottom.spawn((
                     ImageNode::new(handle),
                     Node {
@@ -366,8 +370,8 @@ fn spawn_battle_ui_inner(
                         } else {
                             Val::Px(112.0)
                         },
-                        // Offset initial hors écran (bas) pour l'animation d'entrée
-                        top: if player_dead { Val::Px(0.0) } else { Val::Px(140.0) },
+                        // Offset initial hors écran uniquement pour l'animation d'entrée
+                        top: if player_entry_anim { Val::Px(140.0) } else { Val::Px(0.0) },
                         ..default()
                     },
                     if player_dead {
@@ -377,7 +381,7 @@ fn spawn_battle_ui_inner(
                     },
                     PlayerSprite,
                 ));
-                if !player_dead {
+                if player_entry_anim {
                     player_entry.insert(BattleEntryAnim {
                         timer: Timer::from_seconds(0.45, TimerMode::Once),
                         is_player: true,
