@@ -60,24 +60,6 @@ pub(crate) struct WaitingDots {
 #[derive(Component)]
 pub(crate) struct BattleRootNode;
 
-/// Phase du zoom séquentiel style Pokémon.
-#[derive(Default, PartialEq, Clone)]
-pub(crate) enum ZoomPhase {
-    #[default]
-    Idle,
-    AttackerZoom,
-    DefenderZoom,
-    ReturnGlobal,
-}
-
-/// Ressource pour le zoom séquentiel : attaquant → défenseur → global.
-#[derive(Resource, Default)]
-pub(crate) struct BattleZoomAnim {
-    pub phase: ZoomPhase,
-    pub progress: f32,
-    /// true = joueur attaque, false = adversaire attaque
-    pub is_player_attack: bool,
-}
 
 /// Ressource qui gère l'état global de l'animation de combat.
 #[derive(Resource)]
@@ -101,6 +83,43 @@ pub(crate) struct AttackFlashOverlay {
     /// Délai avant apparition du flash (laisse le temps aux particules de jouer).
     pub delay: Timer,
     pub started: bool,
+    /// Alpha maximum du flash (0.35 pour hit normal, 0.7 pour critique).
+    pub max_alpha: f32,
+}
+
+/// Filtre de couleur plein-écran déclenché par le type d'attaque (fade in → hold → fade out).
+#[derive(Component)]
+pub(crate) struct BattleColorFilter {
+    pub timer: Timer,
+    /// Couleur du filtre (alpha max inclus dans la couleur).
+    pub color: Color,
+}
+
+/// Effet machine à écrire — révèle le texte du message caractère par caractère.
+#[derive(Component)]
+pub(crate) struct BattleTypewriter {
+    /// Texte complet à révéler.
+    pub full_text: String,
+    /// Timer entre deux caractères.
+    pub char_timer: Timer,
+    /// Nombre de caractères actuellement affichés.
+    pub displayed: usize,
+    /// true quand tous les caractères sont visibles.
+    pub done: bool,
+}
+
+/// Indicateur ▼ clignotant — affiché quand le message est entièrement révélé.
+#[derive(Component)]
+pub(crate) struct BattlePromptArrow {
+    pub timer: Timer,
+}
+
+/// Animation d'entrée en combat : le sprite glisse depuis l'extérieur de l'écran.
+#[derive(Component)]
+pub(crate) struct BattleEntryAnim {
+    pub timer: Timer,
+    /// true = joueur (entre par le bas), false = adversaire (entre par le haut).
+    pub is_player: bool,
 }
 
 /// Construit l'UI de combat.
@@ -171,12 +190,19 @@ fn spawn_battle_ui_inner(
                 ..default()
             })
             .with_children(|top| {
-                // Stats adversaire + barre PV (à gauche)
-                top.spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    flex_grow: 1.0,
-                    ..default()
-                })
+                // Stats adversaire + barre PV (à gauche — encadré style Pokémon)
+                top.spawn((
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        flex_grow: 1.0,
+                        padding: UiRect::all(Val::Px(8.0)),
+                        border: UiRect::all(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
+                    BorderColor(Color::srgba(0.85, 0.85, 1.0, 0.3)),
+                    BorderRadius::all(Val::Px(8.0)),
+                ))
                 .with_children(|info| {
                     info.spawn((
                         Text::new(format!(
@@ -270,7 +296,7 @@ fn spawn_battle_ui_inner(
                         .iter()
                         .any(|m| matches!(m.anim_type, Some(AnimationType::OpponentFaint))));
                 let opponent_dead = battle.opponent.current_hp == 0 && !faint_still_pending;
-                top.spawn((
+                let mut opp_entry = top.spawn((
                     ImageNode::new(handle),
                     Node {
                         width: Val::Px(80.0),
@@ -279,6 +305,8 @@ fn spawn_battle_ui_inner(
                         } else {
                             Val::Px(80.0)
                         },
+                        // Offset initial hors écran (haut) pour l'animation d'entrée
+                        top: if opponent_dead { Val::Px(0.0) } else { Val::Px(-120.0) },
                         ..default()
                     },
                     if opponent_dead {
@@ -288,6 +316,12 @@ fn spawn_battle_ui_inner(
                     },
                     OpponentSprite,
                 ));
+                if !opponent_dead {
+                    opp_entry.insert(BattleEntryAnim {
+                        timer: Timer::from_seconds(0.4, TimerMode::Once),
+                        is_player: false,
+                    });
+                }
             });
 
             // ── Zone joueur (bas-gauche, style Pokémon) ──────────
@@ -323,7 +357,7 @@ fn spawn_battle_ui_inner(
                         .iter()
                         .any(|m| matches!(m.anim_type, Some(AnimationType::PlayerFaint))));
                 let player_dead = battle.player.current_hp == 0 && !faint_still_pending;
-                bottom.spawn((
+                let mut player_entry = bottom.spawn((
                     ImageNode::new(handle),
                     Node {
                         width: Val::Px(112.0),
@@ -332,6 +366,8 @@ fn spawn_battle_ui_inner(
                         } else {
                             Val::Px(112.0)
                         },
+                        // Offset initial hors écran (bas) pour l'animation d'entrée
+                        top: if player_dead { Val::Px(0.0) } else { Val::Px(140.0) },
                         ..default()
                     },
                     if player_dead {
@@ -341,15 +377,28 @@ fn spawn_battle_ui_inner(
                     },
                     PlayerSprite,
                 ));
+                if !player_dead {
+                    player_entry.insert(BattleEntryAnim {
+                        timer: Timer::from_seconds(0.45, TimerMode::Once),
+                        is_player: true,
+                    });
+                }
 
-                // Stats joueur + barre PV (à droite)
+                // Stats joueur + barre PV (à droite — encadré style Pokémon)
                 bottom
-                    .spawn(Node {
-                        flex_direction: FlexDirection::Column,
-                        align_items: AlignItems::FlexEnd,
-                        flex_grow: 1.0,
-                        ..default()
-                    })
+                    .spawn((
+                        Node {
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::FlexEnd,
+                            flex_grow: 1.0,
+                            padding: UiRect::all(Val::Px(8.0)),
+                            border: UiRect::all(Val::Px(2.0)),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
+                        BorderColor(Color::srgba(0.85, 0.85, 1.0, 0.3)),
+                        BorderRadius::all(Val::Px(8.0)),
+                    ))
                     .with_children(|info| {
                         info.spawn((
                             Text::new(
@@ -417,133 +466,190 @@ fn spawn_battle_ui_inner(
                     });
             });
 
-            // ── Zone actions / messages (bas) ────────────────────
-            root.spawn(Node {
-                flex_direction: FlexDirection::Column,
-                width: Val::Percent(100.0),
-                padding: UiRect::all(Val::Px(8.0)),
-                ..default()
-            })
+            // ── Zone actions / messages (bas) — style Pokémon ────
+            root.spawn((
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    width: Val::Percent(100.0),
+                    row_gap: Val::Px(5.0),
+                    ..default()
+                },
+            ))
             .with_children(|actions| {
-                // Message courant
-                if let Some(ref msg) = battle.current_message {
-                    let msg_color = match msg.style {
-                        MessageStyle::PlayerAttack => colors::ACCENT_BLUE,
-                        MessageStyle::OpponentAttack => colors::ACCENT_RED,
-                        MessageStyle::Victory => colors::ACCENT_GREEN,
-                        MessageStyle::Defeat => colors::ACCENT_RED,
-                        _ => colors::TEXT_PRIMARY,
-                    };
+                // === BOÎTE DE DIALOGUE style Pokémon ===
+                // Visible quand il y a un message ou une attente PvP.
+                let has_message = battle.current_message.is_some() || is_waiting;
+                if has_message {
                     actions.spawn((
-                        Text::new(msg.text.clone()),
-                        TextFont {
-                            font_size: fonts::BODY,
-                            ..default()
-                        },
-                        TextColor(msg_color),
                         Node {
-                            margin: UiRect::bottom(Val::Px(8.0)),
+                            flex_direction: FlexDirection::Column,
+                            width: Val::Percent(100.0),
+                            min_height: Val::Px(82.0),
+                            padding: UiRect::new(
+                                Val::Px(14.0), Val::Px(14.0),
+                                Val::Px(10.0), Val::Px(10.0),
+                            ),
+                            border: UiRect::all(Val::Px(3.0)),
+                            position_type: PositionType::Relative,
                             ..default()
                         },
-                    ));
-                } else if is_waiting {
-                    // Texte animé « En attente de l'adversaire... »
-                    actions.spawn((
-                        Text::new("En attente de l'adversaire".to_string()),
-                        TextFont {
-                            font_size: fonts::BODY,
-                            ..default()
-                        },
-                        TextColor(Color::srgba(0.7, 0.7, 0.7, 0.8)),
-                        Node {
-                            margin: UiRect::bottom(Val::Px(8.0)),
-                            ..default()
-                        },
-                        WaitingDots {
-                            timer: Timer::from_seconds(0.5, TimerMode::Repeating),
-                            dots: 0,
-                        },
-                    ));
+                        BackgroundColor(Color::srgb(0.05, 0.05, 0.10)),
+                        BorderColor(Color::srgb(0.80, 0.80, 0.90)),
+                        BorderRadius::all(Val::Px(10.0)),
+                    ))
+                    .with_children(|msg_box| {
+                        if let Some(ref msg) = battle.current_message {
+                            let msg_color = match msg.style {
+                                MessageStyle::PlayerAttack   => colors::ACCENT_BLUE,
+                                MessageStyle::OpponentAttack => colors::ACCENT_RED,
+                                MessageStyle::Victory        => colors::ACCENT_GREEN,
+                                MessageStyle::Defeat         => colors::ACCENT_RED,
+                                MessageStyle::Critical | MessageStyle::SuperEffective
+                                    => colors::ACCENT_YELLOW,
+                                _   => colors::TEXT_PRIMARY,
+                            };
+                            // Texte avec effet machine à écrire
+                            msg_box.spawn((
+                                Text::new(String::new()),
+                                TextFont { font_size: fonts::BODY, ..default() },
+                                TextColor(msg_color),
+                                BattleTypewriter {
+                                    full_text: msg.text.clone(),
+                                    char_timer: Timer::from_seconds(0.033, TimerMode::Repeating),
+                                    displayed: 0,
+                                    done: false,
+                                },
+                            ));
+                            // Indicateur ▼ clignotant en bas à droite
+                            msg_box.spawn((
+                                Text::new("▼"),
+                                TextFont { font_size: 13.0, ..default() },
+                                TextColor(Color::srgba(1.0, 1.0, 1.0, 0.0)),
+                                Node {
+                                    position_type: PositionType::Absolute,
+                                    right: Val::Px(10.0),
+                                    bottom: Val::Px(8.0),
+                                    ..default()
+                                },
+                                BattlePromptArrow {
+                                    timer: Timer::from_seconds(0.55, TimerMode::Repeating),
+                                },
+                            ));
+                        } else if is_waiting {
+                            msg_box.spawn((
+                                Text::new("En attente de l'adversaire".to_string()),
+                                TextFont { font_size: fonts::BODY, ..default() },
+                                TextColor(Color::srgba(0.7, 0.7, 0.7, 0.8)),
+                                WaitingDots {
+                                    timer: Timer::from_seconds(0.5, TimerMode::Repeating),
+                                    dots: 0,
+                                },
+                            ));
+                        }
+                    });
                 }
 
+                // === BOUTONS ===
                 match battle.phase {
                     BattlePhase::PlayerChooseAttack => {
-                        // Boutons d'attaque
+                        // Boutons d'attaque avec badge de type coloré
                         for (i, attack) in battle.player.attacks.iter().enumerate() {
                             let selected = i == battle.attack_menu_index;
-                            let bg = if selected {
-                                colors::ACCENT_YELLOW
-                            } else {
-                                colors::PANEL
-                            };
-                            let txt_color = if selected {
-                                Color::BLACK
-                            } else {
-                                colors::TEXT_PRIMARY
-                            };
+                            let (badge_bg, badge_txt) = element_badge_colors(attack.element);
 
                             actions
                                 .spawn((
                                     Node {
                                         width: Val::Percent(100.0),
-                                        padding: UiRect::axes(Val::Px(16.0), Val::Px(10.0)),
-                                        margin: UiRect::bottom(Val::Px(4.0)),
+                                        flex_direction: FlexDirection::Row,
+                                        align_items: AlignItems::Center,
+                                        column_gap: Val::Px(10.0),
+                                        padding: UiRect::axes(Val::Px(10.0), Val::Px(10.0)),
+                                        border: UiRect::left(Val::Px(4.0)),
                                         ..default()
                                     },
-                                    BackgroundColor(bg),
+                                    BackgroundColor(if selected {
+                                        Color::srgb(0.18, 0.18, 0.28)
+                                    } else {
+                                        colors::PANEL
+                                    }),
+                                    BorderColor(badge_bg),
                                     BorderRadius::all(Val::Px(6.0)),
                                     AttackButton { index: i },
                                     Interaction::default(),
                                 ))
                                 .with_children(|btn| {
+                                    // Badge type coloré
                                     btn.spawn((
-                                        Text::new(format!(
-                                            "[{}] {}  (Puissance: {})",
-                                            attack.element, attack.name, attack.power,
-                                        )),
-                                        TextFont {
-                                            font_size: fonts::BODY,
+                                        Node {
+                                            padding: UiRect::axes(Val::Px(7.0), Val::Px(3.0)),
                                             ..default()
                                         },
-                                        TextColor(txt_color),
+                                        BackgroundColor(badge_bg),
+                                        BorderRadius::all(Val::Px(4.0)),
+                                    ))
+                                    .with_children(|badge| {
+                                        badge.spawn((
+                                            Text::new(format!("{}", attack.element)),
+                                            TextFont { font_size: 12.0, ..default() },
+                                            TextColor(badge_txt),
+                                        ));
+                                    });
+
+                                    // Nom de l'attaque (flex-grow)
+                                    btn.spawn((
+                                        Node { flex_grow: 1.0, ..default() },
+                                    ))
+                                    .with_children(|name_col| {
+                                        name_col.spawn((
+                                            Text::new(attack.name.clone()),
+                                            TextFont { font_size: fonts::BODY, ..default() },
+                                            TextColor(if selected {
+                                                colors::ACCENT_YELLOW
+                                            } else {
+                                                colors::TEXT_PRIMARY
+                                            }),
+                                        ));
+                                    });
+
+                                    // Puissance à droite
+                                    btn.spawn((
+                                        Text::new(format!("Puiss. {}", attack.power)),
+                                        TextFont { font_size: fonts::SMALL, ..default() },
+                                        TextColor(colors::TEXT_SECONDARY),
                                     ));
                                 });
                         }
 
-                        // Bouton « Fuir »
+                        // Bouton « Fuir » — discret
                         actions
                             .spawn((
                                 Node {
                                     width: Val::Percent(100.0),
-                                    padding: UiRect::axes(Val::Px(16.0), Val::Px(10.0)),
-                                    margin: UiRect::top(Val::Px(8.0)),
+                                    padding: UiRect::axes(Val::Px(16.0), Val::Px(8.0)),
+                                    margin: UiRect::top(Val::Px(2.0)),
                                     justify_content: JustifyContent::Center,
                                     ..default()
                                 },
-                                BackgroundColor(colors::ACCENT_RED),
+                                BackgroundColor(Color::srgba(0.96, 0.26, 0.21, 0.12)),
                                 BorderRadius::all(Val::Px(6.0)),
                                 FleeButton,
                                 Interaction::default(),
                             ))
                             .with_children(|btn| {
                                 btn.spawn((
-                                    Text::new("Fuir le combat"),
-                                    TextFont {
-                                        font_size: fonts::BODY,
-                                        ..default()
-                                    },
-                                    TextColor(Color::WHITE),
+                                    Text::new("Fuir"),
+                                    TextFont { font_size: fonts::SMALL, ..default() },
+                                    TextColor(colors::ACCENT_RED),
                                 ));
                             });
                     }
                     BattlePhase::Victory if battle.is_over() => {
-                        // Bouton retour après victoire (tous les messages affichés)
                         actions
                             .spawn((
                                 Node {
                                     width: Val::Percent(100.0),
                                     padding: UiRect::axes(Val::Px(16.0), Val::Px(14.0)),
-                                    margin: UiRect::top(Val::Px(8.0)),
                                     justify_content: JustifyContent::Center,
                                     ..default()
                                 },
@@ -555,22 +661,17 @@ fn spawn_battle_ui_inner(
                             .with_children(|btn| {
                                 btn.spawn((
                                     Text::new("Victoire ! Retour au menu"),
-                                    TextFont {
-                                        font_size: fonts::BODY,
-                                        ..default()
-                                    },
+                                    TextFont { font_size: fonts::BODY, ..default() },
                                     TextColor(Color::BLACK),
                                 ));
                             });
                     }
                     BattlePhase::Defeat if battle.is_over() => {
-                        // Bouton retour après défaite (tous les messages affichés)
                         actions
                             .spawn((
                                 Node {
                                     width: Val::Percent(100.0),
                                     padding: UiRect::axes(Val::Px(16.0), Val::Px(14.0)),
-                                    margin: UiRect::top(Val::Px(8.0)),
                                     justify_content: JustifyContent::Center,
                                     ..default()
                                 },
@@ -581,39 +682,34 @@ fn spawn_battle_ui_inner(
                             ))
                             .with_children(|btn| {
                                 btn.spawn((
-                                    Text::new("Defaite... Retour au menu"),
-                                    TextFont {
-                                        font_size: fonts::BODY,
-                                        ..default()
-                                    },
+                                    Text::new("Défaite... Retour au menu"),
+                                    TextFont { font_size: fonts::BODY, ..default() },
                                     TextColor(Color::WHITE),
                                 ));
                             });
                     }
                     _ => {
-                        // Autres phases : bouton « Continuer » pour avancer les messages
+                        // Bouton discret « Appuyer pour continuer »
                         actions
                             .spawn((
                                 Node {
                                     width: Val::Percent(100.0),
-                                    padding: UiRect::axes(Val::Px(16.0), Val::Px(12.0)),
-                                    margin: UiRect::top(Val::Px(8.0)),
+                                    padding: UiRect::axes(Val::Px(16.0), Val::Px(10.0)),
                                     justify_content: JustifyContent::Center,
+                                    border: UiRect::all(Val::Px(1.0)),
                                     ..default()
                                 },
-                                BackgroundColor(colors::PANEL),
+                                BackgroundColor(Color::srgba(0.12, 0.12, 0.20, 0.6)),
+                                BorderColor(Color::srgba(0.5, 0.5, 0.6, 0.3)),
                                 BorderRadius::all(Val::Px(6.0)),
                                 ContinueButton,
                                 Interaction::default(),
                             ))
                             .with_children(|btn| {
                                 btn.spawn((
-                                    Text::new("Continuer..."),
-                                    TextFont {
-                                        font_size: fonts::BODY,
-                                        ..default()
-                                    },
-                                    TextColor(colors::TEXT_PRIMARY),
+                                    Text::new("Appuyer pour continuer"),
+                                    TextFont { font_size: fonts::SMALL, ..default() },
+                                    TextColor(colors::TEXT_SECONDARY),
                                 ));
                             });
                     }
@@ -656,7 +752,36 @@ pub(crate) fn handle_battle_input(
     continue_query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
     screen_entities: Query<Entity, With<ScreenEntity>>,
     metrics: Res<ScreenMetrics>,
+    anim_timer: Option<Res<BattleAnimTimer>>,
+    mut typewriter_query: Query<(&mut Text, &mut BattleTypewriter)>,
 ) {
+    // === Pré-vérification : machine à écrire ===
+    // Si le joueur appuie et qu'un texte est en cours de révélation, on le complète
+    // immédiatement plutôt que d'avancer au message suivant.
+    {
+        let any_pressed = keyboard.just_pressed(KeyCode::Enter)
+            || keyboard.just_pressed(KeyCode::Space)
+            || continue_query.iter().any(|i| *i == Interaction::Pressed);
+        if any_pressed {
+            let mut completed_any = false;
+            for (mut text, mut tw) in &mut typewriter_query {
+                if !tw.done {
+                    tw.done = true;
+                    *text = Text::new(tw.full_text.clone());
+                    completed_any = true;
+                }
+            }
+            if completed_any {
+                return; // Le texte vient d'être complété — attendre le prochain tap
+            }
+        }
+    }
+
+    // === Bloquer les inputs pendant les animations de combat ===
+    // (les animations doivent se terminer avant que le joueur puisse avancer)
+    if anim_timer.is_some() {
+        return;
+    }
     let is_pvp = net_task
         .as_ref()
         .map(|t| t.action == NetTaskAction::Pvp)
@@ -711,10 +836,11 @@ pub(crate) fn handle_battle_input(
                                 // Capture l'élément de l'attaque avant de l'exécuter
                                 let attack_element = battle.player.attacks[btn.index].element;
                                 battle.player_attack(btn.index);
-                                // Émettre l'effet de combat (particules)
+                                // Émettre l'effet de combat (particules) — délai = moment d'impact
                                 attack_effects.send(PlayAttackEffect {
                                     element: attack_element,
                                     position: Vec2::new(0.65, 0.30), // Position adversaire (viewport %)
+                                    startup_delay: 0.42,
                                 });
                                 act = Action::Rebuild;
                             }
@@ -759,6 +885,7 @@ pub(crate) fn handle_battle_input(
                                 attack_effects.send(PlayAttackEffect {
                                     element: attack_element,
                                     position: Vec2::new(0.65, 0.30), // Position adversaire (viewport %)
+                                    startup_delay: 0.42,
                                 });
                                 act = Action::Rebuild;
                             }
@@ -867,11 +994,68 @@ pub(crate) fn handle_battle_input(
                             timer: Timer::from_seconds(duration, TimerMode::Once),
                             anim: anim.clone(),
                         });
-                        // Flash blanc uniquement sur coup critique, après les particules
                         match anim {
+                            AnimationType::PlayerAttack => {
+                                // Filtre couleur de l'élément du joueur pendant l'attaque
+                                let color = element_filter_color(battle.player.element);
+                                commands.spawn((
+                                    Node {
+                                        width: Val::Percent(100.0),
+                                        height: Val::Percent(100.0),
+                                        position_type: PositionType::Absolute,
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+                                    GlobalZIndex(40),
+                                    BattleColorFilter {
+                                        timer: Timer::from_seconds(duration, TimerMode::Once),
+                                        color,
+                                    },
+                                ));
+                            }
+                            AnimationType::OpponentAttack => {
+                                // Filtre couleur de l'élément adversaire + particules sur le joueur
+                                let color = element_filter_color(battle.opponent.element);
+                                commands.spawn((
+                                    Node {
+                                        width: Val::Percent(100.0),
+                                        height: Val::Percent(100.0),
+                                        position_type: PositionType::Absolute,
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+                                    GlobalZIndex(40),
+                                    BattleColorFilter {
+                                        timer: Timer::from_seconds(duration, TimerMode::Once),
+                                        color,
+                                    },
+                                ));
+                                attack_effects.send(PlayAttackEffect {
+                                    element: battle.opponent.element,
+                                    position: Vec2::new(0.35, 0.65),
+                                    startup_delay: 0.42,
+                                });
+                            }
+                            AnimationType::PlayerHit | AnimationType::OpponentHit => {
+                                // Flash léger sur hit normal
+                                commands.spawn((
+                                    Node {
+                                        width: Val::Percent(100.0),
+                                        height: Val::Percent(100.0),
+                                        position_type: PositionType::Absolute,
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.0)),
+                                    GlobalZIndex(100),
+                                    AttackFlashOverlay {
+                                        timer: Timer::from_seconds(0.12, TimerMode::Once),
+                                        delay: Timer::from_seconds(0.20, TimerMode::Once),
+                                        started: false,
+                                        max_alpha: 0.35,
+                                    },
+                                ));
+                            }
                             AnimationType::PlayerHitCritical | AnimationType::OpponentHitCritical => {
-                                // Durée des particules ≈ 0.36s (3 frames × 0.12s × 2 loops)
-                                // On déclenche le flash après ce délai
                                 commands.spawn((
                                     Node {
                                         width: Val::Percent(100.0),
@@ -885,6 +1069,7 @@ pub(crate) fn handle_battle_input(
                                         timer: Timer::from_seconds(0.18, TimerMode::Once),
                                         delay: Timer::from_seconds(0.36, TimerMode::Once),
                                         started: false,
+                                        max_alpha: 0.7,
                                     },
                                 ));
                             }
@@ -1228,61 +1413,63 @@ pub(crate) fn animate_battle_sprites(
 
     match anim.anim {
         AnimationType::PlayerAttack => {
-            // Lunge style Pokémon : dash rapide vers l'adversaire puis retour
+            // Dash ample style Gen 5 (durée 0.9s) : charge-up → rush → impact → retour
             if let Ok((mut node, _)) = player_sprite.get_single_mut() {
-                let (offset_y, offset_x) = if progress < 0.3 {
-                    // Phase d'élan : recul léger
-                    let t = progress / 0.3;
-                    (5.0 * t, -3.0 * t)
-                } else if progress < 0.5 {
-                    // Phase d'attaque : dash vers l'adversaire (haut-droite)
-                    let t = (progress - 0.3) / 0.2;
-                    let ease = t * t; // ease-in
-                    (5.0 - 40.0 * ease, -3.0 + 20.0 * ease)
-                } else if progress < 0.55 {
-                    // Pause à l'impact
-                    (-35.0, 17.0)
+                let (offset_y, offset_x) = if progress < 0.22 {
+                    // Charge-up : recul vers le bas-gauche
+                    let t = progress / 0.22;
+                    let ease = t * t;
+                    (8.0 * ease, -10.0 * ease)
+                } else if progress < 0.47 {
+                    // Rush très rapide vers l'adversaire (haut-droite)
+                    let t = (progress - 0.22) / 0.25;
+                    let ease = t * t; // ease-in accéléré
+                    (8.0 - 65.0 * ease, -10.0 + 75.0 * ease)
+                } else if progress < 0.57 {
+                    // Pause à l'impact (plus longue avec 0.9s)
+                    (-57.0, 65.0)
                 } else {
-                    // Retour à la position d'origine
-                    let t = (progress - 0.55) / 0.45;
-                    let ease = 1.0 - (1.0 - t) * (1.0 - t); // ease-out
-                    (-35.0 * (1.0 - ease), 17.0 * (1.0 - ease))
+                    // Retour fluide
+                    let t = (progress - 0.57) / 0.43;
+                    let ease = 1.0 - (1.0 - t) * (1.0 - t);
+                    (-57.0 * (1.0 - ease), 65.0 * (1.0 - ease))
                 };
                 node.top = Val::Px(offset_y);
                 node.left = Val::Px(offset_x);
             }
         }
         AnimationType::OpponentAttack => {
-            // Lunge style Pokémon : dash rapide vers le joueur puis retour
+            // Dash ample de l'adversaire vers le joueur (miroir)
             if let Ok((mut node, _)) = opponent_sprite.get_single_mut() {
-                let (offset_y, offset_x) = if progress < 0.3 {
-                    let t = progress / 0.3;
-                    (-5.0 * t, 3.0 * t)
-                } else if progress < 0.5 {
-                    let t = (progress - 0.3) / 0.2;
+                let (offset_y, offset_x) = if progress < 0.22 {
+                    let t = progress / 0.22;
                     let ease = t * t;
-                    (-5.0 + 40.0 * ease, 3.0 - 20.0 * ease)
-                } else if progress < 0.55 {
-                    (35.0, -17.0)
+                    (-6.0 * ease, 8.0 * ease)
+                } else if progress < 0.47 {
+                    let t = (progress - 0.22) / 0.25;
+                    let ease = t * t;
+                    (-6.0 + 52.0 * ease, 8.0 - 60.0 * ease)
+                } else if progress < 0.57 {
+                    (46.0, -52.0)
                 } else {
-                    let t = (progress - 0.55) / 0.45;
+                    let t = (progress - 0.57) / 0.43;
                     let ease = 1.0 - (1.0 - t) * (1.0 - t);
-                    (35.0 * (1.0 - ease), -17.0 * (1.0 - ease))
+                    (46.0 * (1.0 - ease), -52.0 * (1.0 - ease))
                 };
                 node.top = Val::Px(offset_y);
                 node.left = Val::Px(offset_x);
             }
         }
         AnimationType::PlayerHit => {
-            // Clignotement rapide + tremblement (style Pokémon : blink + shake)
+            // Tremblement fort + clignotement rapide style Gen 5
             if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
-                // Tremblement avec amplitude décroissante
-                let shake_amp = 8.0 * (1.0 - progress);
-                let shake = (progress * 30.0 * std::f32::consts::PI).sin() * shake_amp;
+                // Shake latéral avec pic au début puis amplitude décroissante
+                let shake_amp = 12.0 * (1.0 - progress).powf(0.6);
+                let shake = (progress * 32.0 * std::f32::consts::PI).sin() * shake_amp;
                 node.left = Val::Px(shake);
 
-                // Clignotement rapide (toggle visible/invisible)
-                let blink_cycle = (progress * 20.0) as u32;
+                // Clignotement rapide (5 cycles sur la durée)
+                let blink_cycle = (progress * 22.0) as u32;
                 *vis = if blink_cycle.is_multiple_of(2) {
                     Visibility::Visible
                 } else {
@@ -1291,13 +1478,13 @@ pub(crate) fn animate_battle_sprites(
             }
         }
         AnimationType::OpponentHit => {
-            // Clignotement rapide + tremblement (style Pokémon)
+            // Tremblement + clignotement (même logique côté adversaire)
             if let Ok((mut node, mut vis)) = opponent_sprite.get_single_mut() {
-                let shake_amp = 8.0 * (1.0 - progress);
-                let shake = (progress * 30.0 * std::f32::consts::PI).sin() * shake_amp;
+                let shake_amp = 12.0 * (1.0 - progress).powf(0.6);
+                let shake = (progress * 32.0 * std::f32::consts::PI).sin() * shake_amp;
                 node.left = Val::Px(shake);
 
-                let blink_cycle = (progress * 20.0) as u32;
+                let blink_cycle = (progress * 22.0) as u32;
                 *vis = if blink_cycle.is_multiple_of(2) {
                     Visibility::Visible
                 } else {
@@ -1306,43 +1493,50 @@ pub(crate) fn animate_battle_sprites(
             }
         }
         AnimationType::PlayerHitCritical => {
-            // Coup critique : même tremblement que PlayerHit mais plus fort
+            // Coup critique : tremblement très fort + clignotement intense
             if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
-                let shake_amp = 14.0 * (1.0 - progress);
-                let shake = (progress * 35.0 * std::f32::consts::PI).sin() * shake_amp;
+                let shake_amp = 18.0 * (1.0 - progress).powf(0.5);
+                let shake = (progress * 40.0 * std::f32::consts::PI).sin() * shake_amp;
                 node.left = Val::Px(shake);
-                let blink_cycle = (progress * 24.0) as u32;
+                let blink_cycle = (progress * 28.0) as u32;
                 *vis = if blink_cycle.is_multiple_of(2) { Visibility::Visible } else { Visibility::Hidden };
             }
         }
         AnimationType::OpponentHitCritical => {
-            // Coup critique sur l'adversaire : tremblement amplifié
+            // Coup critique sur l'adversaire : tremblement très fort
             if let Ok((mut node, mut vis)) = opponent_sprite.get_single_mut() {
-                let shake_amp = 14.0 * (1.0 - progress);
-                let shake = (progress * 35.0 * std::f32::consts::PI).sin() * shake_amp;
+                let shake_amp = 18.0 * (1.0 - progress).powf(0.5);
+                let shake = (progress * 40.0 * std::f32::consts::PI).sin() * shake_amp;
                 node.left = Val::Px(shake);
-                let blink_cycle = (progress * 24.0) as u32;
+                let blink_cycle = (progress * 28.0) as u32;
                 *vis = if blink_cycle.is_multiple_of(2) { Visibility::Visible } else { Visibility::Hidden };
             }
         }
         AnimationType::PlayerFaint => {
-            // K.O. style Pokémon : le sprite rétrécit vers le bas et disparaît
+            // K.O. style Gen 5 : le sprite tombe hors écran avec accélération + clignotement
             if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
-                let shrink = 1.0 - progress;
-                node.height = Val::Px(112.0 * shrink);
-                // Glisser vers le bas en rétrécissant
-                node.top = Val::Px(112.0 * progress * 0.5);
+                let ease_in = progress * progress; // accélération gravitationnelle
+                // Glisse vers le bas de manière accélérée
+                node.top = Val::Px(160.0 * ease_in);
+                // Clignotement à partir de 40% de l'animation
+                if progress > 0.4 {
+                    let blink_cycle = ((progress - 0.4) / 0.6 * 18.0) as u32;
+                    *vis = if blink_cycle.is_multiple_of(2) { Visibility::Visible } else { Visibility::Hidden };
+                }
                 if progress > 0.95 {
                     *vis = Visibility::Hidden;
                 }
             }
         }
         AnimationType::OpponentFaint => {
-            // K.O. style Pokémon : le sprite rétrécit vers le bas et disparaît
+            // K.O. style Gen 5 : tombe hors écran avec accélération + clignotement
             if let Ok((mut node, mut vis)) = opponent_sprite.get_single_mut() {
-                let shrink = 1.0 - progress;
-                node.height = Val::Px(80.0 * shrink);
-                node.top = Val::Px(80.0 * progress * 0.5);
+                let ease_in = progress * progress;
+                node.top = Val::Px(120.0 * ease_in);
+                if progress > 0.4 {
+                    let blink_cycle = ((progress - 0.4) / 0.6 * 18.0) as u32;
+                    *vis = if blink_cycle.is_multiple_of(2) { Visibility::Visible } else { Visibility::Hidden };
+                }
                 if progress > 0.95 {
                     *vis = Visibility::Hidden;
                 }
@@ -1356,28 +1550,28 @@ pub(crate) fn animate_battle_sprites(
             AnimationType::PlayerFaint => {
                 if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
                     node.height = Val::Px(0.0);
-                    node.top = Val::Auto;
-                    node.left = Val::Auto;
+                    node.top = Val::Px(0.0);
+                    node.left = Val::Px(0.0);
                     *vis = Visibility::Hidden;
                 }
             }
             AnimationType::OpponentFaint => {
                 if let Ok((mut node, mut vis)) = opponent_sprite.get_single_mut() {
                     node.height = Val::Px(0.0);
-                    node.top = Val::Auto;
-                    node.left = Val::Auto;
+                    node.top = Val::Px(0.0);
+                    node.left = Val::Px(0.0);
                     *vis = Visibility::Hidden;
                 }
             }
             _ => {
                 if let Ok((mut node, mut vis)) = player_sprite.get_single_mut() {
-                    node.top = Val::Auto;
-                    node.left = Val::Auto;
+                    node.top = Val::Px(0.0);
+                    node.left = Val::Px(0.0);
                     *vis = Visibility::Visible;
                 }
                 if let Ok((mut node, mut vis)) = opponent_sprite.get_single_mut() {
-                    node.top = Val::Auto;
-                    node.left = Val::Auto;
+                    node.top = Val::Px(0.0);
+                    node.left = Val::Px(0.0);
                     *vis = Visibility::Visible;
                 }
             }
@@ -1407,137 +1601,27 @@ pub(crate) fn animate_idle_sprites(
 
     let t = time.elapsed_secs();
     if let Ok(mut node) = player_sprite.get_single_mut() {
-        node.top = Val::Px((t * 1.5 * std::f32::consts::TAU).sin() * 3.0);
+        // Bob plus prononcé style Gen 5 : amplitude 5px, rythme légèrement plus rapide
+        node.top = Val::Px((t * 1.8 * std::f32::consts::TAU).sin() * 5.0);
     }
     if let Ok(mut node) = opponent_sprite.get_single_mut() {
-        node.top = Val::Px((t * 1.3 * std::f32::consts::TAU + 1.0).sin() * 2.0);
+        // Adversaire oscille en décalage de phase
+        node.top = Val::Px((t * 1.5 * std::f32::consts::TAU + 1.2).sin() * 3.5);
     }
 }
 
-/// Zoom caméra séquentiel style Pokémon N&B.
-/// Simule un travelling caméra en scalant + translatant le nœud racine :
-///   Phase 1 (AttackerZoom) : zoom vers l'attaquant
-///   Phase 1 (AttackerZoom) : le sprite attaquant grossit, s'approche du centre
-///   Phase 2 (DefenderZoom) : l'attaquant revient, le défenseur grossit
-///   Phase 3 (ReturnGlobal) : retour tailles normales
-///
-/// On manipule directement width/height des sprites — pas de Transform global.
-/// Zoom caméra style Pokémon N&B — lit la position réelle des sprites via GlobalTransform
-/// et calcule le pivot exact pour compenser le scale.
-/// Formule : translation = -pivot_world * (scale - 1.0)
+/// Zoom désactivé — garantit que UiScale et margin restent à leur valeur par défaut.
 pub(crate) fn animate_attack_zoom(
-    time: Res<Time>,
-    anim_timer: Option<Res<BattleAnimTimer>>,
-    mut zoom: ResMut<BattleZoomAnim>,
     mut ui_scale: ResMut<UiScale>,
     mut root_query: Query<&mut Node, With<BattleRootNode>>,
-    windows: Query<&Window>,
 ) {
-    // Détecter le début d'une attaque
-    if zoom.phase == ZoomPhase::Idle {
-        if let Some(ref anim) = anim_timer {
-            match &anim.anim {
-                AnimationType::PlayerAttack => {
-                    zoom.phase = ZoomPhase::AttackerZoom;
-                    zoom.progress = 0.0;
-                    zoom.is_player_attack = true;
-                }
-                AnimationType::OpponentAttack => {
-                    zoom.phase = ZoomPhase::AttackerZoom;
-                    zoom.progress = 0.0;
-                    zoom.is_player_attack = false;
-                }
-                _ => {}
-            }
-        }
-        return;
+    if (ui_scale.0 - 1.0).abs() > 0.001 {
+        ui_scale.0 = 1.0;
     }
-
-    let speed = match zoom.phase {
-        ZoomPhase::AttackerZoom => 5.0,
-        ZoomPhase::DefenderZoom => 5.0,
-        ZoomPhase::ReturnGlobal => 4.0,
-        ZoomPhase::Idle => return,
-    };
-    zoom.progress += time.delta_secs() * speed;
-
-    if zoom.progress >= 1.0 {
-        zoom.progress = 0.0;
-        zoom.phase = match zoom.phase {
-            ZoomPhase::AttackerZoom => ZoomPhase::DefenderZoom,
-            ZoomPhase::DefenderZoom => ZoomPhase::ReturnGlobal,
-            ZoomPhase::ReturnGlobal | ZoomPhase::Idle => {
-                // Reset UiScale et padding
-                ui_scale.0 = 1.0;
-                for mut node in &mut root_query {
-                    node.margin = UiRect::ZERO;
-                }
-                ZoomPhase::Idle
-            }
-        };
-        return;
-    }
-
-    // ease in-out
-    let ease = {
-        let t = zoom.progress;
-        t * t * (3.0 - 2.0 * t)
-    };
-
-    let win = windows.get_single().map(|w| Vec2::new(w.width(), w.height())).unwrap_or(Vec2::new(480.0, 854.0));
-
-    // Position des monstres en % de la fenêtre (haut-gauche = 0,0)
-    // Joueur : bas-droite  → 70% x, 70% y
-    // Adversaire : haut-gauche → 30% x, 25% y
-    let player_pct  = Vec2::new(0.70, 0.70);
-    let opp_pct     = Vec2::new(0.30, 0.25);
-
-    let (attacker_pct, defender_pct) = if zoom.is_player_attack {
-        (player_pct, opp_pct)
-    } else {
-        (opp_pct, player_pct)
-    };
-
-    let zoom_scale = 1.6_f32;
-
-    // UiScale grossit tout l'UI.
-    // Pour que le point (px, py) reste au centre visible après zoom :
-    //   margin_left = -(px - 0.5) * win.x * (scale - 1)  * 2
-    //   margin_top  = -(py - 0.5) * win.y * (scale - 1)  * 2
-    // (le facteur 2 vient du fait que margin déplace depuis l'origine haut-gauche)
-    let compute_margin = |pct: Vec2, scale: f32| -> (f32, f32) {
-        let offset_x = -(pct.x - 0.5) * win.x * (scale - 1.0);
-        let offset_y = -(pct.y - 0.5) * win.y * (scale - 1.0);
-        (offset_x, offset_y)
-    };
-
-    let (target_scale, margin_x, margin_y) = match zoom.phase {
-        ZoomPhase::AttackerZoom => {
-            let s = 1.0 + (zoom_scale - 1.0) * ease;
-            let (mx, my) = compute_margin(attacker_pct, s);
-            (s, mx, my)
-        }
-        ZoomPhase::DefenderZoom => {
-            let pct = attacker_pct.lerp(defender_pct, ease);
-            let (mx, my) = compute_margin(pct, zoom_scale);
-            (zoom_scale, mx, my)
-        }
-        ZoomPhase::ReturnGlobal => {
-            let s = zoom_scale + (1.0 - zoom_scale) * ease;
-            let (mx, my) = compute_margin(defender_pct, s);
-            (s, mx, my)
-        }
-        ZoomPhase::Idle => (1.0, 0.0, 0.0),
-    };
-
-    ui_scale.0 = target_scale;
     for mut node in &mut root_query {
-        node.margin = UiRect {
-            left:   Val::Px(margin_x),
-            top:    Val::Px(margin_y),
-            right:  Val::Auto,
-            bottom: Val::Auto,
-        };
+        if node.margin != UiRect::ZERO {
+            node.margin = UiRect::ZERO;
+        }
     }
 }
 
@@ -1653,17 +1737,159 @@ pub(crate) fn animate_attack_flash(
             flash.delay.tick(time.delta());
             if flash.delay.just_finished() {
                 flash.started = true;
-                // Apparition immédiate du flash
-                *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.7));
+                // Apparition immédiate au max alpha
+                *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, flash.max_alpha));
             }
         } else {
             // Phase flash : fade out
             flash.timer.tick(time.delta());
-            let alpha = 0.7 * (1.0 - flash.timer.fraction());
+            let alpha = flash.max_alpha * (1.0 - flash.timer.fraction());
             *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, alpha));
             if flash.timer.just_finished() {
                 commands.entity(entity).despawn_recursive();
             }
+        }
+    }
+}
+
+/// Animation d'entrée style Gen 5 : les sprites glissent depuis l'extérieur de l'écran.
+/// Joueur : arrive par le bas (offset top positif → 0).
+/// Adversaire : arrive par le haut (offset top négatif → 0).
+pub(crate) fn animate_entry_sprites(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut sprites: Query<(Entity, &mut Node, &mut BattleEntryAnim)>,
+) {
+    for (entity, mut node, mut entry) in &mut sprites {
+        entry.timer.tick(time.delta());
+        let progress = entry.timer.fraction();
+        // ease-out quadratique : démarre vite, ralentit à l'arrivée
+        let ease = 1.0 - (1.0 - progress) * (1.0 - progress);
+
+        if entry.is_player {
+            // Joueur : entre par le bas (140px → 0px)
+            node.top = Val::Px(140.0 * (1.0 - ease));
+        } else {
+            // Adversaire : entre par le haut (-120px → 0px)
+            node.top = Val::Px(-120.0 * (1.0 - ease));
+        }
+
+        if entry.timer.just_finished() {
+            node.top = Val::Px(0.0);
+            commands.entity(entity).remove::<BattleEntryAnim>();
+        }
+    }
+}
+
+/// Couleurs du badge de type sur les boutons d'attaque : (fond, texte).
+fn element_badge_colors(element: monster_battle_core::types::ElementType) -> (Color, Color) {
+    use monster_battle_core::types::ElementType;
+    match element {
+        ElementType::Fire     => (Color::srgb(0.85, 0.22, 0.05), Color::WHITE),
+        ElementType::Water    => (Color::srgb(0.10, 0.42, 0.88), Color::WHITE),
+        ElementType::Electric => (Color::srgb(0.95, 0.82, 0.05), Color::srgb(0.1, 0.1, 0.1)),
+        ElementType::Earth    => (Color::srgb(0.55, 0.32, 0.08), Color::WHITE),
+        ElementType::Wind     => (Color::srgb(0.20, 0.72, 0.60), Color::srgb(0.1, 0.1, 0.1)),
+        ElementType::Shadow   => (Color::srgb(0.32, 0.05, 0.62), Color::WHITE),
+        ElementType::Light    => (Color::srgb(0.92, 0.88, 0.35), Color::srgb(0.1, 0.1, 0.1)),
+        ElementType::Plant    => (Color::srgb(0.12, 0.62, 0.12), Color::WHITE),
+        ElementType::Normal   => (Color::srgb(0.40, 0.40, 0.48), Color::WHITE),
+    }
+}
+
+/// Anime le texte caractère par caractère (effet machine à écrire style Pokémon).
+pub(crate) fn animate_typewriter(
+    time: Res<Time>,
+    mut query: Query<(&mut Text, &mut BattleTypewriter)>,
+) {
+    for (mut text, mut tw) in &mut query {
+        if tw.done {
+            continue;
+        }
+        let total = tw.full_text.chars().count();
+        if tw.displayed >= total {
+            tw.done = true;
+            *text = Text::new(tw.full_text.clone());
+            continue;
+        }
+        tw.char_timer.tick(time.delta());
+        let ticks = tw.char_timer.times_finished_this_tick() as usize;
+        if ticks > 0 {
+            tw.displayed = (tw.displayed + ticks).min(total);
+            let revealed: String = tw.full_text.chars().take(tw.displayed).collect();
+            *text = Text::new(revealed);
+            if tw.displayed >= total {
+                tw.done = true;
+            }
+        }
+    }
+}
+
+/// Anime l'indicateur ▼ : visible et clignotant quand le message est entièrement révélé.
+pub(crate) fn animate_prompt_arrow(
+    time: Res<Time>,
+    typewriter_query: Query<&BattleTypewriter>,
+    mut arrow_query: Query<(&mut TextColor, &mut BattlePromptArrow)>,
+) {
+    // L'indicateur n'est visible que si TOUS les typewriters sont terminés
+    let all_done = typewriter_query.iter().all(|tw| tw.done);
+
+    for (mut color, mut arrow) in &mut arrow_query {
+        if !all_done {
+            *color = TextColor(Color::srgba(1.0, 1.0, 1.0, 0.0));
+            continue;
+        }
+        arrow.timer.tick(time.delta());
+        // Clignotement doux (sinusoïde : 0.0 → 1.0 → 0.0)
+        let alpha = ((arrow.timer.fraction() * std::f32::consts::PI).sin()).max(0.0);
+        *color = TextColor(Color::srgba(1.0, 1.0, 1.0, alpha));
+    }
+}
+
+/// Retourne la couleur de filtre associée à un type élémentaire.
+fn element_filter_color(element: monster_battle_core::types::ElementType) -> Color {
+    use monster_battle_core::types::ElementType;
+    match element {
+        ElementType::Fire     => Color::srgba(1.00, 0.25, 0.00, 0.22),
+        ElementType::Water    => Color::srgba(0.00, 0.35, 1.00, 0.22),
+        ElementType::Electric => Color::srgba(1.00, 0.90, 0.00, 0.20),
+        ElementType::Earth    => Color::srgba(0.60, 0.35, 0.05, 0.22),
+        ElementType::Wind     => Color::srgba(0.25, 0.85, 0.65, 0.18),
+        ElementType::Shadow   => Color::srgba(0.35, 0.00, 0.70, 0.25),
+        ElementType::Light    => Color::srgba(1.00, 0.95, 0.55, 0.18),
+        ElementType::Plant    => Color::srgba(0.05, 0.70, 0.10, 0.20),
+        ElementType::Normal   => Color::srgba(0.55, 0.55, 0.55, 0.15),
+    }
+}
+
+/// Anime le filtre de couleur plein-écran déclenché par le type d'attaque.
+/// Enveloppe : fade-in rapide (0–20%) → maintien (20–70%) → fade-out (70–100%).
+pub(crate) fn animate_color_filter(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut BattleColorFilter, &mut BackgroundColor)>,
+) {
+    for (entity, mut filter, mut bg) in &mut query {
+        filter.timer.tick(time.delta());
+        let p = filter.timer.fraction();
+
+        // Extraire la couleur de base (RGBA) pour moduler l'alpha
+        let base = filter.color.to_srgba();
+        let alpha = if p < 0.20 {
+            // Fade-in
+            base.alpha * (p / 0.20)
+        } else if p < 0.70 {
+            // Maintien au max
+            base.alpha
+        } else {
+            // Fade-out
+            base.alpha * (1.0 - (p - 0.70) / 0.30)
+        };
+
+        *bg = BackgroundColor(Color::srgba(base.red, base.green, base.blue, alpha));
+
+        if filter.timer.just_finished() {
+            commands.entity(entity).despawn_recursive();
         }
     }
 }

@@ -19,7 +19,7 @@ pub struct UiPlugin;
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
         app
-            .init_resource::<battle::BattleZoomAnim>()
+            // BattleZoomAnim supprimé (zoom désactivé)
             // ── Menu principal ───────────────────────────────────
             .add_systems(OnEnter(GameScreen::MainMenu), main_menu::spawn_menu)
             .add_systems(
@@ -103,6 +103,10 @@ impl Plugin for UiPlugin {
                     battle::animate_attack_flash,
                     battle::animate_idle_sprites,
                     battle::animate_attack_zoom,
+                    battle::animate_entry_sprites,
+                    battle::animate_color_filter,
+                    battle::animate_typewriter,
+                    battle::animate_prompt_arrow,
                 )
                     .run_if(in_state(GameScreen::Battle)),
             )

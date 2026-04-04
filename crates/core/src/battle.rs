@@ -862,11 +862,14 @@ impl AnimationType {
     /// Durée de cette animation en secondes.
     pub fn duration(&self) -> f32 {
         match self {
-            Self::PlayerAttack | Self::OpponentAttack => 0.45,
-            Self::PlayerHit | Self::OpponentHit => 0.5,
+            // Attaque : animation longue et dramatique
+            Self::PlayerAttack | Self::OpponentAttack => 0.9,
+            // Hit : assez long pour le shake + flash visible
+            Self::PlayerHit | Self::OpponentHit => 0.65,
             // Critique : particules (0.36s) + flash (0.18s) + marge
             Self::PlayerHitCritical | Self::OpponentHitCritical => 0.65,
-            Self::PlayerFaint | Self::OpponentFaint => 0.8,
+            // K.O. : plus long pour la chute hors écran
+            Self::PlayerFaint | Self::OpponentFaint => 1.0,
         }
     }
 }
