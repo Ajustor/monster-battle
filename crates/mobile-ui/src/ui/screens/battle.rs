@@ -137,7 +137,7 @@ pub(crate) fn spawn_battle_ui(
     // Le BattleEffectsContainer est créé dans spawn_battle_ui_inner
     // comme enfant du nœud racine — garanti dans la hiérarchie UI.
 
-    spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
+    spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom, true);
 }
 
 /// Logique interne de création de l'UI de combat (réutilisable).
@@ -148,6 +148,7 @@ fn spawn_battle_ui_inner(
     atlas: &mut sprites::MonsterSpriteAtlas,
     safe_top: f32,
     safe_bottom: f32,
+    is_initial: bool,
 ) {
     let is_waiting = matches!(
         battle.phase,
@@ -296,8 +297,8 @@ fn spawn_battle_ui_inner(
                         .iter()
                         .any(|m| matches!(m.anim_type, Some(AnimationType::OpponentFaint))));
                 let opponent_dead = battle.opponent.current_hp == 0 && !faint_still_pending;
-                // L'animation d'entrée ne joue qu'une seule fois, au début du combat (phase Intro).
-                let opp_entry_anim = !opponent_dead && battle.phase == BattlePhase::Intro;
+                // L'animation d'entrée ne joue qu'une seule fois, au tout premier spawn.
+                let opp_entry_anim = !opponent_dead && is_initial;
                 let mut opp_entry = top.spawn((
                     ImageNode::new(handle),
                     Node {
@@ -359,8 +360,8 @@ fn spawn_battle_ui_inner(
                         .iter()
                         .any(|m| matches!(m.anim_type, Some(AnimationType::PlayerFaint))));
                 let player_dead = battle.player.current_hp == 0 && !faint_still_pending;
-                // L'animation d'entrée ne joue qu'une seule fois, au début du combat (phase Intro).
-                let player_entry_anim = !player_dead && battle.phase == BattlePhase::Intro;
+                // L'animation d'entrée ne joue qu'une seule fois, au tout premier spawn.
+                let player_entry_anim = !player_dead && is_initial;
                 let mut player_entry = bottom.spawn((
                     ImageNode::new(handle),
                     Node {
@@ -1086,7 +1087,7 @@ pub(crate) fn handle_battle_input(
             }
             // Reconstruire avec l'état mis à jour
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom, false);
             }
         }
         Action::EndBattle => {
@@ -1116,7 +1117,7 @@ pub(crate) fn handle_battle_input(
                 commands.entity(entity).despawn_recursive();
             }
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom, false);
             }
         }
         Action::PvpSendReady => {
@@ -1134,7 +1135,7 @@ pub(crate) fn handle_battle_input(
                 commands.entity(entity).despawn_recursive();
             }
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom, false);
             }
         }
         Action::PvpForfeit => {
@@ -1262,7 +1263,7 @@ pub(crate) fn refresh_battle_ui(
 
     // Reconstruire
     if let Some(ref battle) = data.battle_state {
-        spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom);
+        spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom, false);
     }
 }
 
