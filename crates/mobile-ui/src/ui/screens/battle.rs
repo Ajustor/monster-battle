@@ -128,24 +128,24 @@ pub(crate) fn spawn_battle_ui(
     data: Res<GameData>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
+    asset_server: Res<AssetServer>,
     metrics: Res<ScreenMetrics>) {
     let battle = match &data.battle_state {
         Some(b) => b,
         None => return,
     };
 
-    // Le BattleEffectsContainer est créé dans spawn_battle_ui_inner
-    // comme enfant du nœud racine — garanti dans la hiérarchie UI.
-
-    spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom, true);
+    spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &asset_server, metrics.safe_top, metrics.safe_bottom, true);
 }
 
 /// Logique interne de création de l'UI de combat (réutilisable).
+#[allow(clippy::too_many_arguments)]
 fn spawn_battle_ui_inner(
     commands: &mut Commands,
     battle: &BattleState,
     images: &mut Assets<Image>,
     atlas: &mut sprites::MonsterSpriteAtlas,
+    asset_server: &AssetServer,
     safe_top: f32,
     safe_bottom: f32,
     is_initial: bool,
@@ -179,7 +179,7 @@ fn spawn_battle_ui_inner(
         ))
         .with_children(|root| {
             // ── Fond de combat style Pokémon ─────────────────────
-            spawn_battle_background(root, battle.opponent.element);
+            spawn_battle_background(root, battle.opponent.element, asset_server);
 
             // ── Zone adversaire (haut-droite, style Pokémon) ─────
             // Info (nom + barre PV) à gauche, sprite à droite
@@ -750,6 +750,7 @@ pub(crate) fn handle_battle_input(
     mut next_state: ResMut<NextState<GameScreen>>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
+    asset_server: Res<AssetServer>,
     net_task: Option<ResMut<NetTask>>,
     mut attack_effects: EventWriter<PlayAttackEffect>,
     attack_query: Query<(&Interaction, &AttackButton), Changed<Interaction>>,
@@ -1087,7 +1088,7 @@ pub(crate) fn handle_battle_input(
             }
             // Reconstruire avec l'état mis à jour
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom, false);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &asset_server, metrics.safe_top, metrics.safe_bottom, false);
             }
         }
         Action::EndBattle => {
@@ -1117,7 +1118,7 @@ pub(crate) fn handle_battle_input(
                 commands.entity(entity).despawn_recursive();
             }
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom, false);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &asset_server, metrics.safe_top, metrics.safe_bottom, false);
             }
         }
         Action::PvpSendReady => {
@@ -1135,7 +1136,7 @@ pub(crate) fn handle_battle_input(
                 commands.entity(entity).despawn_recursive();
             }
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom, false);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &asset_server, metrics.safe_top, metrics.safe_bottom, false);
             }
         }
         Action::PvpForfeit => {
@@ -1248,6 +1249,7 @@ pub(crate) fn refresh_battle_ui(
     mut data: ResMut<GameData>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
+    asset_server: Res<AssetServer>,
     screen_entities: Query<Entity, With<ScreenEntity>>,
     metrics: Res<ScreenMetrics>,
 ) {
@@ -1263,7 +1265,7 @@ pub(crate) fn refresh_battle_ui(
 
     // Reconstruire
     if let Some(ref battle) = data.battle_state {
-        spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, metrics.safe_top, metrics.safe_bottom, false);
+        spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &asset_server, metrics.safe_top, metrics.safe_bottom, false);
     }
 }
 
@@ -1630,102 +1632,85 @@ pub(crate) fn animate_attack_zoom(
     }
 }
 
-/// Fond de combat dynamique basé sur le type du monstre adversaire.
+/// Fond de combat avec images battleback : wall (haut) + ground (bas).
 fn spawn_battle_background(
     parent: &mut ChildBuilder,
     opponent_element: monster_battle_core::types::ElementType,
+    asset_server: &AssetServer,
 ) {
-    let (bg_top, bg_bottom, accent) = battle_background_colors(opponent_element);
+    let (wall, ground) = battleback_assets(opponent_element);
 
     parent
         .spawn(Node {
             position_type: PositionType::Absolute,
             width: Val::Percent(100.0),
             height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
             ..default()
         })
         .with_children(|bg| {
-            // Moitié haute (ciel/fond)
+            // Mur (haut ~55%)
             bg.spawn((
                 Node {
                     width: Val::Percent(100.0),
                     height: Val::Percent(55.0),
                     ..default()
                 },
-                BackgroundColor(bg_top),
+                ImageNode::new(asset_server.load(wall)),
             ));
-            // Moitié basse (sol/terrain)
+            // Sol (bas ~45%)
             bg.spawn((
                 Node {
                     width: Val::Percent(100.0),
                     height: Val::Percent(45.0),
                     ..default()
                 },
-                BackgroundColor(bg_bottom),
-            ));
-            // Bande de séparation (ligne d'horizon style Pokémon)
-            bg.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    top: Val::Percent(53.0),
-                    width: Val::Percent(100.0),
-                    height: Val::Px(3.0),
-                    ..default()
-                },
-                BackgroundColor(accent),
+                ImageNode::new(asset_server.load(ground)),
             ));
         });
 }
 
-fn battle_background_colors(
+/// Retourne (wall_path, ground_path) selon le type de l'adversaire.
+fn battleback_assets(
     element: monster_battle_core::types::ElementType,
-) -> (Color, Color, Color) {
+) -> (&'static str, &'static str) {
     use monster_battle_core::types::ElementType;
     match element {
         ElementType::Fire => (
-            Color::srgb(0.15, 0.05, 0.05),
-            Color::srgb(0.35, 0.10, 0.05),
-            Color::srgb(0.9, 0.3, 0.1),
+            "battlebacks/walls/LavaCave.png",
+            "battlebacks/grounds/Lava2.png",
         ),
         ElementType::Water => (
-            Color::srgb(0.05, 0.10, 0.25),
-            Color::srgb(0.10, 0.20, 0.40),
-            Color::srgb(0.2, 0.6, 1.0),
+            "battlebacks/walls/Clouds.png",
+            "battlebacks/grounds/Clouds.png",
         ),
         ElementType::Electric => (
-            Color::srgb(0.10, 0.10, 0.05),
-            Color::srgb(0.15, 0.15, 0.05),
-            Color::srgb(1.0, 0.9, 0.1),
+            "battlebacks/walls/RockCave.png",
+            "battlebacks/grounds/RockCave.png",
         ),
         ElementType::Earth => (
-            Color::srgb(0.20, 0.15, 0.05),
-            Color::srgb(0.30, 0.20, 0.08),
-            Color::srgb(0.7, 0.5, 0.2),
+            "battlebacks/walls/RockCave.png",
+            "battlebacks/grounds/RockCave.png",
         ),
         ElementType::Wind => (
-            Color::srgb(0.15, 0.20, 0.20),
-            Color::srgb(0.20, 0.28, 0.25),
-            Color::srgb(0.6, 1.0, 0.8),
+            "battlebacks/walls/Clouds.png",
+            "battlebacks/grounds/Clouds.png",
         ),
         ElementType::Shadow => (
-            Color::srgb(0.05, 0.02, 0.10),
-            Color::srgb(0.08, 0.04, 0.15),
-            Color::srgb(0.5, 0.1, 0.8),
+            "battlebacks/walls/LavaCave.png",
+            "battlebacks/grounds/RockCave.png",
         ),
         ElementType::Light => (
-            Color::srgb(0.20, 0.18, 0.10),
-            Color::srgb(0.25, 0.22, 0.12),
-            Color::srgb(1.0, 0.95, 0.6),
+            "battlebacks/walls/Clouds.png",
+            "battlebacks/grounds/Grassland.png",
         ),
         ElementType::Plant => (
-            Color::srgb(0.05, 0.15, 0.05),
-            Color::srgb(0.08, 0.22, 0.06),
-            Color::srgb(0.3, 0.9, 0.2),
+            "battlebacks/walls/Forest.png",
+            "battlebacks/grounds/GrassMaze.png",
         ),
         ElementType::Normal => (
-            Color::srgb(0.15, 0.15, 0.18),
-            Color::srgb(0.20, 0.20, 0.22),
-            Color::srgb(0.7, 0.7, 0.8),
+            "battlebacks/walls/GrassMaze.png",
+            "battlebacks/grounds/Grassland.png",
         ),
     }
 }
