@@ -1640,6 +1640,7 @@ fn spawn_battle_background(
     asset_server: &AssetServer,
 ) {
     let (wall, ground) = battleback_assets(opponent_element);
+    log::debug!("spawn_battle_background: element={:?} wall={} ground={}", opponent_element, wall, ground);
 
     parent
         .spawn(Node {
