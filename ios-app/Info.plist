@@ -34,16 +34,24 @@
             <false/>
         </dict>
     </dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>fr</string>
+    <key>CFBundleExecutable</key>
+    <string>monster-battle-ios</string>
     <key>CFBundleIdentifier</key>
     <string>com.ajustor.monsterbattle</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
     <key>CFBundleName</key>
-    <string>monster-battle-ios</string>
+    <string>Monster Battle</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>1.5.5</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>40</string>
+    <key>MinimumOSVersion</key>
+    <string>15.0</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>UIApplicationSceneManifest</key>
