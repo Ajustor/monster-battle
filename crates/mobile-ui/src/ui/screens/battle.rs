@@ -2,6 +2,7 @@
 
 use bevy::prelude::*;
 use bevy::state::state::NextState;
+use bevy::ui::widget::NodeImageMode;
 
 use crate::battle_effects::PlayAttackEffect;
 use crate::game::{GameData, GameScreen, ScreenEntity};
@@ -1656,7 +1657,7 @@ fn spawn_battle_background(
                     height: Val::Percent(55.0),
                     ..default()
                 },
-                ImageNode::new(asset_server.load(wall)),
+                ImageNode::new(asset_server.load(wall)).with_mode(NodeImageMode::Stretch),
             ));
             // Sol (bas ~45%)
             bg.spawn((
@@ -1665,7 +1666,7 @@ fn spawn_battle_background(
                     height: Val::Percent(45.0),
                     ..default()
                 },
-                ImageNode::new(asset_server.load(ground)),
+                ImageNode::new(asset_server.load(ground)).with_mode(NodeImageMode::Stretch),
             ));
         });
 }
