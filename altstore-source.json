@@ -1,0 +1,33 @@
+{
+  "name": "Monster Battle",
+  "identifier": "com.ajustor.monsterbattle.source",
+  "subtitle": "RPG créature-collector",
+  "description": "Collectez et combattez des monstres !",
+  "iconURL": "https://ajustor.github.io/monster-battle/icon-512.png",
+  "headerURL": "https://ajustor.github.io/monster-battle/icon-512.png",
+  "website": "https://github.com/Ajustor/monster-battle",
+  "tintColor": "4CAF50",
+  "apps": [
+    {
+      "name": "Monster Battle",
+      "bundleIdentifier": "com.ajustor.monsterbattle",
+      "developerName": "Ajustor",
+      "subtitle": "RPG créature-collector",
+      "localizedDescription": "Collectez, entraînez et combattez des monstres dans ce RPG mobile !",
+      "iconURL": "https://ajustor.github.io/monster-battle/icon-512.png",
+      "tintColor": "4CAF50",
+      "screenshotURLs": [],
+      "versions": [
+        {
+          "version": "1.9.0",
+          "date": "2026-04-06",
+          "localizedDescription": "Battlebacks images, correction zoom combat, correction updater",
+          "downloadURL": "https://ajustor.github.io/monster-battle/monster-battle-ios.ipa",
+          "size": 50000000,
+          "minOSVersion": "15.0"
+        }
+      ]
+    }
+  ],
+  "news": []
+}
