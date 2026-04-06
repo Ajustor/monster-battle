@@ -52,6 +52,7 @@ jobs:
       version: ${{ needs.version-check.outputs.new_version }}
       sign_ipa: false
       deploy_pages: true
+      icon_url: https://ajustor.github.io/monster-battle/icon-512.png
 
   # ── Release Android APK ────────────────────────────────────────
   release-android:
