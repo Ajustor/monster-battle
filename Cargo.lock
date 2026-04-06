@@ -2183,9 +2183,9 @@ dependencies = [
 
 [[package]]
 name = "fastrand"
-version = "2.3.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
+checksum = "a043dc74da1e37d6afe657061213aa6f425f855399a11d3463c6ecccc4dfda1f"
 
 [[package]]
 name = "fdeflate"
@@ -3030,7 +3030,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3050,7 +3050,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-android"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -3073,7 +3073,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-audio"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "rand 0.8.5",
  "rodio",
@@ -3083,7 +3083,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-composer"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "anyhow",
  "crossterm",
@@ -3095,7 +3095,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-core"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "chrono",
  "rand 0.8.5",
@@ -3107,7 +3107,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-ios"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "bevy",
  "env_logger",
@@ -3117,7 +3117,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-mobile-ui"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -3143,7 +3143,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-network"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -3159,7 +3159,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-server"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -3174,14 +3174,14 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-sprites"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "monster-battle-core",
 ]
 
 [[package]]
 name = "monster-battle-storage"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -4285,9 +4285,9 @@ checksum = "b12e76d157a900eb52e81bc6e9f3069344290341720e9178cde2407113ac8d89"
 
 [[package]]
 name = "semver"
-version = "1.0.27"
+version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
+checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
 name = "send_wrapper"
@@ -4917,9 +4917,9 @@ checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "typewit"
-version = "1.15.0"
+version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06fee3a8df48c50c55ad646a4e03b00a370da6fe1850ebf467a8d0165dfcafae"
+checksum = "bc19094686c694eb41b3b99dcc2f2975d4b078512fa22ae6c63f7ca318bdcff7"
 
 [[package]]
 name = "unicode-bidi"
