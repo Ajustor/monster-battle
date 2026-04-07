@@ -150,6 +150,11 @@ fn spawn_battle_ui_inner(
     ) && battle.current_message.is_none()
         && battle.message_queue.is_empty();
 
+    // Fond de combat : entité root indépendante à z=-1, spawné une seule fois.
+    if is_initial {
+        spawn_battle_background(commands, battle.opponent.element, asset_server);
+    }
+
     commands
         .spawn((
             Node {
@@ -166,14 +171,11 @@ fn spawn_battle_ui_inner(
                 ..default()
             },
 
-            BackgroundColor(colors::BACKGROUND),
             ScreenEntity,
             BattleRootNode,
             bevy::state::state_scoped::StateScoped(GameScreen::Battle),
         ))
         .with_children(|root| {
-            // ── Fond de combat style Pokémon ─────────────────────
-            spawn_battle_background(root, battle.opponent.element, asset_server);
 
             // ── Zone adversaire (haut-droite, style Pokémon) ─────
             // Info (nom + barre PV) à gauche, sprite à droite
@@ -1609,23 +1611,30 @@ pub(crate) fn animate_attack_zoom(
     }
 }
 
-/// Fond de combat avec images battleback : wall (haut) + ground (bas).
+/// Fond de combat : entité racine indépendante à GlobalZIndex(-1) pour être
+/// garantie derrière tous les nœuds UI (qui sont à z ≥ 0 par défaut).
 fn spawn_battle_background(
-    parent: &mut ChildBuilder,
+    commands: &mut Commands,
     opponent_element: monster_battle_core::types::ElementType,
     asset_server: &AssetServer,
 ) {
     let (wall, ground) = battleback_assets(opponent_element);
-    log::debug!("spawn_battle_background: element={:?} wall={} ground={}", opponent_element, wall, ground);
+    log::info!("spawn_battle_background: element={:?} wall={} ground={}", opponent_element, wall, ground);
 
-    parent
-        .spawn(Node {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            ..default()
-        })
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                top: Val::Px(0.0),
+                right: Val::Px(0.0),
+                bottom: Val::Px(0.0),
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            GlobalZIndex(-1),
+            bevy::state::state_scoped::StateScoped(GameScreen::Battle),
+        ))
         .with_children(|bg| {
             // Mur (haut ~55%)
             bg.spawn((
