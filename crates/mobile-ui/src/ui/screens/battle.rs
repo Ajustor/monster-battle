@@ -122,14 +122,14 @@ pub(crate) fn spawn_battle_ui(
     data: Res<GameData>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
-    asset_server: Res<AssetServer>,
+    battle_images: Res<crate::battle_images::BattleImages>,
     metrics: Res<ScreenMetrics>) {
     let battle = match &data.battle_state {
         Some(b) => b,
         None => return,
     };
 
-    spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &asset_server, metrics.safe_top, metrics.safe_bottom, true);
+    spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &battle_images, metrics.safe_top, metrics.safe_bottom, true);
 }
 
 /// Logique interne de création de l'UI de combat (réutilisable).
@@ -139,7 +139,7 @@ fn spawn_battle_ui_inner(
     battle: &BattleState,
     images: &mut Assets<Image>,
     atlas: &mut sprites::MonsterSpriteAtlas,
-    asset_server: &AssetServer,
+    battle_images: &crate::battle_images::BattleImages,
     safe_top: f32,
     safe_bottom: f32,
     is_initial: bool,
@@ -152,7 +152,7 @@ fn spawn_battle_ui_inner(
 
     // Fond de combat : entité root indépendante à z=-1, spawné une seule fois.
     if is_initial {
-        spawn_battle_background(commands, battle.opponent.element, asset_server);
+        spawn_battle_background(commands, battle.opponent.element, battle_images);
     }
 
     commands
@@ -729,7 +729,7 @@ pub(crate) fn handle_battle_input(
     mut next_state: ResMut<NextState<GameScreen>>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
-    asset_server: Res<AssetServer>,
+    battle_images: Res<crate::battle_images::BattleImages>,
     net_task: Option<ResMut<NetTask>>,
     mut attack_effects: EventWriter<PlayAttackEffect>,
     attack_query: Query<(&Interaction, &AttackButton), Changed<Interaction>>,
@@ -1067,7 +1067,7 @@ pub(crate) fn handle_battle_input(
             }
             // Reconstruire avec l'état mis à jour
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &asset_server, metrics.safe_top, metrics.safe_bottom, false);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &battle_images, metrics.safe_top, metrics.safe_bottom, false);
             }
         }
         Action::EndBattle => {
@@ -1097,7 +1097,7 @@ pub(crate) fn handle_battle_input(
                 commands.entity(entity).despawn_recursive();
             }
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &asset_server, metrics.safe_top, metrics.safe_bottom, false);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &battle_images, metrics.safe_top, metrics.safe_bottom, false);
             }
         }
         Action::PvpSendReady => {
@@ -1115,7 +1115,7 @@ pub(crate) fn handle_battle_input(
                 commands.entity(entity).despawn_recursive();
             }
             if let Some(ref battle) = data.battle_state {
-                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &asset_server, metrics.safe_top, metrics.safe_bottom, false);
+                spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &battle_images, metrics.safe_top, metrics.safe_bottom, false);
             }
         }
         Action::PvpForfeit => {
@@ -1228,7 +1228,7 @@ pub(crate) fn refresh_battle_ui(
     mut data: ResMut<GameData>,
     mut images: ResMut<Assets<Image>>,
     mut atlas: ResMut<sprites::MonsterSpriteAtlas>,
-    asset_server: Res<AssetServer>,
+    battle_images: Res<crate::battle_images::BattleImages>,
     screen_entities: Query<Entity, With<ScreenEntity>>,
     metrics: Res<ScreenMetrics>,
 ) {
@@ -1244,7 +1244,7 @@ pub(crate) fn refresh_battle_ui(
 
     // Reconstruire
     if let Some(ref battle) = data.battle_state {
-        spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &asset_server, metrics.safe_top, metrics.safe_bottom, false);
+        spawn_battle_ui_inner(&mut commands, battle, &mut images, &mut atlas, &battle_images, metrics.safe_top, metrics.safe_bottom, false);
     }
 }
 
@@ -1616,10 +1616,10 @@ pub(crate) fn animate_attack_zoom(
 fn spawn_battle_background(
     commands: &mut Commands,
     opponent_element: monster_battle_core::types::ElementType,
-    asset_server: &AssetServer,
+    battle_images: &crate::battle_images::BattleImages,
 ) {
-    let (wall, ground) = battleback_assets(opponent_element);
-    log::info!("spawn_battle_background: element={:?} wall={} ground={}", opponent_element, wall, ground);
+    let (wall, ground) = battle_images.battleback(opponent_element);
+    log::info!("spawn_battle_background: element={:?}", opponent_element);
 
     commands
         .spawn((
@@ -1643,7 +1643,7 @@ fn spawn_battle_background(
                     height: Val::Percent(55.0),
                     ..default()
                 },
-                ImageNode::new(asset_server.load(wall)).with_mode(NodeImageMode::Stretch),
+                ImageNode::new(wall).with_mode(NodeImageMode::Stretch),
             ));
             // Sol (bas ~45%)
             bg.spawn((
@@ -1652,55 +1652,11 @@ fn spawn_battle_background(
                     height: Val::Percent(45.0),
                     ..default()
                 },
-                ImageNode::new(asset_server.load(ground)).with_mode(NodeImageMode::Stretch),
+                ImageNode::new(ground).with_mode(NodeImageMode::Stretch),
             ));
         });
 }
 
-/// Retourne (wall_path, ground_path) selon le type de l'adversaire.
-fn battleback_assets(
-    element: monster_battle_core::types::ElementType,
-) -> (&'static str, &'static str) {
-    use monster_battle_core::types::ElementType;
-    match element {
-        ElementType::Fire => (
-            "battlebacks/walls/LavaCave.png",
-            "battlebacks/grounds/Lava2.png",
-        ),
-        ElementType::Water => (
-            "battlebacks/walls/Clouds.png",
-            "battlebacks/grounds/Clouds.png",
-        ),
-        ElementType::Electric => (
-            "battlebacks/walls/RockCave.png",
-            "battlebacks/grounds/RockCave.png",
-        ),
-        ElementType::Earth => (
-            "battlebacks/walls/RockCave.png",
-            "battlebacks/grounds/RockCave.png",
-        ),
-        ElementType::Wind => (
-            "battlebacks/walls/Clouds.png",
-            "battlebacks/grounds/Clouds.png",
-        ),
-        ElementType::Shadow => (
-            "battlebacks/walls/LavaCave.png",
-            "battlebacks/grounds/RockCave.png",
-        ),
-        ElementType::Light => (
-            "battlebacks/walls/Clouds.png",
-            "battlebacks/grounds/Grassland.png",
-        ),
-        ElementType::Plant => (
-            "battlebacks/walls/Forest.png",
-            "battlebacks/grounds/GrassMaze.png",
-        ),
-        ElementType::Normal => (
-            "battlebacks/walls/GrassMaze.png",
-            "battlebacks/grounds/Grassland.png",
-        ),
-    }
-}
 
 /// Anime le flash d'impact critique (overlay blanc, déclenché après les particules).
 pub(crate) fn animate_attack_flash(

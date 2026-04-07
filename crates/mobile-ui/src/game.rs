@@ -280,7 +280,8 @@ impl Plugin for GamePlugin {
             .add_systems(OnEnter(GameScreen::MonsterDetail), on_enter_monster_detail)
             .add_systems(OnEnter(GameScreen::SelectAttacks), on_enter_select_attacks)
             .add_systems(OnEnter(GameScreen::DevourSelect), on_enter_devour_select)
-            .add_plugins(crate::battle_effects::BattleEffectsPlugin);
+            .add_plugins(crate::battle_effects::BattleEffectsPlugin)
+            .add_systems(Startup, crate::battle_images::setup_battle_images);
     }
 }
 

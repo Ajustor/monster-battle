@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod battle_effects;
+pub mod battle_images;
 pub mod connection;
 pub mod game;
 pub mod net_task;

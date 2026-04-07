@@ -45,22 +45,9 @@ pub struct PlayAttackEffect {
 
 #[derive(Component)]
 pub struct AttackFrames {
-    pub paths: Vec<String>,
+    pub handles: Vec<Handle<Image>>,
 }
 
-fn sprites_for_element(element: ElementType) -> Vec<&'static str> {
-    match element {
-        ElementType::Fire     => vec!["effects/fire_01.png",     "effects/fire_02.png",     "effects/fire_03.png"],
-        ElementType::Water    => vec!["effects/water_01.png",    "effects/water_02.png",    "effects/water_03.png"],
-        ElementType::Electric => vec!["effects/electric_01.png", "effects/electric_02.png", "effects/electric_03.png"],
-        ElementType::Earth    => vec!["effects/earth_01.png",    "effects/earth_02.png",    "effects/earth_03.png"],
-        ElementType::Wind     => vec!["effects/wind_01.png",     "effects/wind_02.png",     "effects/wind_03.png"],
-        ElementType::Shadow   => vec!["effects/shadow_01.png",   "effects/shadow_02.png",   "effects/shadow_03.png"],
-        ElementType::Light    => vec!["effects/light_01.png",    "effects/light_02.png",    "effects/light_03.png"],
-        ElementType::Plant    => vec!["effects/plant_01.png",    "effects/plant_02.png",    "effects/plant_03.png"],
-        ElementType::Normal   => vec!["effects/normal_01.png",   "effects/normal_02.png",   "effects/normal_03.png"],
-    }
-}
 
 fn tint_for_element(element: ElementType) -> Color {
     match element {
@@ -85,23 +72,19 @@ const EFFECT_SIZE: f32 = 180.0;
 
 pub fn handle_play_attack_effect(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
+    battle_images: Res<crate::battle_images::BattleImages>,
     mut events: EventReader<PlayAttackEffect>,
 ) {
     for event in events.read() {
-        let sprites = sprites_for_element(event.element);
-        let frame_count = sprites.len();
+        let frames = battle_images.effect_frames(event.element);
+        let frame_count = frames.len();
         let tint = tint_for_element(event.element);
-        if frame_count == 0 { continue; }
 
-        let first_image: Handle<Image> = asset_server.load(sprites[0]);
+        let first_image = frames[0].clone();
         let size = EFFECT_SIZE;
         let delay = event.startup_delay;
-        // Durée totale : délai + séquence complète + maintien sur dernière frame
         let lifetime = delay + frame_count as f32 * FRAME_DURATION + HOLD_DURATION;
 
-        // Spawné comme entité racine pour éviter d'être détruit lors d'un rebuild UI.
-        // StateScoped assure le nettoyage à la sortie du combat.
         commands.spawn((
             AttackEffect {
                 frame_timer:    Timer::from_seconds(FRAME_DURATION, TimerMode::Repeating),
@@ -113,7 +96,7 @@ pub fn handle_play_attack_effect(
                 sequence_done:  false,
             },
             AttackFrames {
-                paths: sprites.iter().map(|s| s.to_string()).collect(),
+                handles: frames.to_vec(),
             },
             Node {
                 position_type: PositionType::Absolute,
@@ -143,7 +126,6 @@ pub fn handle_play_attack_effect(
 
 pub fn animate_attack_effects(
     time: Res<Time>,
-    asset_server: Res<AssetServer>,
     mut query: Query<(&mut AttackEffect, &AttackFrames, &mut ImageNode, &mut Visibility, &mut Node)>,
 ) {
     for (mut effect, frames, mut img_node, mut vis, mut node) in query.iter_mut() {
@@ -197,7 +179,7 @@ pub fn animate_attack_effects(
                 effect.sequence_done = true;
             } else {
                 effect.current_frame = next_frame;
-                img_node.image = asset_server.load(frames.paths[effect.current_frame].as_str());
+                img_node.image = frames.handles[effect.current_frame].clone();
             }
         }
     }
