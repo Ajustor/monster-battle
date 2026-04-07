@@ -3,7 +3,7 @@
 
 use bevy::prelude::*;
 use monster_battle_core::types::ElementType;
-use crate::ui::screens::battle::BattleEffectsContainer;
+use crate::game::GameScreen;
 
 pub struct BattleEffectsPlugin;
 
@@ -87,10 +87,7 @@ pub fn handle_play_attack_effect(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut events: EventReader<PlayAttackEffect>,
-    container_query: Query<Entity, With<BattleEffectsContainer>>,
 ) {
-    let container = container_query.get_single().ok();
-
     for event in events.read() {
         let sprites = sprites_for_element(event.element);
         let frame_count = sprites.len();
@@ -103,7 +100,9 @@ pub fn handle_play_attack_effect(
         // Durée totale : délai + séquence complète + maintien sur dernière frame
         let lifetime = delay + frame_count as f32 * FRAME_DURATION + HOLD_DURATION;
 
-        let bundle = (
+        // Spawné comme entité racine pour éviter d'être détruit lors d'un rebuild UI.
+        // StateScoped assure le nettoyage à la sortie du combat.
+        commands.spawn((
             AttackEffect {
                 frame_timer:    Timer::from_seconds(FRAME_DURATION, TimerMode::Repeating),
                 frame_count,
@@ -136,15 +135,9 @@ pub fn handle_play_attack_effect(
                 ..default()
             },
             GlobalZIndex(50),
-            // Caché jusqu'à la fin du délai de démarrage
             if delay > 0.0 { Visibility::Hidden } else { Visibility::Visible },
-        );
-
-        if let Some(parent) = container {
-            commands.entity(parent).with_children(|p| { p.spawn(bundle); });
-        } else {
-            commands.spawn(bundle);
-        }
+            bevy::state::state_scoped::StateScoped(GameScreen::Battle),
+        ));
     }
 }
 
