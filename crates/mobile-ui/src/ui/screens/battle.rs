@@ -1636,7 +1636,7 @@ fn spawn_battle_background(
             bg.spawn((
                 Node {
                     width: Val::Percent(100.0),
-                    height: Val::Percent(25.0),
+                    height: Val::Percent(45.0),
                     margin: UiRect::bottom(Val::Px(-20.0)),
                     ..default()
                 },
