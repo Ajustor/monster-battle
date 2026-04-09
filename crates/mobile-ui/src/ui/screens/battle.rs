@@ -1651,7 +1651,7 @@ fn spawn_battle_background(
                 Node {
                     position_type: PositionType::Absolute,
                     width: Val::Percent(100.0),
-                    height: Val::Percent(55.0),
+                    height: Val::Percent(70.0),
                     left: Val::Px(0.0),
                     top: Val::Px(0.0),
                     ..default()
