@@ -28,11 +28,11 @@ pub(crate) struct ContinueButton;
 
 /// Marqueur pour le sprite du joueur.
 #[derive(Component)]
-pub(crate) struct PlayerSprite;
+pub struct PlayerSprite;
 
 /// Marqueur pour le sprite de l'adversaire.
 #[derive(Component)]
-pub(crate) struct OpponentSprite;
+pub struct OpponentSprite;
 
 /// Marqueur pour la barre de PV du joueur.
 #[derive(Component)]
@@ -818,15 +818,7 @@ pub(crate) fn handle_battle_input(
                             if is_pvp {
                                 act = Action::PvpSendAttack(btn.index);
                             } else {
-                                // Capture l'élément de l'attaque avant de l'exécuter
-                                let attack_element = battle.player.attacks[btn.index].element;
                                 battle.player_attack(btn.index);
-                                // Émettre l'effet de combat (particules) — délai = moment d'impact
-                                attack_effects.send(PlayAttackEffect {
-                                    element: attack_element,
-                                    position: Vec2::new(0.65, 0.30), // Position adversaire (viewport %)
-                                    startup_delay: 0.42,
-                                });
                                 act = Action::Rebuild;
                             }
                             break;
@@ -864,14 +856,7 @@ pub(crate) fn handle_battle_input(
                             if is_pvp {
                                 act = Action::PvpSendAttack(idx);
                             } else {
-                                // Capture l'élément avant l'attaque
-                                let attack_element = battle.player.attacks[idx].element;
                                 battle.player_attack(idx);
-                                attack_effects.send(PlayAttackEffect {
-                                    element: attack_element,
-                                    position: Vec2::new(0.65, 0.30), // Position adversaire (viewport %)
-                                    startup_delay: 0.42,
-                                });
                                 act = Action::Rebuild;
                             }
                         }
@@ -997,6 +982,12 @@ pub(crate) fn handle_battle_input(
                                         color,
                                     },
                                 ));
+                                // Particules d'attaque sur l'adversaire (synchronisé avec l'impact)
+                                attack_effects.send(PlayAttackEffect {
+                                    element: battle.player.element,
+                                    target_opponent: true,
+                                    startup_delay: 0.42,
+                                });
                             }
                             AnimationType::OpponentAttack => {
                                 // Filtre couleur de l'élément adversaire + particules sur le joueur
@@ -1017,7 +1008,7 @@ pub(crate) fn handle_battle_input(
                                 ));
                                 attack_effects.send(PlayAttackEffect {
                                     element: battle.opponent.element,
-                                    position: Vec2::new(0.35, 0.65),
+                                    target_opponent: false,
                                     startup_delay: 0.42,
                                 });
                             }
@@ -1628,7 +1619,7 @@ fn spawn_battle_background(
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
                 right: Val::Px(0.0),
-                bottom: Val::Px(0.0),
+                bottom: Val::Percent(40.0),
                 flex_direction: FlexDirection::Column,
                 ..default()
             },

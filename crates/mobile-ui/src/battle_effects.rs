@@ -34,11 +34,12 @@ pub struct AttackEffect {
     pub sequence_done: bool,
 }
 
-/// Position en coordonnées viewport normalisées (0.0–1.0, origin haut-gauche).
+/// Événement : jouer un effet d'attaque sur la cible.
 #[derive(Event)]
 pub struct PlayAttackEffect {
     pub element: ElementType,
-    pub position: Vec2,
+    /// `true` = cibler le sprite adversaire, `false` = cibler le sprite joueur.
+    pub target_opponent: bool,
     /// Secondes d'attente avant d'afficher l'effet (correspond au moment d'impact).
     pub startup_delay: f32,
 }
@@ -74,8 +75,38 @@ pub fn handle_play_attack_effect(
     mut commands: Commands,
     battle_images: Res<crate::battle_images::BattleImages>,
     mut events: EventReader<PlayAttackEffect>,
+    player_sprite: Query<&GlobalTransform, With<crate::ui::screens::battle::PlayerSprite>>,
+    opponent_sprite: Query<&GlobalTransform, With<crate::ui::screens::battle::OpponentSprite>>,
+    windows: Query<&Window>,
 ) {
+    let win = windows.get_single().ok();
+
     for event in events.read() {
+        // Calculer la position viewport du sprite ciblé
+        let position = {
+            let gt = if event.target_opponent {
+                opponent_sprite.get_single().ok()
+            } else {
+                player_sprite.get_single().ok()
+            };
+            match (gt, win) {
+                (Some(gt), Some(w)) => {
+                    let t = gt.translation();
+                    let vp_x = (t.x + w.width() / 2.0) / w.width();
+                    let vp_y = (w.height() / 2.0 - t.y) / w.height();
+                    Vec2::new(vp_x.clamp(0.05, 0.95), vp_y.clamp(0.05, 0.95))
+                }
+                _ => {
+                    // Fallback si le sprite n'existe plus
+                    if event.target_opponent {
+                        Vec2::new(0.65, 0.30)
+                    } else {
+                        Vec2::new(0.35, 0.65)
+                    }
+                }
+            }
+        };
+
         let frames = battle_images.effect_frames(event.element);
         let frame_count = frames.len();
         let tint = tint_for_element(event.element);
@@ -100,8 +131,8 @@ pub fn handle_play_attack_effect(
             },
             Node {
                 position_type: PositionType::Absolute,
-                left:   Val::Percent(event.position.x * 100.0),
-                top:    Val::Percent(event.position.y * 100.0),
+                left:   Val::Percent(position.x * 100.0),
+                top:    Val::Percent(position.y * 100.0),
                 width:  Val::Px(size),
                 height: Val::Px(size),
                 margin: UiRect {
