@@ -184,7 +184,7 @@ fn spawn_battle_ui_inner(
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(12.0),
                 margin: UiRect {
-                    top: Val::Percent(30.0),
+                    top: Val::Percent(38.0),
                     bottom: Val::Px(16.0),
                     ..default()
                 },
@@ -333,6 +333,7 @@ fn spawn_battle_ui_inner(
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(12.0),
+                margin: UiRect::top(Val::Px(20.0)),
                 ..default()
             })
             .with_children(|bottom| {
@@ -1632,25 +1633,31 @@ fn spawn_battle_background(
             bevy::state::state_scoped::StateScoped(GameScreen::Battle),
         ))
         .with_children(|bg| {
-            // Mur (haut ~25%, chevauche légèrement le sol)
+            // Sol (bas ~75%, positionné en premier = en dessous)
             bg.spawn((
                 Node {
+                    position_type: PositionType::Absolute,
                     width: Val::Percent(100.0),
-                    height: Val::Percent(45.0),
-                    margin: UiRect::bottom(Val::Px(-20.0)),
+                    height: Val::Percent(75.0),
+                    left: Val::Px(0.0),
+                    bottom: Val::Px(0.0),
+                    ..default()
+                },
+                ImageNode::new(ground).with_mode(NodeImageMode::Stretch),
+                GlobalZIndex(-1),
+            ));
+            // Mur (haut ~55%, chevauche le sol de 30px)
+            bg.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(55.0),
+                    left: Val::Px(0.0),
+                    top: Val::Px(0.0),
                     ..default()
                 },
                 ImageNode::new(wall).with_mode(NodeImageMode::Stretch),
                 GlobalZIndex(0),
-            ));
-            // Sol (bas ~75%)
-            bg.spawn((
-                Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(75.0),
-                    ..default()
-                },
-                ImageNode::new(ground).with_mode(NodeImageMode::Stretch),
             ));
         });
 }
