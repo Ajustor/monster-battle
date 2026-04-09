@@ -1624,7 +1624,7 @@ fn spawn_battle_background(
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
                 right: Val::Px(0.0),
-                bottom: Val::Percent(25.0),
+                bottom: Val::Percent(15.0),
                 flex_direction: FlexDirection::Column,
                 ..default()
             },

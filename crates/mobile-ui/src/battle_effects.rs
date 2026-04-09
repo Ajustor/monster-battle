@@ -77,25 +77,31 @@ pub fn handle_play_attack_effect(
     mut events: EventReader<PlayAttackEffect>,
     player_sprite: Query<&GlobalTransform, With<crate::ui::screens::battle::PlayerSprite>>,
     opponent_sprite: Query<&GlobalTransform, With<crate::ui::screens::battle::OpponentSprite>>,
+    camera: Query<(&Camera, &GlobalTransform), With<Camera2d>>,
     windows: Query<&Window>,
 ) {
     let win = windows.get_single().ok();
+    let cam = camera.get_single().ok();
 
     for event in events.read() {
         // Calculer la position viewport du sprite ciblé
         let position = {
-            let gt = if event.target_opponent {
+            let sprite_gt = if event.target_opponent {
                 opponent_sprite.get_single().ok()
             } else {
                 player_sprite.get_single().ok()
             };
-            match (gt, win) {
-                (Some(gt), Some(w)) => {
-                    let t = gt.translation();
-                    // UI nodes GlobalTransform includes root offset of screen_size/2
-                    let vp_x = (t.x - w.width() / 2.0) / w.width();
-                    let vp_y = (-t.y - w.height() / 2.0) / w.height();
-                    Vec2::new(vp_x.clamp(0.05, 0.95), vp_y.clamp(0.05, 0.95))
+            match (sprite_gt, cam, win) {
+                (Some(sprite_gt), Some((cam, cam_gt)), Some(w)) => {
+                    if let Ok(vp) = cam.world_to_viewport(cam_gt, sprite_gt.translation()) {
+                        let vp_x = vp.x / w.width();
+                        let vp_y = vp.y / w.height();
+                        Vec2::new(vp_x.clamp(0.05, 0.95), vp_y.clamp(0.05, 0.95))
+                    } else if event.target_opponent {
+                        Vec2::new(0.65, 0.30)
+                    } else {
+                        Vec2::new(0.35, 0.65)
+                    }
                 }
                 _ => {
                     // Fallback si le sprite n'existe plus
