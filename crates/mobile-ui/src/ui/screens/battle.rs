@@ -161,7 +161,7 @@ fn spawn_battle_ui_inner(
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::SpaceBetween,
+                justify_content: JustifyContent::FlexStart,
                 padding: UiRect::new(
                     Val::Px(12.0),
                     Val::Px(12.0),
@@ -183,7 +183,11 @@ fn spawn_battle_ui_inner(
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(12.0),
-                margin: UiRect::bottom(Val::Px(16.0)),
+                margin: UiRect {
+                    top: Val::Percent(22.0),
+                    bottom: Val::Px(16.0),
+                    ..default()
+                },
                 ..default()
             })
             .with_children(|top| {
@@ -473,6 +477,7 @@ fn spawn_battle_ui_inner(
                     flex_direction: FlexDirection::Column,
                     width: Val::Percent(100.0),
                     row_gap: Val::Px(5.0),
+                    margin: UiRect::top(Val::Auto),
                     ..default()
                 },
             ))
@@ -1619,7 +1624,7 @@ fn spawn_battle_background(
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
                 right: Val::Px(0.0),
-                bottom: Val::Percent(40.0),
+                bottom: Val::Percent(25.0),
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
@@ -1627,20 +1632,20 @@ fn spawn_battle_background(
             bevy::state::state_scoped::StateScoped(GameScreen::Battle),
         ))
         .with_children(|bg| {
-            // Mur (haut ~55%)
+            // Mur (haut ~35%)
             bg.spawn((
                 Node {
                     width: Val::Percent(100.0),
-                    height: Val::Percent(55.0),
+                    height: Val::Percent(35.0),
                     ..default()
                 },
                 ImageNode::new(wall).with_mode(NodeImageMode::Stretch),
             ));
-            // Sol (bas ~45%)
+            // Sol (bas ~65%)
             bg.spawn((
                 Node {
                     width: Val::Percent(100.0),
-                    height: Val::Percent(45.0),
+                    height: Val::Percent(65.0),
                     ..default()
                 },
                 ImageNode::new(ground).with_mode(NodeImageMode::Stretch),

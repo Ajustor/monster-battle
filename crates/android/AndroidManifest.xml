@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.ajustor.monsterbattle" android:versionCode="53" android:versionName="1.9.5">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.ajustor.monsterbattle" android:versionCode="54" android:versionName="1.9.6">
 
   <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
 

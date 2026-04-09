@@ -92,8 +92,9 @@ pub fn handle_play_attack_effect(
             match (gt, win) {
                 (Some(gt), Some(w)) => {
                     let t = gt.translation();
-                    let vp_x = (t.x + w.width() / 2.0) / w.width();
-                    let vp_y = (w.height() / 2.0 - t.y) / w.height();
+                    // UI nodes: x = pixels from left, y = negative pixels from top
+                    let vp_x = t.x / w.width();
+                    let vp_y = -t.y / w.height();
                     Vec2::new(vp_x.clamp(0.05, 0.95), vp_y.clamp(0.05, 0.95))
                 }
                 _ => {
