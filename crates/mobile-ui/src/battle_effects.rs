@@ -3,7 +3,7 @@
 
 use bevy::prelude::*;
 use monster_battle_core::types::ElementType;
-use crate::game::GameScreen;
+
 
 pub struct BattleEffectsPlugin;
 
@@ -75,44 +75,16 @@ pub fn handle_play_attack_effect(
     mut commands: Commands,
     battle_images: Res<crate::battle_images::BattleImages>,
     mut events: EventReader<PlayAttackEffect>,
-    player_sprite: Query<&GlobalTransform, With<crate::ui::screens::battle::PlayerSprite>>,
-    opponent_sprite: Query<&GlobalTransform, With<crate::ui::screens::battle::OpponentSprite>>,
-    camera: Query<(&Camera, &GlobalTransform), With<Camera2d>>,
-    windows: Query<&Window>,
+    player_sprite: Query<Entity, With<crate::ui::screens::battle::PlayerSprite>>,
+    opponent_sprite: Query<Entity, With<crate::ui::screens::battle::OpponentSprite>>,
 ) {
-    let win = windows.get_single().ok();
-    let cam = camera.get_single().ok();
-
     for event in events.read() {
-        // Calculer la position viewport du sprite ciblé
-        let position = {
-            let sprite_gt = if event.target_opponent {
-                opponent_sprite.get_single().ok()
-            } else {
-                player_sprite.get_single().ok()
-            };
-            match (sprite_gt, cam, win) {
-                (Some(sprite_gt), Some((cam, cam_gt)), Some(w)) => {
-                    if let Ok(vp) = cam.world_to_viewport(cam_gt, sprite_gt.translation()) {
-                        let vp_x = vp.x / w.width();
-                        let vp_y = vp.y / w.height();
-                        Vec2::new(vp_x.clamp(0.05, 0.95), vp_y.clamp(0.05, 0.95))
-                    } else if event.target_opponent {
-                        Vec2::new(0.65, 0.30)
-                    } else {
-                        Vec2::new(0.35, 0.65)
-                    }
-                }
-                _ => {
-                    // Fallback si le sprite n'existe plus
-                    if event.target_opponent {
-                        Vec2::new(0.65, 0.30)
-                    } else {
-                        Vec2::new(0.35, 0.65)
-                    }
-                }
-            }
+        let sprite_entity = if event.target_opponent {
+            opponent_sprite.get_single().ok()
+        } else {
+            player_sprite.get_single().ok()
         };
+        let Some(sprite_entity) = sprite_entity else { continue };
 
         let frames = battle_images.effect_frames(event.element);
         let frame_count = frames.len();
@@ -123,7 +95,7 @@ pub fn handle_play_attack_effect(
         let delay = event.startup_delay;
         let lifetime = delay + frame_count as f32 * FRAME_DURATION + HOLD_DURATION;
 
-        commands.spawn((
+        let effect = commands.spawn((
             AttackEffect {
                 frame_timer:    Timer::from_seconds(FRAME_DURATION, TimerMode::Repeating),
                 frame_count,
@@ -138,8 +110,8 @@ pub fn handle_play_attack_effect(
             },
             Node {
                 position_type: PositionType::Absolute,
-                left:   Val::Percent(position.x * 100.0),
-                top:    Val::Percent(position.y * 100.0),
+                left:   Val::Percent(50.0),
+                top:    Val::Percent(50.0),
                 width:  Val::Px(size),
                 height: Val::Px(size),
                 margin: UiRect {
@@ -157,8 +129,8 @@ pub fn handle_play_attack_effect(
             },
             GlobalZIndex(50),
             if delay > 0.0 { Visibility::Hidden } else { Visibility::Visible },
-            bevy::state::state_scoped::StateScoped(GameScreen::Battle),
-        ));
+        )).id();
+        commands.entity(sprite_entity).add_child(effect);
     }
 }
 

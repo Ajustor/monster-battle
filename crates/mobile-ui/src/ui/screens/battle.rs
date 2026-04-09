@@ -184,7 +184,7 @@ fn spawn_battle_ui_inner(
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(12.0),
                 margin: UiRect {
-                    top: Val::Percent(22.0),
+                    top: Val::Percent(30.0),
                     bottom: Val::Px(16.0),
                     ..default()
                 },
@@ -1632,14 +1632,16 @@ fn spawn_battle_background(
             bevy::state::state_scoped::StateScoped(GameScreen::Battle),
         ))
         .with_children(|bg| {
-            // Mur (haut ~40%)
+            // Mur (haut ~25%, chevauche légèrement le sol)
             bg.spawn((
                 Node {
                     width: Val::Percent(100.0),
-                    height: Val::Percent(40.0),
+                    height: Val::Percent(25.0),
+                    margin: UiRect::bottom(Val::Px(-20.0)),
                     ..default()
                 },
                 ImageNode::new(wall).with_mode(NodeImageMode::Stretch),
+                GlobalZIndex(0),
             ));
             // Sol (bas ~75%)
             bg.spawn((
