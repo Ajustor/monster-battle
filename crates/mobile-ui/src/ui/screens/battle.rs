@@ -1632,20 +1632,20 @@ fn spawn_battle_background(
             bevy::state::state_scoped::StateScoped(GameScreen::Battle),
         ))
         .with_children(|bg| {
-            // Mur (haut ~35%)
+            // Mur (haut ~40%)
             bg.spawn((
                 Node {
                     width: Val::Percent(100.0),
-                    height: Val::Percent(35.0),
+                    height: Val::Percent(40.0),
                     ..default()
                 },
                 ImageNode::new(wall).with_mode(NodeImageMode::Stretch),
             ));
-            // Sol (bas ~65%)
+            // Sol (bas ~75%)
             bg.spawn((
                 Node {
                     width: Val::Percent(100.0),
-                    height: Val::Percent(65.0),
+                    height: Val::Percent(75.0),
                     ..default()
                 },
                 ImageNode::new(ground).with_mode(NodeImageMode::Stretch),
