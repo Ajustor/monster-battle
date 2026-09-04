@@ -128,6 +128,42 @@ tui:
 tui-release:
 	cargo run -p monster-battle-tui --release
 
+# ── Serveur (comptes + synchronisation) ──────────────────────────
+
+.PHONY: server-db server-db-stop server-run server-test
+
+DB_CONTAINER  := monster-battle-postgres
+DEV_DB_URL    := postgres://postgres:postgres@localhost:5432/monster_battle
+TEST_DB_URL   := postgres://postgres:postgres@localhost:5432/monster_battle_test
+
+## Démarrer une base Postgres de développement (Docker)
+server-db:
+	@docker start $(DB_CONTAINER) 2>/dev/null || docker run -d --name $(DB_CONTAINER) \
+	  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=monster_battle \
+	  -p 5432:5432 postgres:16-alpine
+	@echo "⏳ Attente de Postgres..."
+	@until docker exec $(DB_CONTAINER) pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
+	@docker exec $(DB_CONTAINER) psql -U postgres -c \
+	  "CREATE DATABASE monster_battle_test" >/dev/null 2>&1 || true
+	@echo "✅ Postgres prêt sur localhost:5432"
+
+## Arrêter la base de développement
+server-db-stop:
+	@docker stop $(DB_CONTAINER) >/dev/null 2>&1 || true
+
+## Lancer le serveur (comptes + relais de combat)
+##   Renseigner GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET (et/ou GOOGLE_*)
+##   pour activer la connexion OAuth.
+server-run: server-db
+	DATABASE_URL=$(DEV_DB_URL) \
+	JWT_SECRET=$${JWT_SECRET:-secret-de-developpement-local-a-ne-pas-deployer} \
+	PUBLIC_URL=$${PUBLIC_URL:-http://localhost:7878} \
+	cargo run -p monster-battle-server
+
+## Lancer les tests du serveur, base d'intégration comprise
+server-test: server-db
+	TEST_DATABASE_URL=$(TEST_DB_URL) cargo test -p monster-battle-server
+
 # ── Général ──────────────────────────────────────────────────────
 
 .PHONY: clean help
@@ -158,6 +194,12 @@ help:
 	@echo "  TUI :"
 	@echo "    make tui            — Lancer le jeu TUI (terminal)"
 	@echo "    make tui-release    — Lancer le jeu TUI (release)"
+	@echo ""
+	@echo "  Serveur :"
+	@echo "    make server-db      — Démarrer Postgres en local (Docker)"
+	@echo "    make server-db-stop — Arrêter Postgres"
+	@echo "    make server-run     — Lancer le serveur (comptes + relais)"
+	@echo "    make server-test    — Tester le serveur avec la base"
 	@echo ""
 	@echo "  Général :"
 	@echo "    make clean          — Nettoyer tout"

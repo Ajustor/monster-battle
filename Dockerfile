@@ -13,7 +13,8 @@ RUN cargo build --release --bin monster-battle-server 2>/dev/null || true
 COPY crates/ crates/
 
 # Forcer la recompilation des crates locaux
-RUN touch crates/core/src/lib.rs crates/storage/src/lib.rs crates/network/src/lib.rs crates/server/src/main.rs
+RUN touch crates/core/src/lib.rs crates/storage/src/lib.rs crates/network/src/lib.rs \
+  crates/server/src/lib.rs crates/server/src/main.rs
 
 # Build final
 RUN cargo build --release --bin monster-battle-server

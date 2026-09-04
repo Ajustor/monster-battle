@@ -14,6 +14,7 @@ Adopte un monstre, entraîne-le, fais-le combattre en ligne contre d'autres joue
 - **Vieillissement sans limite d'âge** : les monstres traversent 4 stades de vie (~30 jours de maturation, +15 avec le trait Longévité) mais ne meurent jamais de vieillesse
 - **8 traits génétiques** : Régénération, Évasion, Coup Critique+, Longévité, Apprentissage Rapide, Épines, Berserk, Ténacité
 - **Sauvegarde locale chiffrée** (AES-256-GCM) liée à la machine
+- **Comptes joueurs et synchronisation multi-appareils** : connexion GitHub / Google, monstres stockés côté serveur, reprise sur n'importe quel appareil
 - **Cimetière** pour honorer les monstres disparus
 
 ## 🏗️ Architecture
@@ -61,13 +62,29 @@ Interface terminal interactive :
 - Indicateur de connexion serveur en temps réel (🟢 / 🔴)
 
 ### `server`
-Serveur relais centralisé (binaire séparé) :
-- TCP port **7878** — protocole de jeu (matchmaking, combat, reproduction) + route santé HTTP
-- Détection automatique HTTP vs protocole de jeu sur le même port
-- `GET /health` → `{"status":"online"}`
+Serveur centralisé (binaire séparé), deux rôles sur **un seul port** (7878),
+distingués automatiquement à partir des premiers octets de la connexion.
+
+**Relais de combat** (`relay.rs`, sans état persistant) :
 - Matchmaking automatique : les joueurs sont mis en file et appairés dès que 2 sont prêts
 - Le combat PvP est **arbitré tour par tour** côté serveur pour éviter la triche
 - La reproduction échange les monstres entre joueurs via le serveur
+
+**API comptes et synchronisation** (`api/`, Postgres) :
+- Connexion **GitHub / Google**, avec un flux d'appairage par code court
+  (RFC 8628) pour le TUI et le mobile, qui n'ont pas de navigateur
+- Jeton d'accès JWT court + refresh token haché en base et tourné à chaque usage
+- Monstres stockés côté serveur avec **concurrence optimiste** : chaque écriture
+  incrémente une version, un appareil en retard reçoit un conflit plutôt que
+  d'écraser les autres
+- Validation anti-triche des monstres poussés (niveau, stats, PV, XP, lignée)
+- `GET /health` → `{"status":"online","version":"…","accounts":true}`
+
+Sans `DATABASE_URL`, le serveur démarre **en relais seul** : le déploiement
+existant continue de fonctionner sans base de données.
+
+📖 Détail des routes, de la configuration et du protocole de synchronisation :
+[`docs/server-api.md`](docs/server-api.md).
 
 ## 🚀 Lancer le jeu
 
@@ -89,16 +106,33 @@ MONSTER_SERVER=localhost cargo run --bin monster-battle-tui
 
 ### Serveur
 
+En relais seul (sans comptes, comme historiquement) :
+
 ```bash
 cargo run --bin monster-battle-server
 ```
 
-Variables d'environnement optionnelles :
+Avec les comptes et la synchronisation (nécessite Postgres) :
+
+```bash
+make server-db     # Postgres dans Docker
+make server-run    # serveur sur http://localhost:7878
+```
+
+Variables d'environnement :
 
 | Variable | Défaut | Description |
 |---|---|---|
-| `PORT` | `7878` | Port TCP (jeu + health check) |
+| `PORT` | `7878` | Port TCP (relais de combat + API HTTP) |
+| `DATABASE_URL` | — | Base Postgres. Absente = relais seul, sans comptes |
+| `JWT_SECRET` | — | Obligatoire avec `DATABASE_URL`, ≥ 32 caractères |
+| `PUBLIC_URL` | `http://localhost:$PORT` | URL publique (callbacks OAuth, page d'appairage) |
+| `ALLOWED_ORIGINS` | — | Origines CORS autorisées, séparées par des virgules |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | — | Active la connexion GitHub |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Active la connexion Google |
 | `MONSTER_SERVER` | `monster-battle.darthoit.eu` | Adresse du serveur (côté client) |
+
+Voir [`docs/server-api.md`](docs/server-api.md) pour le détail des routes.
 
 ## 🎮 Comment jouer
 
@@ -220,15 +254,33 @@ Joueur A                    Serveur                     Joueur B
 - [x] Protocole JSON avec préfixe de longueur
 - [x] Health check HTTP (`GET /health`)
 - [x] Vérification de version client/serveur
+- [x] Authentification / comptes joueurs (OAuth GitHub & Google)
+- [x] Appairage par code court pour le TUI et le mobile (RFC 8628)
+- [x] Validation des stats côté serveur (anti-triche renforcé)
 - [ ] Système de classement / ELO / ranking saisonnier
 - [ ] Tournois organisés
 - [ ] Rate limiting sur le serveur
-- [ ] Authentification / comptes joueurs
-- [ ] Validation des stats côté serveur (anti-triche renforcé)
 - [ ] Reconnexion en cas de déconnexion mid-combat
 - [ ] Heartbeat automatique serveur (ping/pong périodique)
 - [ ] Logging structuré (tracing) et métriques serveur
 - [ ] Arrêt gracieux du serveur (signal handling)
+
+### ☁️ Synchronisation multi-appareils
+
+- [x] Stockage serveur des monstres (Postgres), le serveur fait autorité
+- [x] Concurrence optimiste par version, conflits renvoyés au client
+- [x] Pull incrémental depuis un point de reprise
+- [x] Suppressions propagées par pierres tombales
+- [ ] Intégration dans les clients (TUI, mobile) : écran de connexion et sync automatique
+- [ ] Résolution de conflit assistée côté client
+- [ ] Sync en tâche de fond et mode hors-ligne
+
+### 🏟️ Arène (site web)
+
+- [ ] Site de combats et tournois avec vue 3D des combats (Three.js + React)
+- [ ] Rejouer une timeline de combat calculée par le serveur
+- [ ] Animations d'attaque et caméras par élément
+- [ ] Spectateurs et replays partageables
 
 ### 🧬 Reproduction
 
