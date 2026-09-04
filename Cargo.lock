@@ -3588,7 +3588,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3608,7 +3608,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-android"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -3631,7 +3631,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-audio"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "rand 0.8.5",
  "rodio",
@@ -3641,7 +3641,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-composer"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "anyhow",
  "crossterm",
@@ -3653,7 +3653,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-core"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "chrono",
  "rand 0.8.5",
@@ -3665,7 +3665,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-ios"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "bevy",
  "env_logger",
@@ -3675,7 +3675,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-mobile-ui"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "android_logger",
  "anyhow",
@@ -3701,7 +3701,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-network"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -3717,7 +3717,7 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-server"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -3746,14 +3746,14 @@ dependencies = [
 
 [[package]]
 name = "monster-battle-sprites"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "monster-battle-core",
 ]
 
 [[package]]
 name = "monster-battle-storage"
-version = "1.9.12"
+version = "1.10.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
