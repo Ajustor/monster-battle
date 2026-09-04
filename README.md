@@ -11,7 +11,7 @@ Adopte un monstre, entraîne-le, fais-le combattre en ligne contre d'autres joue
 - **Entraînement** contre des bots pour gagner de l'XP (50 % de l'XP d'un vrai combat)
 - **Combat PvP en ligne** via un serveur relais centralisé — matchmaking automatique
 - **Reproduction** entre monstres de joueurs différents pour créer des hybrides avec types secondaires, héritage de stats et mutations de traits génétiques
-- **Vieillissement et mort** : chaque monstre a une durée de vie limitée (~30 jours, +15 avec le trait Longévité)
+- **Vieillissement sans limite d'âge** : les monstres traversent 4 stades de vie (~30 jours de maturation, +15 avec le trait Longévité) mais ne meurent jamais de vieillesse
 - **8 traits génétiques** : Régénération, Évasion, Coup Critique+, Longévité, Apprentissage Rapide, Épines, Berserk, Ténacité
 - **Sauvegarde locale chiffrée** (AES-256-GCM) liée à la machine
 - **Cimetière** pour honorer les monstres disparus
@@ -155,8 +155,12 @@ Joueur A                    Serveur                     Joueur B
 
 ### Vieillissement et mort
 
-- Les monstres vieillissent en temps réel (**~30 jours** de durée de vie)
-- Le trait **Longévité** ajoute 15 jours supplémentaires
+- Les monstres vieillissent en temps réel et traversent 4 stades de vie sur un
+  **cycle de maturité d'environ 30 jours** (Bébé → Jeune → Adulte → Vieux)
+- **Aucune mort de vieillesse** : passé le stade Vieux, le monstre continue de
+  vivre indéfiniment tant qu'il est nourri et qu'il survit aux combats
+- Le trait **Longévité** allonge le cycle de 15 jours : le monstre vieillit plus
+  lentement et reste plus longtemps à son pic de stats
 - Un monstre mort rejoint le **cimetière** — il est consultable mais ne peut plus combattre
 - Le chiffrement est retiré à la mort pour permettre l'archivage
 
@@ -176,8 +180,8 @@ Joueur A                    Serveur                     Joueur B
 - [x] Système complet de monstre (UUID, nom, types, stats, niveau, XP, lignée, wins/losses)
 - [x] 8 types élémentaires + Normal (table d'efficacité ×1.5 / ×0.5)
 - [x] 4 stades de vie (Bébé / Jeune / Adulte / Vieux) avec multiplicateurs de stats
-- [x] Vieillissement en temps réel (~30 jours de durée de vie)
-- [x] Mort de vieillesse automatique
+- [x] Vieillissement en temps réel (cycle de maturité ~30 jours)
+- [x] Pas de limite d'âge : la mort survient au combat ou par la faim uniquement
 - [x] 8 traits génétiques héritables (Régénération, Évasion, Coup Critique+, Longévité, etc.)
 - [x] Système de faim (4 niveaux, fenêtre de 12h, mort après 3 jours sans nourriture)
 - [x] 5 types de nourriture (Baie, Viande, Poisson, Herbes, Gâteau) avec effets uniques

@@ -287,10 +287,9 @@ fn spawn_monster_list_inner(
                                     let stage = monster.age_stage();
                                     info.spawn((
                                         Text::new(format!(
-                                            "Stade : {}  Age : {}j/{}j",
+                                            "Stade : {}  Age : {}j",
                                             stage,
                                             monster.age_days(),
-                                            monster.max_age_days(),
                                         )),
                                         TextFont {
                                             font_size: fonts::SMALL,

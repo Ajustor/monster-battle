@@ -2169,21 +2169,9 @@ impl App {
                 // Décroissance passive du bonheur
                 monster.decay_happiness();
 
-                let died_of_age = monster.check_aging();
-                let died_of_hunger = if !died_of_age {
-                    monster.check_hunger()
-                } else {
-                    false
-                };
+                let died_of_hunger = monster.check_hunger();
 
-                if died_of_age {
-                    self.message = Some(format!(
-                        "💀 {} est mort de vieillesse à {} jours...",
-                        monster.name,
-                        monster.age_days()
-                    ));
-                    let _ = self.storage.save(monster);
-                } else if died_of_hunger {
+                if died_of_hunger {
                     self.message = Some(format!(
                         "💀 {} est mort de faim ! ({} heures sans manger)",
                         monster.name,
