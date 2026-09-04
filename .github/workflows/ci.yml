@@ -16,6 +16,23 @@ jobs:
   check-test-lint:
     name: Check / Test / Clippy (Linux)
     runs-on: ubuntu-latest
+
+    # Les tests d'intégration du serveur tournent sur une vraie base ; sans ce
+    # service ils s'ignorent silencieusement (voir crates/server/tests).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: monster_battle_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - uses: actions/checkout@v4
 
@@ -52,6 +69,8 @@ jobs:
           --exclude monster-battle-android
 
       - name: Run tests
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/monster_battle_test
         run: >
           cargo test --workspace
           --exclude monster-battle-ios

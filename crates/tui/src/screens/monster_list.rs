@@ -256,12 +256,11 @@ fn draw_monster_detail(frame: &mut Frame, area: Rect, m: &monster_battle_core::M
         monster_battle_core::AgeStage::Old => "🧓",
     };
     let age_bar = format!(
-        "{} [{}{}] {}j/{}j",
+        "{} [{}{}] {}j",
         age_bar_color,
         "█".repeat(age_pct),
         "░".repeat(age_bar_width - age_pct),
-        m.age_days(),
-        m.max_age_days()
+        m.age_days()
     );
 
     let hunger = m.hunger_level();

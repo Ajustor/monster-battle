@@ -7,25 +7,30 @@ use rand::Rng;
 
 use crate::types::{BondLevel, ElementType, FoodType, HappinessLevel, RandomEvent, Stats, Trait};
 
-/// Durée de vie maximale d'un monstre en jours (sans le trait Longévité).
-const BASE_MAX_AGE_DAYS: i64 = 30;
+/// Durée du cycle de maturité d'un monstre en jours (sans le trait Longévité).
+///
+/// Les monstres ne meurent plus de vieillesse : cette constante ne sert plus
+/// qu'à échelonner les stades de vie (Bébé → Jeune → Adulte → Vieux). Un
+/// monstre resté « Vieux » continue de vivre indéfiniment.
+const BASE_MATURITY_DAYS: i64 = 30;
 
-/// Bonus de longévité en jours.
+/// Bonus de longévité en jours : allonge le cycle de maturité, donc ralentit
+/// le vieillissement (le monstre reste plus longtemps à son pic de stats).
 const LONGEVITY_BONUS_DAYS: i64 = 15;
 
 /// Nombre d'heures pendant lesquelles le monstre est rassasié après avoir mangé.
 const SATISFIED_HOURS: i64 = 12;
 
-/// Stade de vie d'un monstre, basé sur son âge relatif à sa durée de vie max.
+/// Stade de vie d'un monstre, basé sur son âge relatif à son cycle de maturité.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgeStage {
-    /// 0–15 % de la durée de vie : le monstre vient d'éclore.
+    /// 0–15 % du cycle de maturité : le monstre vient d'éclore.
     Baby,
     /// 15–40 % : il grandit et apprend.
     Young,
     /// 40–75 % : pleine maturité, pic de puissance.
     Adult,
-    /// 75–100 % : le déclin s'installe.
+    /// 75 % et plus : le déclin s'installe (stade final, sans limite de durée).
     Old,
 }
 
@@ -249,7 +254,7 @@ impl Monster {
         }
     }
 
-    /// Retourne `true` si le monstre est mort (combat ou vieillesse).
+    /// Retourne `true` si le monstre est mort (combat ou faim).
     pub fn is_dead(&self) -> bool {
         self.died_at.is_some()
     }
@@ -265,9 +270,13 @@ impl Monster {
         (end - self.born_at).num_days()
     }
 
-    /// Retourne l'âge maximum en jours pour ce monstre.
-    pub fn max_age_days(&self) -> i64 {
-        let base = BASE_MAX_AGE_DAYS;
+    /// Retourne la durée du cycle de maturité en jours pour ce monstre.
+    ///
+    /// Ce n'est **pas** une espérance de vie : les monstres ne meurent plus de
+    /// vieillesse. C'est simplement l'échelle utilisée pour déterminer le stade
+    /// de vie (et donc le multiplicateur de stats et le sprite).
+    pub fn maturity_span_days(&self) -> i64 {
+        let base = BASE_MATURITY_DAYS;
         if self.traits.contains(&Trait::Longevity) {
             base + LONGEVITY_BONUS_DAYS
         } else {
@@ -277,7 +286,7 @@ impl Monster {
 
     /// Retourne le stade de vie actuel du monstre.
     pub fn age_stage(&self) -> AgeStage {
-        let ratio = self.age_days() as f64 / self.max_age_days() as f64;
+        let ratio = self.age_days() as f64 / self.maturity_span_days() as f64;
         if ratio < 0.15 {
             AgeStage::Baby
         } else if ratio < 0.40 {
@@ -289,23 +298,12 @@ impl Monster {
         }
     }
 
-    /// Retourne le pourcentage de vie écoulée (0.0 – 1.0).
+    /// Retourne la progression dans le cycle de maturité (0.0 – 1.0).
+    ///
+    /// Plafonné à 1.0 : un monstre plus vieux que son cycle de maturité reste
+    /// au stade `Old` sans jamais mourir de vieillesse.
     pub fn age_ratio(&self) -> f64 {
-        (self.age_days() as f64 / self.max_age_days() as f64).clamp(0.0, 1.0)
-    }
-
-    /// Vérifie si le monstre devrait mourir de vieillesse et le tue le cas échéant.
-    /// Retourne `true` si le monstre vient de mourir.
-    pub fn check_aging(&mut self) -> bool {
-        if self.is_dead() {
-            return false;
-        }
-        if self.age_days() >= self.max_age_days() {
-            self.died_at = Some(Utc::now());
-            true
-        } else {
-            false
-        }
+        (self.age_days() as f64 / self.maturity_span_days() as f64).clamp(0.0, 1.0)
     }
 
     // ── Système de faim ─────────────────────────────────────────
@@ -904,7 +902,7 @@ impl Monster {
             .map(|t| format!(" «{}»", t))
             .unwrap_or_default();
         format!(
-            "{}{} [{}] — Nv.{} — {} — PV: {}/{} — {} {} ({}j/{}j) — {} {} — {} {} — {} {} — {}",
+            "{}{} [{}] — Nv.{} — {} — PV: {}/{} — {} {} ({}j) — {} {} — {} {} — {} {} — {}",
             self.name,
             bond_title,
             types,
@@ -915,7 +913,6 @@ impl Monster {
             stage.icon(),
             stage,
             self.age_days(),
-            self.max_age_days(),
             hunger.icon(),
             hunger,
             happiness.icon(),
@@ -932,5 +929,63 @@ impl Monster {
                     .join(", ")
             }
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{ElementType, Stats};
+    use chrono::Duration;
+
+    /// Crée un monstre né il y a `days` jours.
+    fn aged_monster(days: i64) -> Monster {
+        let mut m = Monster::new_starter(
+            "Ancien".to_string(),
+            ElementType::Fire,
+            Stats::new(50, 50, 50, 50, 50, 50),
+        );
+        m.born_at = Utc::now() - Duration::days(days);
+        m
+    }
+
+    #[test]
+    fn monstre_centenaire_reste_vivant() {
+        let m = aged_monster(120);
+        assert_eq!(m.age_days(), 120);
+        assert!(m.is_alive(), "un monstre ne doit plus mourir de vieillesse");
+    }
+
+    #[test]
+    fn stade_old_est_terminal_et_borne() {
+        let jeune = aged_monster(1);
+        assert_eq!(jeune.age_stage(), AgeStage::Baby);
+
+        let vieux = aged_monster(29);
+        assert_eq!(vieux.age_stage(), AgeStage::Old);
+
+        // Bien au-delà du cycle de maturité : toujours Old, ratio plafonné.
+        let tres_vieux = aged_monster(365);
+        assert_eq!(tres_vieux.age_stage(), AgeStage::Old);
+        assert_eq!(tres_vieux.age_ratio(), 1.0);
+    }
+
+    #[test]
+    fn longevite_ralentit_la_maturation() {
+        let mut normal = aged_monster(15);
+        let mut lent = aged_monster(15);
+        lent.traits.push(Trait::Longevity);
+
+        assert_eq!(normal.maturity_span_days(), 30);
+        assert_eq!(lent.maturity_span_days(), 45);
+
+        // À 15 jours : 15/30 = 50 % → Adulte, alors que 15/45 = 33 % → Jeune.
+        assert_eq!(normal.age_stage(), AgeStage::Adult);
+        assert_eq!(lent.age_stage(), AgeStage::Young);
+
+        // Aucun des deux n'est mort.
+        normal.decay_happiness();
+        lent.decay_happiness();
+        assert!(normal.is_alive() && lent.is_alive());
     }
 }

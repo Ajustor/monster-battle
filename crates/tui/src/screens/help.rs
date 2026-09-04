@@ -27,7 +27,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         Line::from("  Élevez un monstre unique, nourrissez-le, entraînez-le"),
         Line::from("  et affrontez d'autres joueurs en combat PvP !"),
         Line::from("  Votre monstre est mortel : il vieillit et peut mourir"),
-        Line::from("  de vieillesse, de faim ou au combat."),
+        Line::from("  de faim ou au combat."),
         Line::from("  Reproduisez-le pour créer une lignée plus puissante."),
         Line::from(""),
         Line::from(Span::styled(
@@ -41,7 +41,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         Line::from("  🌱 Jeune (15-40%)   → Stats ×95%"),
         Line::from("  💪 Adulte (40-75%)  → Stats ×110%  ← pic de puissance"),
         Line::from("  🧓 Vieux (75-100%)  → Stats ×85%"),
-        Line::from("  💀 Mort au-delà de la durée de vie max (~30 jours)"),
+        Line::from("  ♾️  Pas de mort de vieillesse : le monstre vit"),
+        Line::from("     tant qu'il est nourri et qu'il survit aux combats"),
         Line::from(""),
         Line::from(Span::styled(
             "  ── Système de faim ─────────────────────",
@@ -120,7 +121,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         Line::from("  💪 Tenacity         → 15% de survie à 1 PV"),
         Line::from("  🩹 Regeneration     → 5% PV max régénérés/tour"),
         Line::from("  📚 FastLearner      → XP ×1.5"),
-        Line::from("  🕰️  Longevity        → +15 jours de vie"),
+        Line::from("  🕰️  Longevity        → vieillit plus lentement (+15j)"),
         Line::from(""),
         Line::from(Span::styled(
             "  ── Commandes ───────────────────────────",

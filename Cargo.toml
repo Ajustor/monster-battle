@@ -15,7 +15,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.9.12"
+version = "1.10.0"
 edition = "2024"
 license = "MIT"
 
@@ -63,6 +63,30 @@ futures-util = "0.3"
 # Error handling
 anyhow = "1"
 thiserror = "2"
+
+# API HTTP (serveur de comptes / synchronisation)
+axum = "0.8"
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["server", "server-auto", "tokio"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors"] }
+sqlx = { version = "0.8", default-features = false, features = [
+  "runtime-tokio",
+  "tls-rustls-ring",
+  "postgres",
+  "uuid",
+  "chrono",
+  "json",
+  "migrate",
+  "macros",
+] }
+jsonwebtoken = "9"
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "rustls-tls",
+] }
+base64 = "0.22"
+urlencoding = "2"
 
 # Internal crates
 monster-battle-core = { path = "crates/core" }
